@@ -1,110 +1,242 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+// app/(tabs)/explore.tsx — Visually Enhanced Explore Screen with Pull-to-Refresh
+import {
+    collection,
+    limit,
+    onSnapshot,
+    orderBy,
+    query,
+} from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    FlatList,
+    SafeAreaView,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import { db } from '../../firebase';
 
-import { Collapsible } from '@/components/Collapsible';
-import { ExternalLink } from '@/components/ExternalLink';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { IconSymbol } from '@/components/ui/IconSymbol';
+interface Wish {
+  id: string;
+  text: string;
+  category: string;
+  likes: number;
+}
 
-export default function TabTwoScreen() {
+const allCategories = ['love', 'health', 'career', 'general', 'money', 'friendship'];
+
+export default function ExploreScreen() {
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const [filteredWishes, setFilteredWishes] = useState<Wish[]>([]);
+  const [topWishes, setTopWishes] = useState<Wish[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [trendingMode, setTrendingMode] = useState(false);
+
+  useEffect(() => {
+    const topQuery = query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(3));
+    const unsubscribe = onSnapshot(topQuery, (snapshot) => {
+      const top = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Wish[];
+      setTopWishes(top);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const fetchWishes = () => {
+    setLoading(true);
+    const baseQuery = query(collection(db, 'wishes'), orderBy(trendingMode ? 'likes' : 'timestamp', 'desc'));
+    const unsubscribe = onSnapshot(baseQuery, (snapshot) => {
+      const all = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Wish[];
+      const filtered = trendingMode
+        ? all
+        : all.filter((wish) => selectedCategories.size === 0 || selectedCategories.has(wish.category));
+      setFilteredWishes(filtered);
+      setLoading(false);
+    });
+    return unsubscribe;
+  };
+
+  useEffect(() => {
+    const unsubscribe = fetchWishes();
+    return () => unsubscribe();
+  }, [selectedCategories, trendingMode]);
+
+  const handleReload = () => {
+    fetchWishes();
+  };
+
+  const toggleCategory = (cat: string) => {
+    if (cat === 'trending') {
+      setTrendingMode(true);
+      setSelectedCategories(new Set());
+    } else {
+      setTrendingMode(false);
+      const newSet = new Set(selectedCategories);
+      newSet.has(cat) ? newSet.delete(cat) : newSet.add(cat);
+      setSelectedCategories(newSet);
+    }
+  };
+
+  const renderWish = ({ item }: { item: Wish }) => (
+    <View style={styles.wishItem}>
+      <Text style={styles.wishCategory}>#{item.category}</Text>
+      <Text style={styles.wishText}>{item.text}</Text>
+      <Text style={styles.likes}>❤️ {item.likes}</Text>
+    </View>
+  );
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Explore</ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image source={require('@/assets/images/react-logo.png')} style={{ alignSelf: 'center' }} />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Custom fonts">
-        <ThemedText>
-          Open <ThemedText type="defaultSemiBold">app/_layout.tsx</ThemedText> to see how to load{' '}
-          <ThemedText style={{ fontFamily: 'SpaceMono' }}>
-            custom fonts such as this one.
-          </ThemedText>
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/versions/latest/sdk/font">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful <ThemedText type="defaultSemiBold">react-native-reanimated</ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="#0e0e0e" />
+      <View style={styles.container}>
+        <Text style={styles.title}>Explore Wishes 🧭</Text>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryBar}>
+          <TouchableOpacity
+            onPress={() => toggleCategory('trending')}
+            style={[styles.categoryButton, trendingMode && styles.activeCategory]}
+          >
+            <Text style={[styles.categoryText, trendingMode && styles.activeCategoryText]}>🔥 Trending</Text>
+          </TouchableOpacity>
+          {allCategories.map((cat) => (
+            <TouchableOpacity
+              key={cat}
+              onPress={() => toggleCategory(cat)}
+              style={[styles.categoryButton, selectedCategories.has(cat) && styles.activeCategory]}
+            >
+              <Text style={[styles.categoryText, selectedCategories.has(cat) && styles.activeCategoryText]}>
+                {cat.charAt(0).toUpperCase() + cat.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {!trendingMode && topWishes.length > 0 && (
+          <View style={styles.topSection}>
+            <Text style={styles.sectionTitle}>🔥 <Text style={{ color: '#a78bfa' }}>Top Wishes</Text></Text>
+            {topWishes.map((wish) => (
+              <View key={wish.id} style={styles.topWish}>
+                <Text style={styles.topWishText}>{wish.text}</Text>
+                <Text style={styles.likes}>❤️ {wish.likes}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {loading ? (
+          <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
+        ) : filteredWishes.length === 0 ? (
+          <Text style={styles.noResults}>No matching wishes 💭</Text>
+        ) : (
+          <FlatList
+            data={filteredWishes}
+            keyExtractor={(item) => item.id}
+            renderItem={renderWish}
+            refreshing={loading}
+            onRefresh={handleReload}
+            contentContainerStyle={{ paddingBottom: 80 }}
+          />
+        )}
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#0e0e0e',
   },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
+  container: {
+    flex: 1,
+    padding: 20,
+  },
+  title: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  categoryBar: {
+    flexGrow: 0,
+    marginBottom: 16,
+  },
+  categoryButton: {
+    backgroundColor: '#1e1e1e',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  activeCategory: {
+    backgroundColor: '#8b5cf6',
+  },
+  categoryText: {
+    color: '#aaa',
+    fontSize: 14,
+  },
+  activeCategoryText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  sectionTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  topSection: {
+    marginBottom: 24,
+  },
+  topWish: {
+    backgroundColor: '#1e1e1e',
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+  },
+  topWishText: {
+    color: '#fff',
+    fontSize: 15,
+  },
+  wishItem: {
+    backgroundColor: '#1a1a1a',
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 12,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 4,
+  },
+  wishCategory: {
+    color: '#a78bfa',
+    fontSize: 13,
+    marginBottom: 6,
+    fontWeight: '600',
+  },
+  wishText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+  likes: {
+    marginTop: 8,
+    color: '#f472b6',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  noResults: {
+    color: '#ccc',
+    textAlign: 'center',
+    marginTop: 20,
   },
 });
