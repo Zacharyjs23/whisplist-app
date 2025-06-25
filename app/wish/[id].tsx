@@ -40,6 +40,7 @@ interface Comment {
   text: string;
   nickname?: string;
   timestamp?: any;
+  parentId?: string;
   reactions?: Record<string, number>;
   userReactions?: Record<string, string>;
 }
@@ -53,6 +54,7 @@ export default function WishDetailScreen() {
   const [comment, setComment] = useState('');
   const [nickname, setNickname] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
+  const [replyTo, setReplyTo] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const animationRefs = useRef<{ [key: string]: Animated.Value }>({});
 
@@ -78,7 +80,8 @@ export default function WishDetailScreen() {
         if (!animationRefs.current[commentId]) {
           animationRefs.current[commentId] = new Animated.Value(0);
         }
-        return { id: d.id, ...(d.data() as Omit<Comment, 'id'>) };
+        const data = d.data() as Omit<Comment, 'id'> & { parentId?: string };
+        return { id: d.id, ...data };
       }) as Comment[];
 
       const sorted = [...list].sort((a, b) => {
@@ -106,14 +109,16 @@ export default function WishDetailScreen() {
         text: comment.trim(),
         nickname: nickname.trim() || 'Anonymous',
         timestamp: serverTimestamp(),
+        parentId: replyTo,
         reactions: {},
         userReactions: {},
       });
       setComment('');
+      setReplyTo(null);
     } catch (err) {
       console.error('❌ Failed to post comment:', err);
     }
-  }, [comment, id, nickname]);
+  }, [comment, id, nickname, replyTo]);
 
   const handleReact = useCallback(async (commentId: string, emoji: string) => {
     const comment = comments.find((c) => c.id === commentId);
@@ -147,56 +152,69 @@ export default function WishDetailScreen() {
   }, [comments, id, nickname]);
 
 
-  const renderComment = useCallback(({ item }: { item: Comment }) => {
-    const animValue = animationRefs.current[item.id] || new Animated.Value(0);
-    Animated.timing(animValue, {
-      toValue: 1,
-      duration: 400,
-      useNativeDriver: true,
-    }).start();
+  const renderCommentItem = useCallback(
+    (item: Comment, level = 0) => {
+      const animValue = animationRefs.current[item.id] || new Animated.Value(0);
+      Animated.timing(animValue, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
 
-    const currentUser = nickname.trim() || 'Anonymous';
-    const userReaction = item.userReactions?.[currentUser];
+      const currentUser = nickname.trim() || 'Anonymous';
+      const userReaction = item.userReactions?.[currentUser];
+      const replies = comments.filter((c) => c.parentId === item.id);
 
-    return (
-      <Animated.View
-        style={{
-          ...styles.commentBox,
-          opacity: animValue,
-          transform: [
-            {
-              translateY: animValue.interpolate({
-                inputRange: [0, 1],
-                outputRange: [10, 0],
-              }),
-            },
-          ],
-        }}
-      >
-        <Text style={styles.nickname}>{item.nickname}</Text>
-        <Text style={styles.comment}>{item.text}</Text>
-        <Text style={styles.timestamp}>
-          {item.timestamp?.seconds
-            ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), { addSuffix: true })
-            : 'Just now'}
-        </Text>
+      return (
+        <View key={item.id}>
+          <Animated.View
+            style={{
+              ...styles.commentBox,
+              marginLeft: level * 16,
+              opacity: animValue,
+              transform: [
+                {
+                  translateY: animValue.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [10, 0],
+                  }),
+                },
+              ],
+            }}
+          >
+            <Text style={styles.nickname}>{item.nickname}</Text>
+            <Text style={styles.comment}>{item.text}</Text>
+            <Text style={styles.timestamp}>
+              {item.timestamp?.seconds
+                ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), { addSuffix: true })
+                : 'Just now'}
+            </Text>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-          {emojiOptions.map((emoji) => (
-            <TouchableOpacity
-              key={emoji}
-              onPress={() => handleReact(item.id, emoji)}
-              style={{ marginRight: 8, opacity: userReaction === emoji ? 1 : 0.4 }}
-            >
-              <Text style={{ fontSize: 20 }}>
-                {emoji} {item.reactions?.[emoji] || 0}
-              </Text>
-            </TouchableOpacity>
-          ))}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+              {emojiOptions.map((emoji) => (
+                <TouchableOpacity
+                  key={emoji}
+                  onPress={() => handleReact(item.id, emoji)}
+                  style={{ marginRight: 8, opacity: userReaction === emoji ? 1 : 0.4 }}
+                >
+                  <Text style={{ fontSize: 20 }}>
+                    {emoji} {item.reactions?.[emoji] || 0}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity onPress={() => setReplyTo(item.id)} style={{ marginLeft: 8 }}>
+                <Text style={{ color: '#a78bfa' }}>Reply</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+          {replies.map((r) => renderCommentItem(r, level + 1))}
         </View>
-      </Animated.View>
-    );
-  }, [handleReact, nickname]);
+      );
+    },
+    [comments, handleReact, nickname]
+  );
+
+  const renderComment = useCallback(({ item }: { item: Comment }) => renderCommentItem(item), [renderCommentItem]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -220,11 +238,22 @@ export default function WishDetailScreen() {
 
         <FlatList
           ref={flatListRef}
-          data={comments}
+          data={comments.filter((c) => !c.parentId)}
           keyExtractor={(item) => item.id}
           renderItem={renderComment}
           contentContainerStyle={{ paddingBottom: 80 }}
         />
+
+        {replyTo && (
+          <View style={styles.replyInfo}>
+            <Text style={{ color: '#a78bfa' }}>
+              Replying to {comments.find((c) => c.id === replyTo)?.nickname}
+            </Text>
+            <TouchableOpacity onPress={() => setReplyTo(null)} style={{ marginLeft: 8 }}>
+              <Text style={{ color: '#fff' }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         <TextInput
           style={styles.input}
@@ -290,6 +319,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a1a',
     padding: 10,
     borderRadius: 8,
+    marginBottom: 10,
+  },
+  replyInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 10,
   },
   nickname: {
