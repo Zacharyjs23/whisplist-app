@@ -31,7 +31,7 @@ import {
 } from 'react-native';
 import ReportDialog from '../components/ReportDialog';
 import { db, storage } from '../../firebase';
-import { Wish } from '../../helpers/firestore'; // if you're now sharing the interface
+import type { Wish } from '../../types/Wish';
 
 
 export default function IndexScreen() {

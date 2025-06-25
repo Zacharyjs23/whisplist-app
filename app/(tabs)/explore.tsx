@@ -31,7 +31,7 @@ import {
 import ReportDialog from '../components/ReportDialog';
 import { Picker } from '@react-native-picker/picker';
 import { db } from '../../firebase';
-import { Wish } from '../../helpers/firestore';
+import type { Wish } from '../../types/Wish';
 
 
 const allCategories = ['love', 'health', 'career', 'general', 'money', 'friendship', 'fitness'];

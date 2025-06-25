@@ -37,7 +37,17 @@ import {
 } from 'react-native';
 import ReportDialog from '../../components/ReportDialog';
 import { db } from '../../firebase';
-import { Wish, Comment } from '../../helpers/firestore'; // only if centralized
+import type { Wish } from '../../types/Wish';
+
+interface Comment {
+  id: string;
+  text: string;
+  nickname?: string;
+  timestamp?: any;
+  parentId?: string;
+  reactions?: Record<string, number>;
+  userReactions?: Record<string, string>;
+}
 
 
 const emojiOptions = ['❤️', '😂', '😢', '👍'];

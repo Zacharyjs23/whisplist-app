@@ -14,6 +14,7 @@ import { listenTrendingWishes, Wish } from '../helpers/firestore';
 import ReportDialog from '../components/ReportDialog';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'; // Only include if still used
 import { db } from '../firebase';
+import type { Wish } from '../types/Wish';
 
 
 export default function TrendingScreen() {
