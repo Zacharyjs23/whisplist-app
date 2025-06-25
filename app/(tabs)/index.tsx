@@ -54,6 +54,7 @@ export default function IndexScreen() {
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [includeAudio, setIncludeAudio] = useState(false);
 
 
 useEffect(() => {
@@ -113,7 +114,7 @@ useEffect(() => {
 
     try {
       let audioUrl = '';
-      if (recordedUri) {
+      if (includeAudio && recordedUri) {
         const resp = await fetch(recordedUri);
         const blob = await resp.blob();
         const storageRef = ref(storage, `audio/${Date.now()}.m4a`);
@@ -140,6 +141,7 @@ useEffect(() => {
       setOptionB('');
       setIsPoll(false);
       setRecordedUri(null);
+      setIncludeAudio(false);
 
     } catch (error) {
       console.error('❌ Failed to post wish:', error);
@@ -244,6 +246,21 @@ useEffect(() => {
           <Switch value={isPoll} onValueChange={setIsPoll} />
         </View>
 
+        {/* Audio toggle */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+          <Text style={{ color: '#fff', marginRight: 8 }}>Add Audio</Text>
+          <Switch
+            value={includeAudio}
+            onValueChange={(v) => {
+              setIncludeAudio(v);
+              if (!v) {
+                if (isRecording) stopRecording();
+                setRecordedUri(null);
+              }
+            }}
+          />
+        </View>
+
         {isPoll && (
           <>
             <TextInput
@@ -264,17 +281,19 @@ useEffect(() => {
         )}
 
         {/* Audio Recording Button */}
-        <TouchableOpacity
-          style={[
-            styles.recButton,
-            { backgroundColor: isRecording ? '#ef4444' : '#22c55e' },
-          ]}
-          onPress={isRecording ? stopRecording : startRecording}
-        >
-          <Text style={styles.buttonText}>
-            {isRecording ? 'Stop Recording' : 'Record Audio'}
-          </Text>
-        </TouchableOpacity>
+        {includeAudio && (
+          <TouchableOpacity
+            style={[
+              styles.recButton,
+              { backgroundColor: isRecording ? '#ef4444' : '#22c55e' },
+            ]}
+            onPress={isRecording ? stopRecording : startRecording}
+          >
+            <Text style={styles.buttonText}>
+              {isRecording ? 'Stop Recording' : 'Record Audio'}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         <Pressable
           style={[styles.button, { opacity: wish.trim() === '' ? 0.5 : 1 }]}
