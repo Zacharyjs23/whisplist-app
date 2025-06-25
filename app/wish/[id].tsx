@@ -385,6 +385,8 @@ try {
               }}
               width={Dimensions.get('window').width - 80}
               height={220}
+              yAxisLabel=""
+              yAxisSuffix=""
               fromZero
               chartConfig={{
                 backgroundColor: '#1e1e1e',

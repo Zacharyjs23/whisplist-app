@@ -91,17 +91,63 @@ export async function updateCommentReaction(
   return updateDoc(ref, { reactions, userReactions });
 }
 
-export async function getWishesByNickname(nickname: string) {
+export async function getWishesByNickname(nickname: string): Promise<Wish[]> {
   const snap = await getDocs(query(collection(db, 'wishes'), where('nickname', '==', nickname)));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => {
+    const data = d.data();
+    const wish: Wish = {
+      id: d.id,
+      text: data.text,
+      category: data.category,
+      likes: data.likes,
+      pushToken: data.pushToken,
+      audioUrl: data.audioUrl,
+      imageUrl: data.imageUrl,
+      isPoll: data.isPoll,
+      optionA: data.optionA,
+      optionB: data.optionB,
+      votesA: data.votesA,
+      votesB: data.votesB,
+    };
+    return wish;
+  });
 }
 
-export async function getAllWishes() {
+export async function getAllWishes(): Promise<Wish[]> {
   const snap = await getDocs(collection(db, 'wishes'));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => {
+    const data = d.data();
+    const wish: Wish = {
+      id: d.id,
+      text: data.text,
+      category: data.category,
+      likes: data.likes,
+      pushToken: data.pushToken,
+      audioUrl: data.audioUrl,
+      imageUrl: data.imageUrl,
+      isPoll: data.isPoll,
+      optionA: data.optionA,
+      optionB: data.optionB,
+      votesA: data.votesA,
+      votesB: data.votesB,
+    };
+    return wish;
+  });
 }
 
-export async function getWishComments(wishId: string) {
+export async function getWishComments(wishId: string): Promise<Comment[]> {
   const snap = await getDocs(collection(db, 'wishes', wishId, 'comments'));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => {
+    const data = d.data();
+    const comment: Comment = {
+      id: d.id,
+      text: data.text,
+      nickname: data.nickname,
+      timestamp: data.timestamp,
+      parentId: data.parentId,
+      reactions: data.reactions,
+      userReactions: data.userReactions,
+    };
+    return comment;
+  });
 }
