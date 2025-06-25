@@ -1,30 +1,90 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { listenTrendingWishes, Wish } from '../helpers/firestore';
+import ReportDialog from '../components/ReportDialog';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore'; // Only include if still used
+import { db } from '../firebase';
 
 
 export default function TrendingScreen() {
   const router = useRouter();
   const [wishes, setWishes] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reportVisible, setReportVisible] = useState(false);
+  const [reportTarget, setReportTarget] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
 
   useEffect(() => {
-    const unsubscribe = listenTrendingWishes((data) => {
-      setWishes(data);
-      setLoading(false);
-    });
+try {
+  const unsubscribe = listenTrendingWishes((data) => {
+    setWishes(data);
+    setLoading(false);
+  });
+  return unsubscribe;
+} catch (err) {
+  console.error('❌ Failed to load wishes:', err);
+  setError('Failed to load wishes');
+  setLoading(false);
+  return () => {};
+}
+
     return () => unsubscribe();
   }, []);
 
+  const handleReport = async (reason: string) => {
+    if (!reportTarget) return;
+    try {
+      await addDoc(collection(db, 'reports'), {
+        itemId: reportTarget,
+        type: 'wish',
+        reason,
+        timestamp: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('❌ Failed to submit report:', err);
+    } finally {
+      setReportVisible(false);
+      setReportTarget(null);
+    }
+  };
+
   const renderWish = ({ item }: { item: Wish }) => (
-    <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)}>
-      <View style={styles.wishItem}>
+    <View style={styles.wishItem}>
+      <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)}>
         <Text style={styles.wishCategory}>#{item.category}</Text>
         <Text style={styles.wishText}>{item.text}</Text>
-        <Text style={styles.likes}>❤️ {item.likes}</Text>
+        {item.isPoll ? (
+          <View style={{ marginTop: 6 }}>
+            <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
+            <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
+          </View>
+        ) : (
+          <Text style={styles.likes}>❤️ {item.likes}</Text>
+        )}
       </View>
+
+      <TouchableOpacity
+        onPress={() => {
+          setReportTarget(item.id);
+          setReportVisible(true);
+        }}
+        style={{ marginTop: 4 }}
+      >
+        <Text style={{ color: '#f87171' }}>Report</Text>
+      </TouchableOpacity>
     </TouchableOpacity>
+
   );
 
   return (
@@ -34,6 +94,8 @@ export default function TrendingScreen() {
         <Text style={styles.title}>Trending Wishes 🔥</Text>
         {loading ? (
           <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
+        ) : error ? (
+          <Text style={styles.errorText}>{error}</Text>
         ) : (
           <FlatList
             data={wishes}
@@ -42,6 +104,14 @@ export default function TrendingScreen() {
             contentContainerStyle={{ paddingBottom: 80 }}
           />
         )}
+        <ReportDialog
+          visible={reportVisible}
+          onClose={() => {
+            setReportVisible(false);
+            setReportTarget(null);
+          }}
+          onSubmit={handleReport}
+        />
       </View>
     </SafeAreaView>
   );
@@ -84,5 +154,16 @@ const styles = StyleSheet.create({
     color: '#f472b6',
     fontSize: 14,
     fontWeight: '500',
+  },
+  pollText: {
+    color: '#fff',
+    fontSize: 14,
+  },
+  errorText: {
+    color: '#f87171',
+    textAlign: 'center',
+    marginTop: 20,
+  },
+
   },
 });
