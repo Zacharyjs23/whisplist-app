@@ -5,16 +5,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { Audio } from 'expo-av';
 import {
+import {
+  getWish,
+  listenWishComments,
+  addComment,
+  updateCommentReaction,
+  Wish,
+  Comment,
+} from '../../helpers/firestore';
+
+import {
   addDoc,
   collection,
-  doc,
-  onSnapshot,
-  orderBy,
-  query,
   serverTimestamp,
   increment,
-  updateDoc,
-} from 'firebase/firestore';
+} from 'firebase/firestore'; // ✅ Keep only if used directly in this file
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -31,32 +37,8 @@ import {
 } from 'react-native';
 import ReportDialog from '../../components/ReportDialog';
 import { db } from '../../firebase';
+import { Wish, Comment } from '../../helpers/firestore'; // only if centralized
 
-interface Wish {
-  id: string;
-  text: string;
-  category: string;
-  likes: number;
-  isPoll?: boolean;
-  optionA?: string;
-  optionB?: string;
-  votesA?: number;
-  votesB?: number;
-  pushToken?: string;
-  audioUrl?: string;
-
-}
-
-
-interface Comment {
-  id: string;
-  text: string;
-  nickname?: string;
-  timestamp?: any;
-  parentId?: string;
-  reactions?: Record<string, number>;
-  userReactions?: Record<string, string>;
-}
 
 const emojiOptions = ['❤️', '😂', '😢', '👍'];
 // Approximate height of a single comment item including margins
@@ -83,19 +65,20 @@ export default function WishDetailScreen() {
   const animationRefs = useRef<{ [key: string]: Animated.Value }>({});
 
   const fetchWish = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const ref = doc(db, 'wishes', id as string);
-      const snap = await getDoc(ref);
-      if (snap.exists()) {
-        setWish({ id: snap.id, ...(snap.data() as Omit<Wish, 'id'>) });
-      }
-    } catch (err) {
-      console.error('❌ Failed to load wish:', err);
-      setError('Failed to load wish');
-    } finally {
-      setLoading(false);
+setLoading(true);
+setError(null);
+try {
+  const data = await getWish(id as string);
+  if (data) {
+    setWish(data);
+  }
+} catch (err) {
+  console.error('❌ Failed to load wish:', err);
+  setError('Failed to load wish');
+} finally {
+  setLoading(false);
+}
+
     }
   }, [id]);
 
@@ -111,39 +94,37 @@ export default function WishDetailScreen() {
   }, [id]);
 
   const subscribeToComments = useCallback(() => {
-    const commentsRef = collection(db, 'wishes', id as string, 'comments');
-    const q = query(commentsRef, orderBy('timestamp', 'asc'));
-
-    setLoading(true);
-    return onSnapshot(
-      q,
-      (snapshot) => {
-        const list = snapshot.docs.map((d) => {
-          const commentId = d.id;
-          if (!animationRefs.current[commentId]) {
-            animationRefs.current[commentId] = new Animated.Value(0);
-          }
-          const data = d.data() as Omit<Comment, 'id'> & { parentId?: string };
-          return { id: d.id, ...data };
-        }) as Comment[];
-
-        const sorted = [...list].sort((a, b) => {
-          const aCount = Object.values(a.reactions || {}).reduce((s, v) => s + v, 0);
-          const bCount = Object.values(b.reactions || {}).reduce((s, v) => s + v, 0);
-          return bCount - aCount;
-        });
-        setComments(sorted);
-        setLoading(false);
-        setTimeout(() => {
-          flatListRef.current?.scrollToEnd({ animated: true });
-        }, 300);
-      },
-      (err) => {
-        console.error('❌ Failed to load comments:', err);
-        setError('Failed to load comments');
-        setLoading(false);
+setLoading(true);
+try {
+  const unsubscribe = listenWishComments(id as string, (list) => {
+    list.forEach((d) => {
+      const commentId = d.id;
+      if (!animationRefs.current[commentId]) {
+        animationRefs.current[commentId] = new Animated.Value(0);
       }
-    );
+    });
+
+    const sorted = [...list].sort((a, b) => {
+      const aCount = Object.values(a.reactions || {}).reduce((s, v) => s + v, 0);
+      const bCount = Object.values(b.reactions || {}).reduce((s, v) => s + v, 0);
+      return bCount - aCount;
+    });
+
+    setComments(sorted);
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 300);
+    setLoading(false);
+  });
+
+  return unsubscribe;
+} catch (err) {
+  console.error('❌ Failed to load comments:', err);
+  setError('Failed to load comments');
+  setLoading(false);
+  return () => {};
+}
+
   }, [id]);
 
   useEffect(() => {
@@ -171,11 +152,9 @@ export default function WishDetailScreen() {
   const handlePostComment = useCallback(async () => {
     if (!comment.trim()) return;
     try {
-      const commentsRef = collection(db, 'wishes', id as string, 'comments');
-      await addDoc(commentsRef, {
+      await addComment(id as string, {
         text: comment.trim(),
         nickname: nickname.trim() || 'Anonymous',
-        timestamp: serverTimestamp(),
         parentId: replyTo,
         reactions: {},
         userReactions: {},
@@ -208,27 +187,9 @@ export default function WishDetailScreen() {
     if (!comment) return;
     const currentUser = nickname.trim() || 'Anonymous';
     const prevEmoji = comment.userReactions?.[currentUser];
-    const newReactions = { ...(comment.reactions || {}) };
-    const newUserReactions = { ...(comment.userReactions || {}) };
-
-    if (prevEmoji && newReactions[prevEmoji]) {
-      newReactions[prevEmoji] -= 1;
-      if (newReactions[prevEmoji] === 0) delete newReactions[prevEmoji];
-    }
-
-    if (prevEmoji === emoji) {
-      delete newUserReactions[currentUser];
-    } else {
-      newUserReactions[currentUser] = emoji;
-      newReactions[emoji] = (newReactions[emoji] || 0) + 1;
-    }
 
     try {
-      const commentRef = doc(db, 'wishes', id as string, 'comments', commentId);
-      await updateDoc(commentRef, {
-        reactions: newReactions,
-        userReactions: newUserReactions,
-      });
+      await updateCommentReaction(id as string, commentId, emoji, prevEmoji, currentUser);
     } catch (err) {
       console.error('❌ Failed to update reaction:', err);
     }

@@ -5,17 +5,12 @@ import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { Audio } from 'expo-av';
 import {
-  addDoc,
-  collection,
-  doc,
-  getDoc,
-  increment,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  updateDoc,
-} from 'firebase/firestore';
+  listenWishes,
+  addWish,
+  likeWish,
+  getWish,
+  Wish,
+} from '../../helpers/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import React, { useEffect, useState } from 'react';
 import {
@@ -36,22 +31,8 @@ import {
 } from 'react-native';
 import ReportDialog from '../components/ReportDialog';
 import { db, storage } from '../../firebase';
+import { Wish } from '../../helpers/firestore'; // if you're now sharing the interface
 
-
-interface Wish {
-  id: string;
-  text: string;
-  category: string;
-  likes: number;
-  pushToken?: string;
-  isPoll?: boolean;
-  optionA?: string;
-  optionB?: string;
-  votesA?: number;
-  votesB?: number;
-  audioUrl?: string;
-
-}
 
 export default function IndexScreen() {
   const [wish, setWish] = useState('');
@@ -74,23 +55,18 @@ export default function IndexScreen() {
   useEffect(() => {
     registerForPushNotificationsAsync().then(setPushToken);
 
-    const q = query(collection(db, 'wishes'), orderBy('timestamp', 'desc'));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const wishes = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Wish[];
-        setWishList(wishes);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('❌ Failed to load wishes:', err);
-        setError('Failed to load wishes');
-        setLoading(false);
-      }
-    );
+try {
+  const unsubscribe = listenWishes((w) => {
+    setWishList(w);
+    setLoading(false);
+  });
+  return unsubscribe;
+} catch (err) {
+  console.error('❌ Failed to load wishes:', err);
+  setError('Failed to load wishes');
+  setLoading(false);
+  return () => {};
+}
 
     return () => unsubscribe();
   }, []);
@@ -144,11 +120,9 @@ export default function IndexScreen() {
         await uploadBytes(storageRef, blob);
         audioUrl = await getDownloadURL(storageRef);
       }
-      await addDoc(collection(db, 'wishes'), {
+      await addWish({
         text: wish,
         category: category.trim().toLowerCase(),
-        likes: 0,
-        timestamp: serverTimestamp(),
         pushToken: pushToken || '',
         ...(isPoll && {
           isPoll: true,
@@ -182,16 +156,13 @@ export default function IndexScreen() {
         return;
       }
 
-      const ref = doc(db, 'wishes', id);
-      await updateDoc(ref, {
-        likes: increment(1),
-      });
+      await likeWish(id);
 
       const updatedLikes = [...likedWishes, id];
       await AsyncStorage.setItem('likedWishes', JSON.stringify(updatedLikes));
 
-      const snap = await getDoc(ref);
-      const token = snap.data()?.pushToken;
+      const snap = await getWish(id);
+      const token = snap?.pushToken;
 
       if (token) {
         await fetch('https://exp.host/--/api/v2/push/send', {

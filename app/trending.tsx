@@ -1,21 +1,20 @@
 import { useRouter } from 'expo-router';
-import { addDoc, collection, limit, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { listenTrendingWishes, Wish } from '../helpers/firestore';
 import ReportDialog from '../components/ReportDialog';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore'; // Only include if still used
 import { db } from '../firebase';
 
-interface Wish {
-  id: string;
-  text: string;
-  category: string;
-  likes: number;
-  isPoll?: boolean;
-  optionA?: string;
-  optionB?: string;
-  votesA?: number;
-  votesB?: number;
-}
 
 export default function TrendingScreen() {
   const router = useRouter();
@@ -27,23 +26,19 @@ export default function TrendingScreen() {
 
 
   useEffect(() => {
-    const q = query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(20));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const data = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...(doc.data() as Omit<Wish, 'id'>),
-        }));
-        setWishes(data as Wish[]);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('❌ Failed to load wishes:', err);
-        setError('Failed to load wishes');
-        setLoading(false);
-      }
-    );
+try {
+  const unsubscribe = listenTrendingWishes((data) => {
+    setWishes(data);
+    setLoading(false);
+  });
+  return unsubscribe;
+} catch (err) {
+  console.error('❌ Failed to load wishes:', err);
+  setError('Failed to load wishes');
+  setLoading(false);
+  return () => {};
+}
+
     return () => unsubscribe();
   }, []);
 

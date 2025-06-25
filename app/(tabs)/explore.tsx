@@ -1,13 +1,21 @@
 // app/(tabs)/explore.tsx — Visually Enhanced Explore Screen with Pull-to-Refresh
 import {
-    addDoc,
-    collection,
-    limit,
-    onSnapshot,
-    orderBy,
-    query,
-    serverTimestamp,
+import {
+  listenTrendingWishes,
+  listenWishes,
+  Wish,
+} from '../../helpers/firestore';
+
+import {
+  addDoc,
+  collection,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
 } from 'firebase/firestore';
+
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -22,22 +30,9 @@ import {
 } from 'react-native';
 import ReportDialog from '../components/ReportDialog';
 import { Picker } from '@react-native-picker/picker';
-
 import { db } from '../../firebase';
+import { Wish } from '../../helpers/firestore';
 
-interface Wish {
-  id: string;
-  text: string;
-  category: string;
-  likes: number;
-  isPoll?: boolean;
-  optionA?: string;
-  optionB?: string;
-  votesA?: number;
-  votesB?: number;
-  audioUrl?: string;
-
-}
 
 const allCategories = ['love', 'health', 'career', 'general', 'money', 'friendship', 'fitness'];
 
@@ -53,34 +48,36 @@ export default function ExploreScreen() {
   const [reportTarget, setReportTarget] = useState<string | null>(null);
 
   useEffect(() => {
-    const topQuery = query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(3));
-    const unsubscribe = onSnapshot(
-      topQuery,
-      (snapshot) => {
-        const top = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Wish[];
-        setTopWishes(top);
-      },
-      (err) => {
-        console.error('❌ Failed to load top wishes:', err);
-        setError('Failed to load wishes');
-      }
-    );
+try {
+  const unsubscribe = listenTrendingWishes((data) => {
+    setTopWishes(data.slice(0, 3));
+  });
+  return unsubscribe;
+} catch (err) {
+  console.error('❌ Failed to load top wishes:', err);
+  setError('Failed to load wishes');
+  return () => {};
+}
+
     return () => unsubscribe();
   }, []);
 
   const fetchWishes = () => {
     setLoading(true);
-const fetchWishes = () => {
-  setLoading(true);
-  const baseQuery = query(
-    collection(db, 'wishes'),
-    orderBy(trendingMode ? 'likes' : 'timestamp', 'desc')
-  );
-  const unsubscribe = onSnapshot(
-    baseQuery,
-    (snapshot) => {
-      const all = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Wish[];
-      const filtered = all.filter((wish) => {
+setLoading(true);
+const unsubscribe = (trendingMode ? listenTrendingWishes : listenWishes)((all: Wish[]) => {
+  const filtered = all.filter((wish) => {
+    const inCategory =
+      trendingMode || !selectedCategory || wish.category === selectedCategory;
+    const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+    return inCategory && inSearch;
+  });
+  setFilteredWishes(filtered);
+  setLoading(false);
+});
+
+return unsubscribe;
+
         const inCategory =
           trendingMode || !selectedCategory || wish.category === selectedCategory;
         const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
