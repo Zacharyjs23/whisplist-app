@@ -35,8 +35,10 @@ interface Wish {
   text: string;
   category: string;
   likes: number;
+  pushToken?: string;
   audioUrl?: string;
 }
+
 
 interface Comment {
   id: string;
@@ -159,10 +161,26 @@ export default function WishDetailScreen() {
       });
       setComment('');
       setReplyTo(null);
+
+      if (wish?.pushToken) {
+        await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: wish.pushToken,
+            title: 'New comment on your wish 💬',
+            body: 'Someone left a comment on your wish.',
+          }),
+        });
+      }
     } catch (err) {
       console.error('❌ Failed to post comment:', err);
     }
-  }, [comment, id, nickname, replyTo]);
+  }, [comment, id, nickname, replyTo, wish]);
+
 
   const handleReact = useCallback(async (commentId: string, emoji: string) => {
     const comment = comments.find((c) => c.id === commentId);
