@@ -49,6 +49,7 @@ export default function IndexScreen() {
   const [category, setCategory] = useState('general');
   const [wishList, setWishList] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [pushToken, setPushToken] = useState<string | null>(null);
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
@@ -59,14 +60,22 @@ export default function IndexScreen() {
     registerForPushNotificationsAsync().then(setPushToken);
 
     const q = query(collection(db, 'wishes'), orderBy('timestamp', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const wishes = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Wish[];
-      setWishList(wishes);
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const wishes = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Wish[];
+        setWishList(wishes);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('❌ Failed to load wishes:', err);
+        setError('Failed to load wishes');
+        setLoading(false);
+      }
+    );
 
     return () => unsubscribe();
   }, []);
@@ -243,6 +252,8 @@ export default function IndexScreen() {
 
         {loading ? (
           <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
+        ) : error ? (
+          <Text style={styles.errorText}>{error}</Text>
         ) : filteredWishes.length === 0 ? (
           <Text style={styles.noResults}>No matching wishes 💭</Text>
         ) : (
@@ -339,6 +350,11 @@ const styles = StyleSheet.create({
     color: '#a78bfa',
     marginTop: 6,
     fontSize: 14,
+  },
+  errorText: {
+    color: '#f87171',
+    textAlign: 'center',
+    marginTop: 20,
   },
   noResults: {
     color: '#ccc',

@@ -17,6 +17,7 @@ import {
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -57,15 +58,27 @@ export default function WishDetailScreen() {
   const [nickname, setNickname] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
   const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
+
   const flatListRef = useRef<FlatList>(null);
   const animationRefs = useRef<{ [key: string]: Animated.Value }>({});
 
   const fetchWish = useCallback(async () => {
-    const ref = doc(db, 'wishes', id as string);
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      setWish({ id: snap.id, ...(snap.data() as Omit<Wish, 'id'>) });
+    setLoading(true);
+    setError(null);
+    try {
+      const ref = doc(db, 'wishes', id as string);
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        setWish({ id: snap.id, ...(snap.data() as Omit<Wish, 'id'>) });
+      }
+    } catch (err) {
+      console.error('❌ Failed to load wish:', err);
+      setError('Failed to load wish');
+    } finally {
+      setLoading(false);
     }
   }, [id]);
 
@@ -77,26 +90,36 @@ export default function WishDetailScreen() {
     const commentsRef = collection(db, 'wishes', id as string, 'comments');
     const q = query(commentsRef, orderBy('timestamp', 'asc'));
 
-    return onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((d) => {
-        const commentId = d.id;
-        if (!animationRefs.current[commentId]) {
-          animationRefs.current[commentId] = new Animated.Value(0);
-        }
-        const data = d.data() as Omit<Comment, 'id'> & { parentId?: string };
-        return { id: d.id, ...data };
-      }) as Comment[];
+    setLoading(true);
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const list = snapshot.docs.map((d) => {
+          const commentId = d.id;
+          if (!animationRefs.current[commentId]) {
+            animationRefs.current[commentId] = new Animated.Value(0);
+          }
+          const data = d.data() as Omit<Comment, 'id'> & { parentId?: string };
+          return { id: d.id, ...data };
+        }) as Comment[];
 
-      const sorted = [...list].sort((a, b) => {
-        const aCount = Object.values(a.reactions || {}).reduce((s, v) => s + v, 0);
-        const bCount = Object.values(b.reactions || {}).reduce((s, v) => s + v, 0);
-        return bCount - aCount;
-      });
-      setComments(sorted);
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 300);
-    });
+        const sorted = [...list].sort((a, b) => {
+          const aCount = Object.values(a.reactions || {}).reduce((s, v) => s + v, 0);
+          const bCount = Object.values(b.reactions || {}).reduce((s, v) => s + v, 0);
+          return bCount - aCount;
+        });
+        setComments(sorted);
+        setLoading(false);
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 300);
+      },
+      (err) => {
+        console.error('❌ Failed to load comments:', err);
+        setError('Failed to load comments');
+        setLoading(false);
+      }
+    );
   }, [id]);
 
   useEffect(() => {
@@ -248,26 +271,34 @@ export default function WishDetailScreen() {
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
 
-        {wish && (
-          <View style={styles.wishBox}>
-            <Text style={styles.wishCategory}>#{wish.category}</Text>
-            <Text style={styles.wishText}>{wish.text}</Text>
-            <Text style={styles.likes}>❤️ {wish.likes}</Text>
-            {wish.audioUrl && (
-              <TouchableOpacity onPress={playAudio} style={{ marginTop: 10 }}>
-                <Text style={{ color: '#a78bfa' }}>▶ Play Audio</Text>
-              </TouchableOpacity>
+        {loading ? (
+          <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
+        ) : error ? (
+          <Text style={styles.errorText}>{error}</Text>
+        ) : (
+          <>
+            {wish && (
+              <View style={styles.wishBox}>
+                <Text style={styles.wishCategory}>#{wish.category}</Text>
+                <Text style={styles.wishText}>{wish.text}</Text>
+                <Text style={styles.likes}>❤️ {wish.likes}</Text>
+                {wish.audioUrl && (
+                  <TouchableOpacity onPress={playAudio} style={{ marginTop: 10 }}>
+                    <Text style={{ color: '#a78bfa' }}>▶ Play Audio</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             )}
-          </View>
-        )}
 
-        <FlatList
-          ref={flatListRef}
-          data={comments.filter((c) => !c.parentId)}
-          keyExtractor={(item) => item.id}
-          renderItem={renderComment}
-          contentContainerStyle={{ paddingBottom: 80 }}
-        />
+            <FlatList
+              ref={flatListRef}
+              data={comments.filter((c) => !c.parentId)}
+              keyExtractor={(item) => item.id}
+              renderItem={renderComment}
+              contentContainerStyle={{ paddingBottom: 80 }}
+            />
+          </>
+        )}
 
         {replyTo && (
           <View style={styles.replyInfo}>
@@ -371,6 +402,11 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
     marginBottom: 10,
+  },
+  errorText: {
+    color: '#f87171',
+    textAlign: 'center',
+    marginTop: 20,
   },
   button: {
     backgroundColor: '#8b5cf6',

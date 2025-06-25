@@ -36,22 +36,37 @@ export default function ExploreScreen() {
   const [filteredWishes, setFilteredWishes] = useState<Wish[]>([]);
   const [topWishes, setTopWishes] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [trendingMode, setTrendingMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const topQuery = query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(3));
-    const unsubscribe = onSnapshot(topQuery, (snapshot) => {
-      const top = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Wish[];
-      setTopWishes(top);
-    });
+    const unsubscribe = onSnapshot(
+      topQuery,
+      (snapshot) => {
+        const top = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Wish[];
+        setTopWishes(top);
+      },
+      (err) => {
+        console.error('❌ Failed to load top wishes:', err);
+        setError('Failed to load wishes');
+      }
+    );
     return () => unsubscribe();
   }, []);
 
   const fetchWishes = () => {
     setLoading(true);
-    const baseQuery = query(collection(db, 'wishes'), orderBy(trendingMode ? 'likes' : 'timestamp', 'desc'));
-    const unsubscribe = onSnapshot(baseQuery, (snapshot) => {
+const fetchWishes = () => {
+  setLoading(true);
+  const baseQuery = query(
+    collection(db, 'wishes'),
+    orderBy(trendingMode ? 'likes' : 'timestamp', 'desc')
+  );
+  const unsubscribe = onSnapshot(
+    baseQuery,
+    (snapshot) => {
       const all = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Wish[];
       const filtered = all.filter((wish) => {
         const inCategory =
@@ -61,7 +76,16 @@ export default function ExploreScreen() {
       });
       setFilteredWishes(filtered);
       setLoading(false);
-    });
+    },
+    (err) => {
+      console.error('❌ Failed to load wishes:', err);
+      setError('Failed to load wishes');
+      setLoading(false);
+    }
+  );
+  return unsubscribe;
+};
+
     return unsubscribe;
   };
 
@@ -146,6 +170,8 @@ export default function ExploreScreen() {
 
         {loading ? (
           <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
+        ) : error ? (
+          <Text style={styles.errorText}>{error}</Text>
         ) : filteredWishes.length === 0 ? (
           <Text style={styles.noResults}>No matching wishes 💭</Text>
         ) : (
@@ -265,6 +291,11 @@ const styles = StyleSheet.create({
     color: '#f472b6',
     fontSize: 14,
     fontWeight: '500',
+  },
+  errorText: {
+    color: '#f87171',
+    textAlign: 'center',
+    marginTop: 20,
   },
   noResults: {
     color: '#ccc',
