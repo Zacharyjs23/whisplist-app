@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { listenTrendingWishes, Wish } from '../helpers/firestore';
+import { listenTrendingWishes } from '../helpers/firestore';
 import ReportDialog from '../components/ReportDialog';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'; // Only include if still used
 import { db } from '../firebase';
@@ -73,7 +73,7 @@ try {
         ) : (
           <Text style={styles.likes}>❤️ {item.likes}</Text>
         )}
-      </View>
+      </TouchableOpacity>
 
       <TouchableOpacity
         onPress={() => {
@@ -84,7 +84,7 @@ try {
       >
         <Text style={{ color: '#f87171' }}>Report</Text>
       </TouchableOpacity>
-    </TouchableOpacity>
+    </View>
 
   );
 
@@ -164,7 +164,5 @@ const styles = StyleSheet.create({
     color: '#f87171',
     textAlign: 'center',
     marginTop: 20,
-  },
-
   },
 });
