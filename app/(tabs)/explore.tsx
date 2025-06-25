@@ -4,15 +4,7 @@ import {
   listenWishes,
 } from '../../helpers/firestore';
 
-import {
-  addDoc,
-  collection,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-} from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -46,28 +38,41 @@ export default function ExploreScreen() {
   const [reportTarget, setReportTarget] = useState<string | null>(null);
 
   useEffect(() => {
+useEffect(() => {
+  try {
     const unsubscribe = listenTrendingWishes((data) => {
       setTopWishes(data.slice(0, 3));
     });
     return unsubscribe;
-  }, []);
+  } catch (err) {
+    console.error('❌ Failed to load top wishes:', err);
+    setError('Failed to load wishes');
+    return () => {};
+  }
+}, []);
 
-  const fetchWishes = () => {
-    setLoading(true);
-    const unsubscribe = (trendingMode ? listenTrendingWishes : listenWishes)(
-      (all: Wish[]) => {
-        const filtered = all.filter((wish) => {
-          const inCategory =
-            trendingMode || !selectedCategory || wish.category === selectedCategory;
-          const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
-          return inCategory && inSearch;
-        });
-        setFilteredWishes(filtered);
-        setLoading(false);
-      }
-    );
-    return unsubscribe;
-  };
+const fetchWishes = () => {
+  setLoading(true);
+  const unsubscribe = (trendingMode ? listenTrendingWishes : listenWishes)(
+    (all: Wish[]) => {
+      const filtered = all.filter((wish) => {
+        const inCategory =
+          trendingMode || !selectedCategory || wish.category === selectedCategory;
+        const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+        return inCategory && inSearch;
+      });
+      setFilteredWishes(filtered);
+      setLoading(false);
+    },
+    (err) => {
+      console.error('❌ Failed to load wishes:', err);
+      setError('Failed to load wishes');
+      setLoading(false);
+    }
+  );
+  return unsubscribe;
+};
+
 
   useEffect(() => {
     const unsubscribe = fetchWishes();

@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { listenTrendingWishes, Wish } from '../helpers/firestore';
+import { listenTrendingWishes } from '../helpers/firestore';
 import ReportDialog from '../components/ReportDialog';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'; // Only include if still used
 import { db } from '../firebase';
@@ -51,31 +51,37 @@ export default function TrendingScreen() {
     }
   };
 
-  const renderWish = ({ item }: { item: Wish }) => (
-    <View style={styles.wishItem}>
-      <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)}>
-        <Text style={styles.wishCategory}>#{item.category}</Text>
-        <Text style={styles.wishText}>{item.text}</Text>
-        {item.isPoll ? (
-          <View style={{ marginTop: 6 }}>
-            <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
-            <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
-          </View>
-        ) : (
-          <Text style={styles.likes}>❤️ {item.likes}</Text>
-        )}
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => {
-          setReportTarget(item.id);
-          setReportVisible(true);
-        }}
-        style={{ marginTop: 4 }}
-      >
-        <Text style={{ color: '#f87171' }}>Report</Text>
-      </TouchableOpacity>
-    </View>
-  );
+const renderWish = ({ item }: { item: Wish }) => (
+  <View style={styles.wishItem}>
+    <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)}>
+      <Text style={styles.wishCategory}>#{item.category}</Text>
+      <Text style={styles.wishText}>{item.text}</Text>
+      {item.isPoll ? (
+        <View style={{ marginTop: 6 }}>
+          <Text style={styles.pollText}>
+            {item.optionA}: {item.votesA || 0}
+          </Text>
+          <Text style={styles.pollText}>
+            {item.optionB}: {item.votesB || 0}
+          </Text>
+        </View>
+      ) : (
+        <Text style={styles.likes}>❤️ {item.likes}</Text>
+      )}
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      onPress={() => {
+        setReportTarget(item.id);
+        setReportVisible(true);
+      }}
+      style={{ marginTop: 4 }}
+    >
+      <Text style={{ color: '#f87171' }}>Report</Text>
+    </TouchableOpacity>
+  </View>
+);
+
 
   return (
     <SafeAreaView style={styles.safeArea}>
