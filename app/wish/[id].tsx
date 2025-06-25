@@ -2,6 +2,7 @@
 import { formatDistanceToNow } from 'date-fns';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Audio } from 'expo-av';
 import {
   addDoc,
   collection,
@@ -16,6 +17,7 @@ import {
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -34,13 +36,16 @@ interface Wish {
   category: string;
   likes: number;
   pushToken?: string;
+  audioUrl?: string;
 }
+
 
 interface Comment {
   id: string;
   text: string;
   nickname?: string;
   timestamp?: any;
+  parentId?: string;
   reactions?: Record<string, number>;
   userReactions?: Record<string, string>;
 }
@@ -54,14 +59,29 @@ export default function WishDetailScreen() {
   const [comment, setComment] = useState('');
   const [nickname, setNickname] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [fulfillment, setFulfillment] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+
   const flatListRef = useRef<FlatList>(null);
   const animationRefs = useRef<{ [key: string]: Animated.Value }>({});
 
   const fetchWish = useCallback(async () => {
-    const ref = doc(db, 'wishes', id as string);
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      setWish({ id: snap.id, ...(snap.data() as Omit<Wish, 'id'>) });
+    setLoading(true);
+    setError(null);
+    try {
+      const ref = doc(db, 'wishes', id as string);
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        setWish({ id: snap.id, ...(snap.data() as Omit<Wish, 'id'>) });
+      }
+    } catch (err) {
+      console.error('❌ Failed to load wish:', err);
+      setError('Failed to load wish');
+    } finally {
+      setLoading(false);
     }
   }, [id]);
 
@@ -73,31 +93,59 @@ export default function WishDetailScreen() {
     const commentsRef = collection(db, 'wishes', id as string, 'comments');
     const q = query(commentsRef, orderBy('timestamp', 'asc'));
 
-    return onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((d) => {
-        const commentId = d.id;
-        if (!animationRefs.current[commentId]) {
-          animationRefs.current[commentId] = new Animated.Value(0);
-        }
-        return { id: d.id, ...(d.data() as Omit<Comment, 'id'>) };
-      }) as Comment[];
+    setLoading(true);
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const list = snapshot.docs.map((d) => {
+          const commentId = d.id;
+          if (!animationRefs.current[commentId]) {
+            animationRefs.current[commentId] = new Animated.Value(0);
+          }
+          const data = d.data() as Omit<Comment, 'id'> & { parentId?: string };
+          return { id: d.id, ...data };
+        }) as Comment[];
 
-      const sorted = [...list].sort((a, b) => {
-        const aCount = Object.values(a.reactions || {}).reduce((s, v) => s + v, 0);
-        const bCount = Object.values(b.reactions || {}).reduce((s, v) => s + v, 0);
-        return bCount - aCount;
-      });
-      setComments(sorted);
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 300);
-    });
+        const sorted = [...list].sort((a, b) => {
+          const aCount = Object.values(a.reactions || {}).reduce((s, v) => s + v, 0);
+          const bCount = Object.values(b.reactions || {}).reduce((s, v) => s + v, 0);
+          return bCount - aCount;
+        });
+        setComments(sorted);
+        setLoading(false);
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 300);
+      },
+      (err) => {
+        console.error('❌ Failed to load comments:', err);
+        setError('Failed to load comments');
+        setLoading(false);
+      }
+    );
   }, [id]);
 
   useEffect(() => {
     const unsubscribe = subscribeToComments();
     return unsubscribe;
   }, [subscribeToComments]);
+
+  const playAudio = useCallback(async () => {
+    if (!wish?.audioUrl) return;
+    try {
+      const { sound: newSound } = await Audio.Sound.createAsync({ uri: wish.audioUrl });
+      setSound(newSound);
+      await newSound.playAsync();
+    } catch (err) {
+      console.error('❌ Failed to play audio:', err);
+    }
+  }, [wish]);
+
+  useEffect(() => {
+    return () => {
+      sound?.unloadAsync();
+    };
+  }, [sound]);
 
   const handlePostComment = useCallback(async () => {
     if (!comment.trim()) return;
@@ -107,10 +155,12 @@ export default function WishDetailScreen() {
         text: comment.trim(),
         nickname: nickname.trim() || 'Anonymous',
         timestamp: serverTimestamp(),
+        parentId: replyTo,
         reactions: {},
         userReactions: {},
       });
       setComment('');
+      setReplyTo(null);
 
       if (wish?.pushToken) {
         await fetch('https://exp.host/--/api/v2/push/send', {
@@ -129,7 +179,8 @@ export default function WishDetailScreen() {
     } catch (err) {
       console.error('❌ Failed to post comment:', err);
     }
-  }, [comment, id, nickname, wish]);
+  }, [comment, id, nickname, replyTo, wish]);
+
 
   const handleReact = useCallback(async (commentId: string, emoji: string) => {
     const comment = comments.find((c) => c.id === commentId);
@@ -162,57 +213,84 @@ export default function WishDetailScreen() {
     }
   }, [comments, id, nickname]);
 
+  const handleFulfillWish = useCallback(async () => {
+    if (!fulfillment.trim()) return;
+    try {
+      const fulfillRef = collection(db, 'wishes', id as string, 'fulfillments');
+      await addDoc(fulfillRef, {
+        text: fulfillment.trim(),
+        timestamp: serverTimestamp(),
+      });
+      setFulfillment('');
+    } catch (err) {
+      console.error('❌ Failed to fulfill wish:', err);
+    }
+  }, [fulfillment, id]);
 
-  const renderComment = useCallback(({ item }: { item: Comment }) => {
-    const animValue = animationRefs.current[item.id] || new Animated.Value(0);
-    Animated.timing(animValue, {
-      toValue: 1,
-      duration: 400,
-      useNativeDriver: true,
-    }).start();
 
-    const currentUser = nickname.trim() || 'Anonymous';
-    const userReaction = item.userReactions?.[currentUser];
+  const renderCommentItem = useCallback(
+    (item: Comment, level = 0) => {
+      const animValue = animationRefs.current[item.id] || new Animated.Value(0);
+      Animated.timing(animValue, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
 
-    return (
-      <Animated.View
-        style={{
-          ...styles.commentBox,
-          opacity: animValue,
-          transform: [
-            {
-              translateY: animValue.interpolate({
-                inputRange: [0, 1],
-                outputRange: [10, 0],
-              }),
-            },
-          ],
-        }}
-      >
-        <Text style={styles.nickname}>{item.nickname}</Text>
-        <Text style={styles.comment}>{item.text}</Text>
-        <Text style={styles.timestamp}>
-          {item.timestamp?.seconds
-            ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), { addSuffix: true })
-            : 'Just now'}
-        </Text>
+      const currentUser = nickname.trim() || 'Anonymous';
+      const userReaction = item.userReactions?.[currentUser];
+      const replies = comments.filter((c) => c.parentId === item.id);
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-          {emojiOptions.map((emoji) => (
-            <TouchableOpacity
-              key={emoji}
-              onPress={() => handleReact(item.id, emoji)}
-              style={{ marginRight: 8, opacity: userReaction === emoji ? 1 : 0.4 }}
-            >
-              <Text style={{ fontSize: 20 }}>
-                {emoji} {item.reactions?.[emoji] || 0}
-              </Text>
-            </TouchableOpacity>
-          ))}
+      return (
+        <View key={item.id}>
+          <Animated.View
+            style={{
+              ...styles.commentBox,
+              marginLeft: level * 16,
+              opacity: animValue,
+              transform: [
+                {
+                  translateY: animValue.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [10, 0],
+                  }),
+                },
+              ],
+            }}
+          >
+            <Text style={styles.nickname}>{item.nickname}</Text>
+            <Text style={styles.comment}>{item.text}</Text>
+            <Text style={styles.timestamp}>
+              {item.timestamp?.seconds
+                ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), { addSuffix: true })
+                : 'Just now'}
+            </Text>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+              {emojiOptions.map((emoji) => (
+                <TouchableOpacity
+                  key={emoji}
+                  onPress={() => handleReact(item.id, emoji)}
+                  style={{ marginRight: 8, opacity: userReaction === emoji ? 1 : 0.4 }}
+                >
+                  <Text style={{ fontSize: 20 }}>
+                    {emoji} {item.reactions?.[emoji] || 0}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity onPress={() => setReplyTo(item.id)} style={{ marginLeft: 8 }}>
+                <Text style={{ color: '#a78bfa' }}>Reply</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+          {replies.map((r) => renderCommentItem(r, level + 1))}
         </View>
-      </Animated.View>
-    );
-  }, [handleReact, nickname]);
+      );
+    },
+    [comments, handleReact, nickname]
+  );
+
+  const renderComment = useCallback(({ item }: { item: Comment }) => renderCommentItem(item), [renderCommentItem]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -226,21 +304,45 @@ export default function WishDetailScreen() {
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
 
-        {wish && (
-          <View style={styles.wishBox}>
-            <Text style={styles.wishCategory}>#{wish.category}</Text>
-            <Text style={styles.wishText}>{wish.text}</Text>
-            <Text style={styles.likes}>❤️ {wish.likes}</Text>
-          </View>
+        {loading ? (
+          <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
+        ) : error ? (
+          <Text style={styles.errorText}>{error}</Text>
+        ) : (
+          <>
+            {wish && (
+              <View style={styles.wishBox}>
+                <Text style={styles.wishCategory}>#{wish.category}</Text>
+                <Text style={styles.wishText}>{wish.text}</Text>
+                <Text style={styles.likes}>❤️ {wish.likes}</Text>
+                {wish.audioUrl && (
+                  <TouchableOpacity onPress={playAudio} style={{ marginTop: 10 }}>
+                    <Text style={{ color: '#a78bfa' }}>▶ Play Audio</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            <FlatList
+              ref={flatListRef}
+              data={comments.filter((c) => !c.parentId)}
+              keyExtractor={(item) => item.id}
+              renderItem={renderComment}
+              contentContainerStyle={{ paddingBottom: 80 }}
+            />
+          </>
         )}
 
-        <FlatList
-          ref={flatListRef}
-          data={comments}
-          keyExtractor={(item) => item.id}
-          renderItem={renderComment}
-          contentContainerStyle={{ paddingBottom: 80 }}
-        />
+        {replyTo && (
+          <View style={styles.replyInfo}>
+            <Text style={{ color: '#a78bfa' }}>
+              Replying to {comments.find((c) => c.id === replyTo)?.nickname}
+            </Text>
+            <TouchableOpacity onPress={() => setReplyTo(null)} style={{ marginLeft: 8 }}>
+              <Text style={{ color: '#fff' }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         <TextInput
           style={styles.input}
@@ -260,6 +362,18 @@ export default function WishDetailScreen() {
 
         <TouchableOpacity style={styles.button} onPress={handlePostComment}>
           <Text style={styles.buttonText}>Post Comment</Text>
+        </TouchableOpacity>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Fulfillment text or link"
+          placeholderTextColor="#aaa"
+          value={fulfillment}
+          onChangeText={setFulfillment}
+        />
+
+        <TouchableOpacity style={styles.button} onPress={handleFulfillWish}>
+          <Text style={styles.buttonText}>Fulfill Wish</Text>
         </TouchableOpacity>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -308,6 +422,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 10,
   },
+  replyInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
   nickname: {
     color: '#ccc',
     fontSize: 12,
@@ -328,6 +447,11 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
     marginBottom: 10,
+  },
+  errorText: {
+    color: '#f87171',
+    textAlign: 'center',
+    marginTop: 20,
   },
   button: {
     backgroundColor: '#8b5cf6',
