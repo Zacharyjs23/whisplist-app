@@ -1,35 +1,23 @@
 // app/(tabs)/explore.tsx — Visually Enhanced Explore Screen with Pull-to-Refresh
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
+  FlatList,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { Picker } from '@react-native-picker/picker';
+import ReportDialog from '../components/ReportDialog';
 import {
   listenTrendingWishes,
   listenWishes,
-  Wish,
 } from '../../helpers/firestore';
-
-import {
-  addDoc,
-  collection,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-} from 'firebase/firestore';
-
-import React, { useEffect, useState } from 'react';
-import {
-    ActivityIndicator,
-    FlatList,
-    SafeAreaView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from 'react-native';
-import ReportDialog from '../components/ReportDialog';
-import { Picker } from '@react-native-picker/picker';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 
