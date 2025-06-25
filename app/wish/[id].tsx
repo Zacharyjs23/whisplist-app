@@ -33,7 +33,9 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Dimensions,
 } from 'react-native';
+import { BarChart } from 'react-native-chart-kit';
 import ReportDialog from '../../components/ReportDialog';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
@@ -233,11 +235,12 @@ try {
         list.push(wish.id);
         await AsyncStorage.setItem('votedPolls', JSON.stringify(list));
         setHasVoted(true);
+        await fetchWish();
       } catch (err) {
         console.error('❌ Failed to vote:', err);
       }
     },
-    [hasVoted, wish]
+    [fetchWish, hasVoted, wish]
   );
 
   const handleFulfillWish = useCallback(async () => {
@@ -371,6 +374,23 @@ try {
                 {wish.optionB} - {wish.votesB || 0}
               </Text>
             </TouchableOpacity>
+            <BarChart
+              data={{
+                labels: [wish.optionA || 'A', wish.optionB || 'B'],
+                datasets: [{ data: [wish.votesA || 0, wish.votesB || 0] }],
+              }}
+              width={Dimensions.get('window').width - 80}
+              height={220}
+              fromZero
+              chartConfig={{
+                backgroundColor: '#1e1e1e',
+                backgroundGradientFrom: '#1e1e1e',
+                backgroundGradientTo: '#1e1e1e',
+                color: () => '#a78bfa',
+                labelColor: () => '#ccc',
+              }}
+              style={{ marginTop: 10 }}
+            />
           </View>
         ) : (
           <Text style={styles.likes}>❤️ {wish.likes}</Text>
