@@ -6,6 +6,8 @@ import {
   getAllWishes,
   getWishComments,
 } from '../../helpers/firestore';
+import type { Wish } from '../../types/Wish';
+import type { Comment } from '../../helpers/firestore';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -25,8 +27,8 @@ import { PieChart } from 'react-native-chart-kit';
 export default function ProfileScreen() {
   const [nickname, setNickname] = useState('');
   const [inputName, setInputName] = useState('');
-  const [myWishes, setMyWishes] = useState<any[]>([]);
-  const [myComments, setMyComments] = useState<any[]>([]);
+  const [myWishes, setMyWishes] = useState<Wish[]>([]);
+  const [myComments, setMyComments] = useState<Comment[]>([]);
   const [streak, setStreak] = useState(0);
   const [stats, setStats] = useState({ totalLikes: 0, topWish: '', firstWish: '' });
   const [badges, setBadges] = useState<string[]>([]);
@@ -48,8 +50,8 @@ export default function ProfileScreen() {
         setNickname(stored);
         setInputName(stored);
 
-      const wishesData = await getWishesByNickname(stored);
-      const wishes: any[] = [];
+      const wishesData: Wish[] = await getWishesByNickname(stored);
+      const wishes: Wish[] = [];
       let likeCount = 0;
       const wishDates: string[] = [];
       const categoryMap: Record<string, number> = {};
@@ -78,11 +80,11 @@ export default function ProfileScreen() {
       setStats({ totalLikes: likeCount, topWish, firstWish });
       setCategoryData(catData);
 
-      const allWishesData = await getAllWishes();
-      const allComments: any[] = [];
+      const allWishesData: Wish[] = await getAllWishes();
+      const allComments: Comment[] = [];
 
       for (const wishDoc of allWishesData) {
-        const commentsSnap = await getWishComments(wishDoc.id);
+        const commentsSnap: Comment[] = await getWishComments(wishDoc.id);
         commentsSnap.forEach((data) => {
           if (data.nickname === stored) {
             allComments.push({ ...data, id: data.id, wishId: wishDoc.id });
