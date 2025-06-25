@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
-import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { addDoc, collection, limit, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import ReportDialog from '../components/ReportDialog';
 import { db } from '../firebase';
 
 interface Wish {
@@ -15,6 +16,8 @@ export default function TrendingScreen() {
   const router = useRouter();
   const [wishes, setWishes] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reportVisible, setReportVisible] = useState(false);
+  const [reportTarget, setReportTarget] = useState<string | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(20));
@@ -29,14 +32,40 @@ export default function TrendingScreen() {
     return () => unsubscribe();
   }, []);
 
+  const handleReport = async (reason: string) => {
+    if (!reportTarget) return;
+    try {
+      await addDoc(collection(db, 'reports'), {
+        itemId: reportTarget,
+        type: 'wish',
+        reason,
+        timestamp: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('❌ Failed to submit report:', err);
+    } finally {
+      setReportVisible(false);
+      setReportTarget(null);
+    }
+  };
+
   const renderWish = ({ item }: { item: Wish }) => (
-    <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)}>
-      <View style={styles.wishItem}>
+    <View style={styles.wishItem}>
+      <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)}>
         <Text style={styles.wishCategory}>#{item.category}</Text>
         <Text style={styles.wishText}>{item.text}</Text>
         <Text style={styles.likes}>❤️ {item.likes}</Text>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() => {
+          setReportTarget(item.id);
+          setReportVisible(true);
+        }}
+        style={{ marginTop: 4 }}
+      >
+        <Text style={{ color: '#f87171' }}>Report</Text>
+      </TouchableOpacity>
+    </View>
   );
 
   return (
@@ -54,6 +83,14 @@ export default function TrendingScreen() {
             contentContainerStyle={{ paddingBottom: 80 }}
           />
         )}
+        <ReportDialog
+          visible={reportVisible}
+          onClose={() => {
+            setReportVisible(false);
+            setReportTarget(null);
+          }}
+          onSubmit={handleReport}
+        />
       </View>
     </SafeAreaView>
   );

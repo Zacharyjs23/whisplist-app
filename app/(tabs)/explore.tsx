@@ -1,10 +1,12 @@
 // app/(tabs)/explore.tsx — Visually Enhanced Explore Screen with Pull-to-Refresh
 import {
+    addDoc,
     collection,
     limit,
     onSnapshot,
     orderBy,
     query,
+    serverTimestamp,
 } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
@@ -19,6 +21,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import ReportDialog from '../components/ReportDialog';
 import { db } from '../../firebase';
 
 interface Wish {
@@ -37,6 +40,8 @@ export default function ExploreScreen() {
   const [loading, setLoading] = useState(true);
   const [trendingMode, setTrendingMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [reportVisible, setReportVisible] = useState(false);
+  const [reportTarget, setReportTarget] = useState<string | null>(null);
 
   useEffect(() => {
     const topQuery = query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(3));
@@ -86,11 +91,39 @@ export default function ExploreScreen() {
     setSelectedCategories(newSet);
   };
 
+  const handleReport = async (reason: string) => {
+    if (!reportTarget) return;
+    try {
+      await addDoc(collection(db, 'reports'), {
+        itemId: reportTarget,
+        type: 'wish',
+        reason,
+        timestamp: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('❌ Failed to submit report:', err);
+    } finally {
+      setReportVisible(false);
+      setReportTarget(null);
+    }
+  };
+
   const renderWish = ({ item }: { item: Wish }) => (
     <View style={styles.wishItem}>
-      <Text style={styles.wishCategory}>#{item.category}</Text>
-      <Text style={styles.wishText}>{item.text}</Text>
-      <Text style={styles.likes}>❤️ {item.likes}</Text>
+      <View>
+        <Text style={styles.wishCategory}>#{item.category}</Text>
+        <Text style={styles.wishText}>{item.text}</Text>
+        <Text style={styles.likes}>❤️ {item.likes}</Text>
+      </View>
+      <TouchableOpacity
+        onPress={() => {
+          setReportTarget(item.id);
+          setReportVisible(true);
+        }}
+        style={{ marginTop: 4 }}
+      >
+        <Text style={{ color: '#f87171' }}>Report</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -165,6 +198,14 @@ export default function ExploreScreen() {
             contentContainerStyle={{ paddingBottom: 80 }}
           />
         )}
+        <ReportDialog
+          visible={reportVisible}
+          onClose={() => {
+            setReportVisible(false);
+            setReportTarget(null);
+          }}
+          onSubmit={handleReport}
+        />
       </View>
     </SafeAreaView>
   );

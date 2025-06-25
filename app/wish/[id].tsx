@@ -26,6 +26,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import ReportDialog from '../../components/ReportDialog';
 import { db } from '../../firebase';
 
 interface Wish {
@@ -55,6 +56,8 @@ export default function WishDetailScreen() {
   const [nickname, setNickname] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
   const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [reportTarget, setReportTarget] = useState<{ type: 'wish' | 'comment'; id: string } | null>(null);
+  const [reportVisible, setReportVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const animationRefs = useRef<{ [key: string]: Animated.Value }>({});
 
@@ -151,6 +154,26 @@ export default function WishDetailScreen() {
     }
   }, [comments, id, nickname]);
 
+  const handleReport = useCallback(
+    async (reason: string) => {
+      if (!reportTarget) return;
+      try {
+        await addDoc(collection(db, 'reports'), {
+          itemId: reportTarget.id,
+          type: reportTarget.type,
+          reason,
+          timestamp: serverTimestamp(),
+        });
+      } catch (err) {
+        console.error('❌ Failed to submit report:', err);
+      } finally {
+        setReportVisible(false);
+        setReportTarget(null);
+      }
+    },
+    [reportTarget]
+  );
+
 
   const renderCommentItem = useCallback(
     (item: Comment, level = 0) => {
@@ -205,6 +228,15 @@ export default function WishDetailScreen() {
               <TouchableOpacity onPress={() => setReplyTo(item.id)} style={{ marginLeft: 8 }}>
                 <Text style={{ color: '#a78bfa' }}>Reply</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setReportTarget({ type: 'comment', id: item.id });
+                  setReportVisible(true);
+                }}
+                style={{ marginLeft: 8 }}
+              >
+                <Text style={{ color: '#f87171' }}>Report</Text>
+              </TouchableOpacity>
             </View>
           </Animated.View>
           {replies.map((r) => renderCommentItem(r, level + 1))}
@@ -233,6 +265,15 @@ export default function WishDetailScreen() {
             <Text style={styles.wishCategory}>#{wish.category}</Text>
             <Text style={styles.wishText}>{wish.text}</Text>
             <Text style={styles.likes}>❤️ {wish.likes}</Text>
+            <TouchableOpacity
+              onPress={() => {
+                setReportTarget({ type: 'wish', id: wish.id });
+                setReportVisible(true);
+              }}
+              style={{ marginTop: 8 }}
+            >
+              <Text style={{ color: '#f87171' }}>Report</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -274,6 +315,14 @@ export default function WishDetailScreen() {
         <TouchableOpacity style={styles.button} onPress={handlePostComment}>
           <Text style={styles.buttonText}>Post Comment</Text>
         </TouchableOpacity>
+        <ReportDialog
+          visible={reportVisible}
+          onClose={() => {
+            setReportVisible(false);
+            setReportTarget(null);
+          }}
+          onSubmit={handleReport}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
