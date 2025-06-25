@@ -11,7 +11,6 @@ import {
     ActivityIndicator,
     FlatList,
     SafeAreaView,
-    ScrollView,
     StatusBar,
     StyleSheet,
     Text,
@@ -19,6 +18,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { db } from '../../firebase';
 
 interface Wish {
@@ -26,12 +26,13 @@ interface Wish {
   text: string;
   category: string;
   likes: number;
+  audioUrl?: string;
 }
 
-const allCategories = ['love', 'health', 'career', 'general', 'money', 'friendship'];
+const allCategories = ['love', 'health', 'career', 'general', 'money', 'friendship', 'fitness'];
 
 export default function ExploreScreen() {
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [filteredWishes, setFilteredWishes] = useState<Wish[]>([]);
   const [topWishes, setTopWishes] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,36 +58,41 @@ export default function ExploreScreen() {
 
   const fetchWishes = () => {
     setLoading(true);
-    const baseQuery = query(
-      collection(db, 'wishes'),
-      orderBy(trendingMode ? 'likes' : 'timestamp', 'desc')
-    );
-    const unsubscribe = onSnapshot(
-      baseQuery,
-      (snapshot) => {
-        const all = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Wish[];
-        const filtered = all.filter((wish) => {
-          const inCategory =
-            trendingMode || selectedCategories.size === 0 || selectedCategories.has(wish.category);
-          const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
-          return inCategory && inSearch;
-        });
-        setFilteredWishes(filtered);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('❌ Failed to load wishes:', err);
-        setError('Failed to load wishes');
-        setLoading(false);
-      }
-    );
+const fetchWishes = () => {
+  setLoading(true);
+  const baseQuery = query(
+    collection(db, 'wishes'),
+    orderBy(trendingMode ? 'likes' : 'timestamp', 'desc')
+  );
+  const unsubscribe = onSnapshot(
+    baseQuery,
+    (snapshot) => {
+      const all = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Wish[];
+      const filtered = all.filter((wish) => {
+        const inCategory =
+          trendingMode || !selectedCategory || wish.category === selectedCategory;
+        const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+        return inCategory && inSearch;
+      });
+      setFilteredWishes(filtered);
+      setLoading(false);
+    },
+    (err) => {
+      console.error('❌ Failed to load wishes:', err);
+      setError('Failed to load wishes');
+      setLoading(false);
+    }
+  );
+  return unsubscribe;
+};
+
     return unsubscribe;
   };
 
   useEffect(() => {
     const unsubscribe = fetchWishes();
     return () => unsubscribe();
-  }, [selectedCategories, trendingMode, searchTerm]);
+  }, [selectedCategory, trendingMode, searchTerm]);
 
   const handleReload = () => {
     fetchWishes();
@@ -94,20 +100,12 @@ export default function ExploreScreen() {
 
   const toggleTrending = (mode: boolean) => {
     setTrendingMode(mode);
-    if (mode) {
-      setSelectedCategories(new Set());
-    }
   };
 
-  const toggleCategory = (cat: string) => {
-    const newSet = new Set(selectedCategories);
-    newSet.has(cat) ? newSet.delete(cat) : newSet.add(cat);
-    setSelectedCategories(newSet);
-  };
 
   const renderWish = ({ item }: { item: Wish }) => (
     <View style={styles.wishItem}>
-      <Text style={styles.wishCategory}>#{item.category}</Text>
+      <Text style={styles.wishCategory}>#{item.category} {item.audioUrl ? '🔊' : ''}</Text>
       <Text style={styles.wishText}>{item.text}</Text>
       <Text style={styles.likes}>❤️ {item.likes}</Text>
     </View>
@@ -142,21 +140,21 @@ export default function ExploreScreen() {
           </TouchableOpacity>
         </View>
 
-        {!trendingMode && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryBar}>
-            {allCategories.map((cat) => (
-              <TouchableOpacity
-                key={cat}
-                onPress={() => toggleCategory(cat)}
-                style={[styles.categoryButton, selectedCategories.has(cat) && styles.activeCategory]}
-              >
-                <Text style={[styles.categoryText, selectedCategories.has(cat) && styles.activeCategoryText]}>
-                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
+        <Picker
+          selectedValue={selectedCategory}
+          onValueChange={(value) => setSelectedCategory(value)}
+          style={styles.dropdown}
+          dropdownIconColor="#fff"
+        >
+          <Picker.Item label="All Categories" value={null} />
+          {allCategories.map((cat) => (
+            <Picker.Item
+              key={cat}
+              label={cat.charAt(0).toUpperCase() + cat.slice(1)}
+              value={cat}
+            />
+          ))}
+        </Picker>
 
         {!trendingMode && topWishes.length > 0 && (
           <View style={styles.topSection}>
@@ -237,27 +235,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
-  categoryBar: {
-    flexGrow: 0,
-    marginBottom: 16,
-  },
-  categoryButton: {
+  dropdown: {
     backgroundColor: '#1e1e1e',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    marginRight: 10,
-  },
-  activeCategory: {
-    backgroundColor: '#8b5cf6',
-  },
-  categoryText: {
-    color: '#aaa',
-    fontSize: 14,
-  },
-  activeCategoryText: {
     color: '#fff',
-    fontWeight: 'bold',
+    borderRadius: 10,
+    marginBottom: 16,
   },
   sectionTitle: {
     color: '#fff',

@@ -2,6 +2,7 @@
 import { formatDistanceToNow } from 'date-fns';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Audio } from 'expo-av';
 import {
   addDoc,
   collection,
@@ -34,6 +35,7 @@ interface Wish {
   text: string;
   category: string;
   likes: number;
+  audioUrl?: string;
 }
 
 interface Comment {
@@ -58,6 +60,8 @@ export default function WishDetailScreen() {
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+
   const flatListRef = useRef<FlatList>(null);
   const animationRefs = useRef<{ [key: string]: Animated.Value }>({});
 
@@ -122,6 +126,23 @@ export default function WishDetailScreen() {
     const unsubscribe = subscribeToComments();
     return unsubscribe;
   }, [subscribeToComments]);
+
+  const playAudio = useCallback(async () => {
+    if (!wish?.audioUrl) return;
+    try {
+      const { sound: newSound } = await Audio.Sound.createAsync({ uri: wish.audioUrl });
+      setSound(newSound);
+      await newSound.playAsync();
+    } catch (err) {
+      console.error('❌ Failed to play audio:', err);
+    }
+  }, [wish]);
+
+  useEffect(() => {
+    return () => {
+      sound?.unloadAsync();
+    };
+  }, [sound]);
 
   const handlePostComment = useCallback(async () => {
     if (!comment.trim()) return;
@@ -261,6 +282,11 @@ export default function WishDetailScreen() {
                 <Text style={styles.wishCategory}>#{wish.category}</Text>
                 <Text style={styles.wishText}>{wish.text}</Text>
                 <Text style={styles.likes}>❤️ {wish.likes}</Text>
+                {wish.audioUrl && (
+                  <TouchableOpacity onPress={playAudio} style={{ marginTop: 10 }}>
+                    <Text style={{ color: '#a78bfa' }}>▶ Play Audio</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 

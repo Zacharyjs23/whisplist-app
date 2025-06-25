@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
+import { Audio } from 'expo-av';
 import {
   addDoc,
   collection,
@@ -15,6 +16,7 @@ import {
   serverTimestamp,
   updateDoc,
 } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -31,7 +33,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { db } from '../../firebase';
+import { db, storage } from '../../firebase';
 
 interface Wish {
   id: string;
@@ -39,6 +41,7 @@ interface Wish {
   category: string;
   likes: number;
   pushToken?: string;
+  audioUrl?: string;
 }
 
 export default function IndexScreen() {
@@ -49,6 +52,9 @@ export default function IndexScreen() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [pushToken, setPushToken] = useState<string | null>(null);
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [recordedUri, setRecordedUri] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
 
   useEffect(() => {
     registerForPushNotificationsAsync().then(setPushToken);
@@ -74,19 +80,66 @@ export default function IndexScreen() {
     return () => unsubscribe();
   }, []);
 
+  const startRecording = async () => {
+    try {
+      const { granted } = await Audio.requestPermissionsAsync();
+      if (!granted) {
+        Alert.alert('Permission required', 'Microphone access is needed to record');
+        return;
+      }
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+      const rec = new Audio.Recording();
+      await rec.prepareToRecordAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      await rec.startAsync();
+      setRecording(rec);
+      setIsRecording(true);
+    } catch (err) {
+      console.error('❌ Failed to start recording:', err);
+    }
+  };
+
+  const stopRecording = async () => {
+    try {
+      if (!recording) return;
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setRecordedUri(uri);
+    } catch (err) {
+      console.error('❌ Failed to stop recording:', err);
+    } finally {
+      setIsRecording(false);
+      setRecording(null);
+    }
+  };
+
   const handlePostWish = async () => {
     if (wish.trim() === '') return;
 
     try {
+      let audioUrl = '';
+      if (recordedUri) {
+        const resp = await fetch(recordedUri);
+        const blob = await resp.blob();
+        const storageRef = ref(storage, `audio/${Date.now()}.m4a`);
+        await uploadBytes(storageRef, blob);
+        audioUrl = await getDownloadURL(storageRef);
+      }
       await addDoc(collection(db, 'wishes'), {
         text: wish,
         category: category.trim().toLowerCase(),
         likes: 0,
         timestamp: serverTimestamp(),
         pushToken: pushToken || '',
+        audioUrl,
       });
       setWish('');
       setCategory('general');
+      setRecordedUri(null);
     } catch (error) {
       console.error('❌ Failed to post wish:', error);
     }
@@ -170,6 +223,21 @@ export default function IndexScreen() {
           onChangeText={setCategory}
         />
 
+        <TouchableOpacity
+          style={[
+            styles.recButton,
+            { backgroundColor: isRecording ? '#ef4444' : '#22c55e' },
+          ]}
+          onPress={isRecording ? stopRecording : startRecording}
+        >
+          <Text style={styles.buttonText}>
+            {isRecording ? 'Stop Recording' : 'Record Audio'}
+          </Text>
+        </TouchableOpacity>
+        {recordedUri && !isRecording && (
+          <Text style={styles.recordingStatus}>Audio ready to upload</Text>
+        )}
+
         <Pressable
           style={[styles.button, { opacity: wish.trim() === '' ? 0.5 : 1 }]}
           onPress={handlePostWish}
@@ -195,7 +263,7 @@ export default function IndexScreen() {
             renderItem={({ item }) => (
               <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)}>
                 <View style={styles.wishItem}>
-                  <Text style={{ color: '#a78bfa', fontSize: 12 }}>#{item.category}</Text>
+                  <Text style={{ color: '#a78bfa', fontSize: 12 }}>#{item.category} {item.audioUrl ? '🔊' : ''}</Text>
                   <Text style={styles.wishText}>{item.text}</Text>
                   <Text style={styles.likeText}>❤️ {item.likes}</Text>
                 </View>
@@ -244,9 +312,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
+  recButton: {
+    padding: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
   buttonText: {
     color: '#fff',
     fontWeight: '600',
+  },
+  recordingStatus: {
+    color: '#22c55e',
+    textAlign: 'center',
+    marginBottom: 10,
   },
   authButton: {
     marginBottom: 20,
