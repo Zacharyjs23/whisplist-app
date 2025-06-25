@@ -4,16 +4,13 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Audio } from 'expo-av';
 import {
-  addDoc,
-  collection,
-  doc,
-  getDoc,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  updateDoc,
-} from 'firebase/firestore';
+  getWish,
+  listenWishComments,
+  addComment,
+  updateCommentReaction,
+  Wish,
+  Comment,
+} from '../../helpers/firestore';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -27,25 +24,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { db } from '../../firebase';
 
-interface Wish {
-  id: string;
-  text: string;
-  category: string;
-  likes: number;
-  audioUrl?: string;
-}
-
-interface Comment {
-  id: string;
-  text: string;
-  nickname?: string;
-  timestamp?: any;
-  parentId?: string;
-  reactions?: Record<string, number>;
-  userReactions?: Record<string, string>;
-}
 
 const emojiOptions = ['❤️', '😂', '😢', '👍'];
 
@@ -62,10 +41,9 @@ export default function WishDetailScreen() {
   const animationRefs = useRef<{ [key: string]: Animated.Value }>({});
 
   const fetchWish = useCallback(async () => {
-    const ref = doc(db, 'wishes', id as string);
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      setWish({ id: snap.id, ...(snap.data() as Omit<Wish, 'id'>) });
+    const data = await getWish(id as string);
+    if (data) {
+      setWish(data);
     }
   }, [id]);
 
@@ -74,18 +52,13 @@ export default function WishDetailScreen() {
   }, [fetchWish]);
 
   const subscribeToComments = useCallback(() => {
-    const commentsRef = collection(db, 'wishes', id as string, 'comments');
-    const q = query(commentsRef, orderBy('timestamp', 'asc'));
-
-    return onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((d) => {
+    return listenWishComments(id as string, (list) => {
+      list.forEach((d) => {
         const commentId = d.id;
         if (!animationRefs.current[commentId]) {
           animationRefs.current[commentId] = new Animated.Value(0);
         }
-        const data = d.data() as Omit<Comment, 'id'> & { parentId?: string };
-        return { id: d.id, ...data };
-      }) as Comment[];
+      });
 
       const sorted = [...list].sort((a, b) => {
         const aCount = Object.values(a.reactions || {}).reduce((s, v) => s + v, 0);
@@ -124,11 +97,9 @@ export default function WishDetailScreen() {
   const handlePostComment = useCallback(async () => {
     if (!comment.trim()) return;
     try {
-      const commentsRef = collection(db, 'wishes', id as string, 'comments');
-      await addDoc(commentsRef, {
+      await addComment(id as string, {
         text: comment.trim(),
         nickname: nickname.trim() || 'Anonymous',
-        timestamp: serverTimestamp(),
         parentId: replyTo,
         reactions: {},
         userReactions: {},
@@ -145,27 +116,9 @@ export default function WishDetailScreen() {
     if (!comment) return;
     const currentUser = nickname.trim() || 'Anonymous';
     const prevEmoji = comment.userReactions?.[currentUser];
-    const newReactions = { ...(comment.reactions || {}) };
-    const newUserReactions = { ...(comment.userReactions || {}) };
-
-    if (prevEmoji && newReactions[prevEmoji]) {
-      newReactions[prevEmoji] -= 1;
-      if (newReactions[prevEmoji] === 0) delete newReactions[prevEmoji];
-    }
-
-    if (prevEmoji === emoji) {
-      delete newUserReactions[currentUser];
-    } else {
-      newUserReactions[currentUser] = emoji;
-      newReactions[emoji] = (newReactions[emoji] || 0) + 1;
-    }
 
     try {
-      const commentRef = doc(db, 'wishes', id as string, 'comments', commentId);
-      await updateDoc(commentRef, {
-        reactions: newReactions,
-        userReactions: newUserReactions,
-      });
+      await updateCommentReaction(id as string, commentId, emoji, prevEmoji, currentUser);
     } catch (err) {
       console.error('❌ Failed to update reaction:', err);
     }

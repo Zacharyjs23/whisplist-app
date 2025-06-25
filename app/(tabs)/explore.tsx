@@ -1,11 +1,9 @@
 // app/(tabs)/explore.tsx — Visually Enhanced Explore Screen with Pull-to-Refresh
 import {
-    collection,
-    limit,
-    onSnapshot,
-    orderBy,
-    query,
-} from 'firebase/firestore';
+    listenTrendingWishes,
+    listenWishes,
+    Wish,
+} from '../../helpers/firestore';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -19,15 +17,7 @@ import {
     View,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { db } from '../../firebase';
 
-interface Wish {
-  id: string;
-  text: string;
-  category: string;
-  likes: number;
-  audioUrl?: string;
-}
 
 const allCategories = ['love', 'health', 'career', 'general', 'money', 'friendship', 'fitness'];
 
@@ -40,20 +30,16 @@ export default function ExploreScreen() {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    const topQuery = query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(3));
-    const unsubscribe = onSnapshot(topQuery, (snapshot) => {
-      const top = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Wish[];
-      setTopWishes(top);
+    const unsubscribe = listenTrendingWishes((data) => {
+      setTopWishes(data.slice(0, 3));
     });
     return () => unsubscribe();
   }, []);
 
   const fetchWishes = () => {
     setLoading(true);
-    const baseQuery = query(collection(db, 'wishes'), orderBy(trendingMode ? 'likes' : 'timestamp', 'desc'));
-    const unsubscribe = onSnapshot(baseQuery, (snapshot) => {
-      const all = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Wish[];
-      const filtered = all.filter((wish) => {
+    const unsubscribe = (trendingMode ? listenTrendingWishes : listenWishes)((all) => {
+      const filtered = all.filter((wish: Wish) => {
         const inCategory =
           trendingMode || !selectedCategory || wish.category === selectedCategory;
         const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());

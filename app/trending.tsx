@@ -1,15 +1,8 @@
 import { useRouter } from 'expo-router';
-import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { db } from '../firebase';
+import { listenTrendingWishes, Wish } from '../helpers/firestore';
 
-interface Wish {
-  id: string;
-  text: string;
-  category: string;
-  likes: number;
-}
 
 export default function TrendingScreen() {
   const router = useRouter();
@@ -17,13 +10,8 @@ export default function TrendingScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(20));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...(doc.data() as Omit<Wish, 'id'>),
-      }));
-      setWishes(data as Wish[]);
+    const unsubscribe = listenTrendingWishes((data) => {
+      setWishes(data);
       setLoading(false);
     });
     return () => unsubscribe();
