@@ -60,7 +60,7 @@ try {
     }
   };
 
-  const renderWish = ({ item }: { item: Wish }) => (
+const renderWish = ({ item }: { item: Wish }) => (
     <View style={styles.wishItem}>
       <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)}>
         <Text style={styles.wishCategory}>#{item.category}</Text>
@@ -73,7 +73,7 @@ try {
         ) : (
           <Text style={styles.likes}>❤️ {item.likes}</Text>
         )}
-      </View>
+      </TouchableOpacity>
 
       <TouchableOpacity
         onPress={() => {
@@ -84,8 +84,7 @@ try {
       >
         <Text style={{ color: '#f87171' }}>Report</Text>
       </TouchableOpacity>
-    </TouchableOpacity>
-
+    </View>
   );
 
   return (
@@ -164,7 +163,5 @@ const styles = StyleSheet.create({
     color: '#f87171',
     textAlign: 'center',
     marginTop: 20,
-  },
-
   },
 });
