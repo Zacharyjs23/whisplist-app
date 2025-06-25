@@ -58,6 +58,7 @@ export default function WishDetailScreen() {
   const [nickname, setNickname] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
   const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [fulfillment, setFulfillment] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
@@ -194,6 +195,20 @@ export default function WishDetailScreen() {
     }
   }, [comments, id, nickname]);
 
+  const handleFulfillWish = useCallback(async () => {
+    if (!fulfillment.trim()) return;
+    try {
+      const fulfillRef = collection(db, 'wishes', id as string, 'fulfillments');
+      await addDoc(fulfillRef, {
+        text: fulfillment.trim(),
+        timestamp: serverTimestamp(),
+      });
+      setFulfillment('');
+    } catch (err) {
+      console.error('❌ Failed to fulfill wish:', err);
+    }
+  }, [fulfillment, id]);
+
 
   const renderCommentItem = useCallback(
     (item: Comment, level = 0) => {
@@ -329,6 +344,18 @@ export default function WishDetailScreen() {
 
         <TouchableOpacity style={styles.button} onPress={handlePostComment}>
           <Text style={styles.buttonText}>Post Comment</Text>
+        </TouchableOpacity>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Fulfillment text or link"
+          placeholderTextColor="#aaa"
+          value={fulfillment}
+          onChangeText={setFulfillment}
+        />
+
+        <TouchableOpacity style={styles.button} onPress={handleFulfillWish}>
+          <Text style={styles.buttonText}>Fulfill Wish</Text>
         </TouchableOpacity>
       </KeyboardAvoidingView>
     </SafeAreaView>
