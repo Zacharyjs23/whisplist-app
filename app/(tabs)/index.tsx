@@ -5,17 +5,12 @@ import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { Audio } from 'expo-av';
 import {
-  addDoc,
-  collection,
-  doc,
-  getDoc,
-  increment,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  updateDoc,
-} from 'firebase/firestore';
+  listenWishes,
+  addWish,
+  likeWish,
+  getWish,
+  Wish,
+} from '../../helpers/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import React, { useEffect, useState } from 'react';
 import {
@@ -30,43 +25,48 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  Switch,
   TouchableOpacity,
   View,
 } from 'react-native';
+import ReportDialog from '../components/ReportDialog';
 import { db, storage } from '../../firebase';
+import type { Wish } from '../../types/Wish';
 
-interface Wish {
-  id: string;
-  text: string;
-  category: string;
-  likes: number;
-  pushToken?: string;
-  audioUrl?: string;
-}
 
 export default function IndexScreen() {
   const [wish, setWish] = useState('');
   const [category, setCategory] = useState('general');
   const [wishList, setWishList] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [pushToken, setPushToken] = useState<string | null>(null);
+  const [reportVisible, setReportVisible] = useState(false);
+  const [reportTarget, setReportTarget] = useState<string | null>(null);
+  const [isPoll, setIsPoll] = useState(false);
+  const [optionA, setOptionA] = useState('');
+  const [optionB, setOptionB] = useState('');
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
 
+
   useEffect(() => {
     registerForPushNotificationsAsync().then(setPushToken);
 
-    const q = query(collection(db, 'wishes'), orderBy('timestamp', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const wishes = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Wish[];
-      setWishList(wishes);
-      setLoading(false);
-    });
+try {
+  const unsubscribe = listenWishes((w) => {
+    setWishList(w);
+    setLoading(false);
+  });
+  return unsubscribe;
+} catch (err) {
+  console.error('❌ Failed to load wishes:', err);
+  setError('Failed to load wishes');
+  setLoading(false);
+  return () => {};
+}
 
     return () => unsubscribe();
   }, []);
@@ -120,17 +120,27 @@ export default function IndexScreen() {
         await uploadBytes(storageRef, blob);
         audioUrl = await getDownloadURL(storageRef);
       }
-      await addDoc(collection(db, 'wishes'), {
+      await addWish({
         text: wish,
         category: category.trim().toLowerCase(),
-        likes: 0,
-        timestamp: serverTimestamp(),
         pushToken: pushToken || '',
-        audioUrl,
+        ...(isPoll && {
+          isPoll: true,
+          optionA: optionA.trim(),
+          optionB: optionB.trim(),
+          votesA: 0,
+          votesB: 0,
+        }),
+        ...(audioUrl && { audioUrl }),
       });
+
       setWish('');
       setCategory('general');
+      setOptionA('');
+      setOptionB('');
+      setIsPoll(false);
       setRecordedUri(null);
+
     } catch (error) {
       console.error('❌ Failed to post wish:', error);
     }
@@ -146,16 +156,13 @@ export default function IndexScreen() {
         return;
       }
 
-      const ref = doc(db, 'wishes', id);
-      await updateDoc(ref, {
-        likes: increment(1),
-      });
+      await likeWish(id);
 
       const updatedLikes = [...likedWishes, id];
       await AsyncStorage.setItem('likedWishes', JSON.stringify(updatedLikes));
 
-      const snap = await getDoc(ref);
-      const token = snap.data()?.pushToken;
+      const snap = await getWish(id);
+      const token = snap?.pushToken;
 
       if (token) {
         await fetch('https://exp.host/--/api/v2/push/send', {
@@ -173,6 +180,23 @@ export default function IndexScreen() {
       }
     } catch (error) {
       console.error('❌ Failed to like wish:', error);
+    }
+  };
+
+  const handleReport = async (reason: string) => {
+    if (!reportTarget) return;
+    try {
+      await addDoc(collection(db, 'reports'), {
+        itemId: reportTarget,
+        type: 'wish',
+        reason,
+        timestamp: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('❌ Failed to submit report:', err);
+    } finally {
+      setReportVisible(false);
+      setReportTarget(null);
     }
   };
 
@@ -214,6 +238,32 @@ export default function IndexScreen() {
           onChangeText={setCategory}
         />
 
+        {/* Poll Mode Switch and Inputs */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+          <Text style={{ color: '#fff', marginRight: 8 }}>Poll Mode</Text>
+          <Switch value={isPoll} onValueChange={setIsPoll} />
+        </View>
+
+        {isPoll && (
+          <>
+            <TextInput
+              style={styles.input}
+              placeholder="Option A"
+              placeholderTextColor="#999"
+              value={optionA}
+              onChangeText={setOptionA}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Option B"
+              placeholderTextColor="#999"
+              value={optionB}
+              onChangeText={setOptionB}
+            />
+          </>
+        )}
+
+        {/* Audio Recording Button */}
         <TouchableOpacity
           style={[
             styles.recButton,
@@ -224,9 +274,8 @@ export default function IndexScreen() {
           <Text style={styles.buttonText}>
             {isRecording ? 'Stop Recording' : 'Record Audio'}
           </Text>
-        </TouchableOpacity>
-        {recordedUri && !isRecording && (
-          <Text style={styles.recordingStatus}>Audio ready to upload</Text>
+        </TouchableOpac
+
         )}
 
         <Pressable
@@ -243,6 +292,8 @@ export default function IndexScreen() {
 
         {loading ? (
           <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
+        ) : error ? (
+          <Text style={styles.errorText}>{error}</Text>
         ) : filteredWishes.length === 0 ? (
           <Text style={styles.noResults}>No matching wishes 💭</Text>
         ) : (
@@ -250,16 +301,44 @@ export default function IndexScreen() {
             data={filteredWishes}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
-              <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)}>
-                <View style={styles.wishItem}>
-                  <Text style={{ color: '#a78bfa', fontSize: 12 }}>#{item.category} {item.audioUrl ? '🔊' : ''}</Text>
-                  <Text style={styles.wishText}>{item.text}</Text>
-                  <Text style={styles.likeText}>❤️ {item.likes}</Text>
-                </View>
-              </TouchableOpacity>
+<View style={styles.wishItem}>
+  <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)}>
+    <Text style={{ color: '#a78bfa', fontSize: 12 }}>
+      #{item.category} {item.audioUrl ? '🔊' : ''}
+    </Text>
+    <Text style={styles.wishText}>{item.text}</Text>
+    {item.isPoll ? (
+      <View style={{ marginTop: 6 }}>
+        <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
+        <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
+      </View>
+    ) : (
+      <Text style={styles.likeText}>❤️ {item.likes}</Text>
+    )}
+  </TouchableOpacity>
+
+  <TouchableOpacity
+    onPress={() => {
+      setReportTarget(item.id);
+      setReportVisible(true);
+    }}
+    style={{ marginTop: 4 }}
+  >
+    <Text style={{ color: '#f87171' }}>Report</Text>
+  </TouchableOpacity>
+</View>
+
             )}
           />
         )}
+        <ReportDialog
+          visible={reportVisible}
+          onClose={() => {
+            setReportVisible(false);
+            setReportTarget(null);
+          }}
+          onSubmit={handleReport}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -339,6 +418,17 @@ const styles = StyleSheet.create({
     color: '#a78bfa',
     marginTop: 6,
     fontSize: 14,
+  },
+  pollText: {
+    color: '#fff',
+    fontSize: 14,
+  },
+  errorText: {
+    color: '#f87171',
+    textAlign: 'center',
+    marginTop: 20,
+  },
+
   },
   noResults: {
     color: '#ccc',

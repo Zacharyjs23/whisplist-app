@@ -1,7 +1,11 @@
 // app/(tabs)/profile/index.tsx — Enhanced Profile Screen with Analytics
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import {
+  getWishesByNickname,
+  getAllWishes,
+  getWishComments,
+} from '../../../helpers/firestore';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -17,7 +21,6 @@ import {
   View,
 } from 'react-native';
 import { PieChart } from 'react-native-chart-kit';
-import { db } from '../../../firebase';
 
 export default function ProfileScreen() {
   const [nickname, setNickname] = useState('');
@@ -29,20 +32,23 @@ export default function ProfileScreen() {
   const [badges, setBadges] = useState<string[]>([]);
   const [categoryData, setCategoryData] = useState<{ category: string; count: number }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      const stored = await AsyncStorage.getItem('nickname');
-      if (!stored) {
-        setLoading(false);
-        return;
-      }
-      setNickname(stored);
-      setInputName(stored);
+      setError(null);
+      try {
+        const stored = await AsyncStorage.getItem('nickname');
+        if (!stored) {
+          setLoading(false);
+          return;
+        }
+        setNickname(stored);
+        setInputName(stored);
 
-      const wishesSnap = await getDocs(query(collection(db, 'wishes'), where('nickname', '==', stored)));
+      const wishesData = await getWishesByNickname(stored);
       const wishes: any[] = [];
       let likeCount = 0;
       const wishDates: string[] = [];
@@ -50,9 +56,8 @@ export default function ProfileScreen() {
       let topWish = '';
       let topLikes = -1;
 
-      wishesSnap.docs.forEach(doc => {
-        const data = doc.data();
-        wishes.push({ ...data, id: doc.id });
+      wishesData.forEach((data) => {
+        wishes.push({ ...data, id: data.id });
         likeCount += data.likes || 0;
         if (data.timestamp?.toDate) {
           wishDates.push(data.timestamp.toDate().toDateString());
@@ -73,16 +78,14 @@ export default function ProfileScreen() {
       setStats({ totalLikes: likeCount, topWish, firstWish });
       setCategoryData(catData);
 
-      const allWishesSnap = await getDocs(collection(db, 'wishes'));
+      const allWishesData = await getAllWishes();
       const allComments: any[] = [];
 
-      for (const wishDoc of allWishesSnap.docs) {
-        const commentsRef = collection(db, 'wishes', wishDoc.id, 'comments');
-        const commentsSnap = await getDocs(commentsRef);
-        commentsSnap.forEach((doc) => {
-          const data = doc.data();
+      for (const wishDoc of allWishesData) {
+        const commentsSnap = await getWishComments(wishDoc.id);
+        commentsSnap.forEach((data) => {
           if (data.nickname === stored) {
-            allComments.push({ ...data, id: doc.id, wishId: wishDoc.id });
+            allComments.push({ ...data, id: data.id, wishId: wishDoc.id });
           }
         });
       }
@@ -125,6 +128,11 @@ export default function ProfileScreen() {
 
       setBadges(badgeList);
       setLoading(false);
+    } catch (err) {
+      console.error('❌ Failed to load profile data:', err);
+      setError('Failed to load profile');
+      setLoading(false);
+    }
     };
     loadData();
   }, []);
@@ -142,6 +150,8 @@ export default function ProfileScreen() {
       <View style={styles.container}>
         {loading ? (
           <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
+        ) : error ? (
+          <Text style={styles.errorText}>{error}</Text>
         ) : (
           <>
         <Text style={styles.header}>👤 {nickname || 'Anonymous'}</Text>
@@ -292,6 +302,11 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
     marginBottom: 10,
+  },
+  errorText: {
+    color: '#f87171',
+    textAlign: 'center',
+    marginTop: 20,
   },
   button: {
     backgroundColor: '#8b5cf6',

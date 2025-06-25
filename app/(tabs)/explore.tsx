@@ -1,11 +1,21 @@
 // app/(tabs)/explore.tsx — Visually Enhanced Explore Screen with Pull-to-Refresh
 import {
-    collection,
-    limit,
-    onSnapshot,
-    orderBy,
-    query,
+import {
+  listenTrendingWishes,
+  listenWishes,
+  Wish,
+} from '../../helpers/firestore';
+
+import {
+  addDoc,
+  collection,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
 } from 'firebase/firestore';
+
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -18,16 +28,11 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import ReportDialog from '../components/ReportDialog';
 import { Picker } from '@react-native-picker/picker';
 import { db } from '../../firebase';
+import type { Wish } from '../../types/Wish';
 
-interface Wish {
-  id: string;
-  text: string;
-  category: string;
-  likes: number;
-  audioUrl?: string;
-}
 
 const allCategories = ['love', 'health', 'career', 'general', 'money', 'friendship', 'fitness'];
 
@@ -36,24 +41,43 @@ export default function ExploreScreen() {
   const [filteredWishes, setFilteredWishes] = useState<Wish[]>([]);
   const [topWishes, setTopWishes] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [trendingMode, setTrendingMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [reportVisible, setReportVisible] = useState(false);
+  const [reportTarget, setReportTarget] = useState<string | null>(null);
 
   useEffect(() => {
-    const topQuery = query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(3));
-    const unsubscribe = onSnapshot(topQuery, (snapshot) => {
-      const top = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Wish[];
-      setTopWishes(top);
-    });
+try {
+  const unsubscribe = listenTrendingWishes((data) => {
+    setTopWishes(data.slice(0, 3));
+  });
+  return unsubscribe;
+} catch (err) {
+  console.error('❌ Failed to load top wishes:', err);
+  setError('Failed to load wishes');
+  return () => {};
+}
+
     return () => unsubscribe();
   }, []);
 
   const fetchWishes = () => {
     setLoading(true);
-    const baseQuery = query(collection(db, 'wishes'), orderBy(trendingMode ? 'likes' : 'timestamp', 'desc'));
-    const unsubscribe = onSnapshot(baseQuery, (snapshot) => {
-      const all = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Wish[];
-      const filtered = all.filter((wish) => {
+setLoading(true);
+const unsubscribe = (trendingMode ? listenTrendingWishes : listenWishes)((all: Wish[]) => {
+  const filtered = all.filter((wish) => {
+    const inCategory =
+      trendingMode || !selectedCategory || wish.category === selectedCategory;
+    const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+    return inCategory && inSearch;
+  });
+  setFilteredWishes(filtered);
+  setLoading(false);
+});
+
+return unsubscribe;
+
         const inCategory =
           trendingMode || !selectedCategory || wish.category === selectedCategory;
         const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
@@ -61,7 +85,16 @@ export default function ExploreScreen() {
       });
       setFilteredWishes(filtered);
       setLoading(false);
-    });
+    },
+    (err) => {
+      console.error('❌ Failed to load wishes:', err);
+      setError('Failed to load wishes');
+      setLoading(false);
+    }
+  );
+  return unsubscribe;
+};
+
     return unsubscribe;
   };
 
@@ -79,11 +112,51 @@ export default function ExploreScreen() {
   };
 
 
+  const handleReport = async (reason: string) => {
+    if (!reportTarget) return;
+    try {
+      await addDoc(collection(db, 'reports'), {
+        itemId: reportTarget,
+        type: 'wish',
+        reason,
+        timestamp: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('❌ Failed to submit report:', err);
+    } finally {
+      setReportVisible(false);
+      setReportTarget(null);
+    }
+  };
+
   const renderWish = ({ item }: { item: Wish }) => (
     <View style={styles.wishItem}>
-      <Text style={styles.wishCategory}>#{item.category} {item.audioUrl ? '🔊' : ''}</Text>
-      <Text style={styles.wishText}>{item.text}</Text>
-      <Text style={styles.likes}>❤️ {item.likes}</Text>
+<View>
+  <Text style={styles.wishCategory}>
+    #{item.category} {item.audioUrl ? '🔊' : ''}
+  </Text>
+  <Text style={styles.wishText}>{item.text}</Text>
+
+  {item.isPoll ? (
+    <View style={{ marginTop: 6 }}>
+      <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
+      <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
+    </View>
+  ) : (
+    <Text style={styles.likes}>❤️ {item.likes}</Text>
+  )}
+
+  <TouchableOpacity
+    onPress={() => {
+      setReportTarget(item.id);
+      setReportVisible(true);
+    }}
+    style={{ marginTop: 4 }}
+  >
+    <Text style={{ color: '#f87171' }}>Report</Text>
+  </TouchableOpacity>
+</View>
+
     </View>
   );
 
@@ -146,6 +219,8 @@ export default function ExploreScreen() {
 
         {loading ? (
           <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
+        ) : error ? (
+          <Text style={styles.errorText}>{error}</Text>
         ) : filteredWishes.length === 0 ? (
           <Text style={styles.noResults}>No matching wishes 💭</Text>
         ) : (
@@ -158,6 +233,14 @@ export default function ExploreScreen() {
             contentContainerStyle={{ paddingBottom: 80 }}
           />
         )}
+        <ReportDialog
+          visible={reportVisible}
+          onClose={() => {
+            setReportVisible(false);
+            setReportTarget(null);
+          }}
+          onSubmit={handleReport}
+        />
       </View>
     </SafeAreaView>
   );
@@ -265,6 +348,17 @@ const styles = StyleSheet.create({
     color: '#f472b6',
     fontSize: 14,
     fontWeight: '500',
+  },
+  pollText: {
+    color: '#fff',
+    fontSize: 14,
+  },
+  errorText: {
+    color: '#f87171',
+    textAlign: 'center',
+    marginTop: 20,
+  },
+
   },
   noResults: {
     color: '#ccc',

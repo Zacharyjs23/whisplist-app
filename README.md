@@ -35,6 +35,10 @@ npm run reset-project
 
 This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
 
+## Poll Mode
+
+Wishes can optionally include a poll with two text choices. Enable **Poll Mode** on the home screen to add options A and B when posting a wish. Vote results update in real time on the wish detail screen.
+
 ## Learn more
 
 To learn more about developing your project with Expo, look at the following resources:
@@ -48,3 +52,7 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## Push notifications
+
+The app registers a device for Expo push notifications. When someone likes or comments on one of your wishes, a notification is sent to the push token saved with that wish.

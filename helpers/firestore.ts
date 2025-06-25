@@ -1,0 +1,116 @@
+import { collection, query, orderBy, limit, onSnapshot, addDoc, doc, updateDoc, increment, getDoc, serverTimestamp, getDocs, where } from 'firebase/firestore';
+import { db } from '../firebase';
+
+export interface Wish {
+  id: string;
+  text: string;
+  category: string;
+  likes: number;
+  pushToken?: string;
+  audioUrl?: string;
+  [key: string]: any;
+}
+
+export interface Comment {
+  id: string;
+  text: string;
+  nickname?: string;
+  timestamp?: any;
+  parentId?: string;
+  reactions?: Record<string, number>;
+  userReactions?: Record<string, string>;
+  [key: string]: any;
+}
+
+export function listenTrendingWishes(cb: (wishes: Wish[]) => void) {
+  const q = query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(20));
+  return onSnapshot(q, snap => {
+    const data = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Wish,'id'>) }));
+    cb(data as Wish[]);
+  });
+}
+
+export function listenWishes(cb: (wishes: Wish[]) => void) {
+  const q = query(collection(db, 'wishes'), orderBy('timestamp', 'desc'));
+  return onSnapshot(q, snap => {
+    const data = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Wish,'id'>) }));
+    cb(data as Wish[]);
+  });
+}
+
+export async function addWish(data: Omit<Wish, 'id'>) {
+  return addDoc(collection(db, 'wishes'), {
+    likes: 0,
+    timestamp: serverTimestamp(),
+    ...data,
+  });
+}
+
+export async function likeWish(id: string) {
+  const ref = doc(db, 'wishes', id);
+  return updateDoc(ref, { likes: increment(1) });
+}
+
+export async function getWish(id: string): Promise<Wish | null> {
+  const snap = await getDoc(doc(db, 'wishes', id));
+  return snap.exists() ? ({ id: snap.id, ...(snap.data() as Omit<Wish,'id'>) } as Wish) : null;
+}
+
+export function listenWishComments(wishId: string, cb: (comments: Comment[]) => void) {
+  const q = query(collection(db, 'wishes', wishId, 'comments'), orderBy('timestamp', 'asc'));
+  return onSnapshot(q, snap => {
+    const data = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Comment,'id'>) }));
+    cb(data as Comment[]);
+  });
+}
+
+export async function addComment(wishId: string, data: Omit<Comment, 'id'>) {
+  return addDoc(collection(db, 'wishes', wishId, 'comments'), {
+    timestamp: serverTimestamp(),
+    ...data,
+  });
+}
+
+export async function updateCommentReaction(
+  wishId: string,
+  commentId: string,
+  emoji: string,
+  prevEmoji: string | undefined,
+  user: string
+) {
+  const ref = doc(db, 'wishes', wishId, 'comments', commentId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  const data = snap.data() as Comment;
+  const reactions = { ...(data.reactions || {}) } as Record<string, number>;
+  const userReactions = { ...(data.userReactions || {}) } as Record<string, string>;
+
+  if (prevEmoji && reactions[prevEmoji]) {
+    reactions[prevEmoji] -= 1;
+    if (reactions[prevEmoji] === 0) delete reactions[prevEmoji];
+  }
+
+  if (prevEmoji === emoji) {
+    delete userReactions[user];
+  } else {
+    userReactions[user] = emoji;
+    reactions[emoji] = (reactions[emoji] || 0) + 1;
+  }
+
+  return updateDoc(ref, { reactions, userReactions });
+}
+
+export async function getWishesByNickname(nickname: string) {
+  const snap = await getDocs(query(collection(db, 'wishes'), where('nickname', '==', nickname)));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export async function getAllWishes() {
+  const snap = await getDocs(collection(db, 'wishes'));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export async function getWishComments(wishId: string) {
+  const snap = await getDocs(collection(db, 'wishes', wishId, 'comments'));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
