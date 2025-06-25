@@ -30,6 +30,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  Switch,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -41,7 +42,13 @@ interface Wish {
   category: string;
   likes: number;
   pushToken?: string;
+  isPoll?: boolean;
+  optionA?: string;
+  optionB?: string;
+  votesA?: number;
+  votesB?: number;
   audioUrl?: string;
+
 }
 
 export default function IndexScreen() {
@@ -52,9 +59,13 @@ export default function IndexScreen() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [pushToken, setPushToken] = useState<string | null>(null);
+  const [isPoll, setIsPoll] = useState(false);
+  const [optionA, setOptionA] = useState('');
+  const [optionB, setOptionB] = useState('');
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+
 
   useEffect(() => {
     registerForPushNotificationsAsync().then(setPushToken);
@@ -135,11 +146,23 @@ export default function IndexScreen() {
         likes: 0,
         timestamp: serverTimestamp(),
         pushToken: pushToken || '',
-        audioUrl,
+        ...(isPoll && {
+          isPoll: true,
+          optionA: optionA.trim(),
+          optionB: optionB.trim(),
+          votesA: 0,
+          votesB: 0,
+        }),
+        ...(audioUrl && { audioUrl }),
       });
+
       setWish('');
       setCategory('general');
+      setOptionA('');
+      setOptionB('');
+      setIsPoll(false);
       setRecordedUri(null);
+
     } catch (error) {
       console.error('❌ Failed to post wish:', error);
     }
@@ -223,6 +246,32 @@ export default function IndexScreen() {
           onChangeText={setCategory}
         />
 
+        {/* Poll Mode Switch and Inputs */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+          <Text style={{ color: '#fff', marginRight: 8 }}>Poll Mode</Text>
+          <Switch value={isPoll} onValueChange={setIsPoll} />
+        </View>
+
+        {isPoll && (
+          <>
+            <TextInput
+              style={styles.input}
+              placeholder="Option A"
+              placeholderTextColor="#999"
+              value={optionA}
+              onChangeText={setOptionA}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Option B"
+              placeholderTextColor="#999"
+              value={optionB}
+              onChangeText={setOptionB}
+            />
+          </>
+        )}
+
+        {/* Audio Recording Button */}
         <TouchableOpacity
           style={[
             styles.recButton,
@@ -233,9 +282,8 @@ export default function IndexScreen() {
           <Text style={styles.buttonText}>
             {isRecording ? 'Stop Recording' : 'Record Audio'}
           </Text>
-        </TouchableOpacity>
-        {recordedUri && !isRecording && (
-          <Text style={styles.recordingStatus}>Audio ready to upload</Text>
+        </TouchableOpac
+
         )}
 
         <Pressable
@@ -265,7 +313,14 @@ export default function IndexScreen() {
                 <View style={styles.wishItem}>
                   <Text style={{ color: '#a78bfa', fontSize: 12 }}>#{item.category} {item.audioUrl ? '🔊' : ''}</Text>
                   <Text style={styles.wishText}>{item.text}</Text>
-                  <Text style={styles.likeText}>❤️ {item.likes}</Text>
+                  {item.isPoll ? (
+                    <View style={{ marginTop: 6 }}>
+                      <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
+                      <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.likeText}>❤️ {item.likes}</Text>
+                  )}
                 </View>
               </TouchableOpacity>
             )}
@@ -351,10 +406,16 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 14,
   },
+  pollText: {
+    color: '#fff',
+    fontSize: 14,
+  },
   errorText: {
     color: '#f87171',
     textAlign: 'center',
     marginTop: 20,
+  },
+
   },
   noResults: {
     color: '#ccc',

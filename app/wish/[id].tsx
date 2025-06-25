@@ -1,17 +1,18 @@
 // app/wish/[id].tsx — detail view of a single wish
 import { formatDistanceToNow } from 'date-fns';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { Audio } from 'expo-av';
 import {
   addDoc,
   collection,
   doc,
-  getDoc,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
+  increment,
   updateDoc,
 } from 'firebase/firestore';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -35,8 +36,14 @@ interface Wish {
   text: string;
   category: string;
   likes: number;
+  isPoll?: boolean;
+  optionA?: string;
+  optionB?: string;
+  votesA?: number;
+  votesB?: number;
   pushToken?: string;
   audioUrl?: string;
+
 }
 
 
@@ -60,6 +67,7 @@ export default function WishDetailScreen() {
   const [nickname, setNickname] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
   const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [hasVoted, setHasVoted] = useState(false);
   const [fulfillment, setFulfillment] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,9 +93,16 @@ export default function WishDetailScreen() {
     }
   }, [id]);
 
+  }, [id]);
+
   useEffect(() => {
-    fetchWish();
-  }, [fetchWish]);
+    const checkVote = async () => {
+      const voted = await AsyncStorage.getItem('votedPolls');
+      const list = voted ? JSON.parse(voted) : [];
+      if (list.includes(id)) setHasVoted(true);
+    };
+    checkVote();
+  }, [id]);
 
   const subscribeToComments = useCallback(() => {
     const commentsRef = collection(db, 'wishes', id as string, 'comments');
@@ -213,6 +228,26 @@ export default function WishDetailScreen() {
     }
   }, [comments, id, nickname]);
 
+  const handleVote = useCallback(
+    async (option: 'A' | 'B') => {
+      if (!wish || hasVoted) return;
+      try {
+        const ref = doc(db, 'wishes', wish.id);
+        await updateDoc(ref, {
+          [option === 'A' ? 'votesA' : 'votesB']: increment(1),
+        });
+        const voted = await AsyncStorage.getItem('votedPolls');
+        const list = voted ? JSON.parse(voted) : [];
+        list.push(wish.id);
+        await AsyncStorage.setItem('votedPolls', JSON.stringify(list));
+        setHasVoted(true);
+      } catch (err) {
+        console.error('❌ Failed to vote:', err);
+      }
+    },
+    [hasVoted, wish]
+  );
+
   const handleFulfillWish = useCallback(async () => {
     if (!fulfillment.trim()) return;
     try {
@@ -226,6 +261,7 @@ export default function WishDetailScreen() {
       console.error('❌ Failed to fulfill wish:', err);
     }
   }, [fulfillment, id]);
+
 
 
   const renderCommentItem = useCallback(
@@ -304,24 +340,52 @@ export default function WishDetailScreen() {
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
 
-        {loading ? (
-          <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
-        ) : error ? (
-          <Text style={styles.errorText}>{error}</Text>
+{loading ? (
+  <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
+) : error ? (
+  <Text style={styles.errorText}>{error}</Text>
+) : (
+  <>
+    {wish && (
+      <View style={styles.wishBox}>
+        <Text style={styles.wishCategory}>#{wish.category}</Text>
+        <Text style={styles.wishText}>{wish.text}</Text>
+
+        {wish.isPoll ? (
+          <View style={{ marginTop: 8 }}>
+            <TouchableOpacity
+              style={styles.pollOption}
+              disabled={hasVoted}
+              onPress={() => handleVote('A')}
+            >
+              <Text style={styles.pollOptionText}>
+                {wish.optionA} - {wish.votesA || 0}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.pollOption}
+              disabled={hasVoted}
+              onPress={() => handleVote('B')}
+            >
+              <Text style={styles.pollOptionText}>
+                {wish.optionB} - {wish.votesB || 0}
+              </Text>
+            </TouchableOpacity>
+          </View>
         ) : (
-          <>
-            {wish && (
-              <View style={styles.wishBox}>
-                <Text style={styles.wishCategory}>#{wish.category}</Text>
-                <Text style={styles.wishText}>{wish.text}</Text>
-                <Text style={styles.likes}>❤️ {wish.likes}</Text>
-                {wish.audioUrl && (
-                  <TouchableOpacity onPress={playAudio} style={{ marginTop: 10 }}>
-                    <Text style={{ color: '#a78bfa' }}>▶ Play Audio</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
+          <Text style={styles.likes}>❤️ {wish.likes}</Text>
+        )}
+
+        {wish.audioUrl && (
+          <TouchableOpacity onPress={playAudio} style={{ marginTop: 10 }}>
+            <Text style={{ color: '#a78bfa' }}>▶ Play Audio</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    )}
+  </>
+)}
+
 
             <FlatList
               ref={flatListRef}
@@ -415,6 +479,16 @@ const styles = StyleSheet.create({
     color: '#a78bfa',
     fontSize: 14,
     marginTop: 8,
+  },
+  pollOption: {
+    backgroundColor: '#2e2e2e',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 6,
+  },
+  pollOptionText: {
+    color: '#fff',
+    textAlign: 'center',
   },
   commentBox: {
     backgroundColor: '#1a1a1a',
