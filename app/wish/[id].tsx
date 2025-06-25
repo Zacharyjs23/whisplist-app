@@ -46,6 +46,8 @@ interface Comment {
 }
 
 const emojiOptions = ['❤️', '😂', '😢', '👍'];
+// Approximate height of a single comment item including margins
+const COMMENT_ITEM_HEIGHT = 80;
 
 export default function WishDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -55,7 +57,7 @@ export default function WishDetailScreen() {
   const [nickname, setNickname] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
   const [replyTo, setReplyTo] = useState<string | null>(null);
-  const flatListRef = useRef<FlatList>(null);
+  const flatListRef = useRef<FlatList<Comment>>(null);
   const animationRefs = useRef<{ [key: string]: Animated.Value }>({});
 
   const fetchWish = useCallback(async () => {
@@ -242,6 +244,12 @@ export default function WishDetailScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderComment}
           contentContainerStyle={{ paddingBottom: 80 }}
+          initialNumToRender={10}
+          getItemLayout={(_, index) => ({
+            length: COMMENT_ITEM_HEIGHT,
+            offset: COMMENT_ITEM_HEIGHT * index,
+            index,
+          })}
         />
 
         {replyTo && (
