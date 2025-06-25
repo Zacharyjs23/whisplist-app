@@ -53,7 +53,33 @@ useEffect(() => {
 
 const fetchWishes = () => {
   setLoading(true);
-  const unsubscribe = (trendingMode ? listenTrendingWishes : listenWishes)(
+  const source = trendingMode ? listenTrendingWishes : listenWishes;
+  const unsubscribe = source((all: Wish[]) => {
+    const filtered = all.filter((wish) => {
+      const inCategory =
+        trendingMode || !selectedCategory || wish.category === selectedCategory;
+      const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+      return inCategory && inSearch;
+    });
+    setFilteredWishes(filtered);
+    setLoading(false);
+  });
+  return unsubscribe;
+};
+
+        const inCategory =
+          trendingMode || !selectedCategory || wish.category === selectedCategory;
+        const inSearch = wish.text
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase());
+        return inCategory && inSearch;
+      });
+      setFilteredWishes(filtered);
+      setLoading(false);
+const fetchWishes = () => {
+  setLoading(true);
+  const source = trendingMode ? listenTrendingWishes : listenWishes;
+  const unsubscribe = source(
     (all: Wish[]) => {
       const filtered = all.filter((wish) => {
         const inCategory =
@@ -107,27 +133,29 @@ const fetchWishes = () => {
 
   const renderWish = ({ item }: { item: Wish }) => (
     <View style={styles.wishItem}>
-      <Text style={styles.wishCategory}>
-        #{item.category} {item.audioUrl ? '🔊' : ''}
-      </Text>
-      <Text style={styles.wishText}>{item.text}</Text>
+<TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)}>
+  <Text style={styles.wishCategory}>
+    #{item.category} {item.audioUrl ? '🔊' : ''}
+  </Text>
+  <Text style={styles.wishText}>{item.text}</Text>
+  {item.isPoll ? (
+    <View style={{ marginTop: 6 }}>
+      <Text style={styles.pollText}>{item.optionA}: {item.votesA ?? 0}</Text>
+      <Text style={styles.pollText}>{item.optionB}: {item.votesB ?? 0}</Text>
+    </View>
+  ) : (
+    <Text style={styles.likes}>❤️ {item.likes}</Text>
+  )}
+</TouchableOpacity>
 
-      {item.isPoll ? (
-        <View style={{ marginTop: 6 }}>
-          <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
-          <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
-        </View>
-      ) : (
-        <Text style={styles.likes}>❤️ {item.likes}</Text>
-      )}
 
       <TouchableOpacity
         onPress={() => {
           setReportTarget(item.id);
           setReportVisible(true);
         }}
-        style={{ marginTop: 4 }}
-      >
+        style={{ marginTop: 4 }}>
+
         <Text style={{ color: '#f87171' }}>Report</Text>
       </TouchableOpacity>
     </View>
