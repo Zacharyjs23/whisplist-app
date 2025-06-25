@@ -7,7 +7,6 @@ import {
   Share,
   StyleSheet,
   Switch,
-  Text,
   TextInput,
   View,
 } from 'react-native';
@@ -31,6 +30,13 @@ import { db, storage } from '../../firebase';
 export default function SettingsScreen() {
   const { theme, toggleTheme } = useTheme();
 
+  interface User {
+    id: string;
+    nickname: string;
+  }
+
+  const [user, setUser] = useState<User | null>(null);
+
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [defaultCategory, setDefaultCategory] = useState('general');
   const [language, setLanguage] = useState('en');
@@ -47,12 +53,14 @@ export default function SettingsScreen() {
       const anon = await AsyncStorage.getItem('anonymize');
       const dev = await AsyncStorage.getItem('devMode');
       const quote = await AsyncStorage.getItem('dailyQuote');
+      const storedNickname = await AsyncStorage.getItem('nickname');
       if (a) setAvatarUrl(a);
       if (cat) setDefaultCategory(cat);
       if (lang) setLanguage(lang);
       setAnonymize(anon === 'true');
       setDevMode(dev === 'true');
       setDailyQuote(quote === 'true');
+      if (storedNickname) setUser({ id: 'local', nickname: storedNickname });
     };
     load();
   }, []);
@@ -82,14 +90,13 @@ export default function SettingsScreen() {
   };
 
   const handleExport = async () => {
-    const nickname = await AsyncStorage.getItem('nickname');
-    if (!nickname) return Alert.alert('No nickname set');
-    const wishes = await getWishesByNickname(nickname);
+    if (!user?.nickname) return Alert.alert('No nickname set');
+    const wishes = await getWishesByNickname(user.nickname);
     const comments: any[] = [];
     for (const w of wishes) {
       const list = await getWishComments(w.id);
       list.forEach((c) => {
-        if (c.nickname === nickname) comments.push(c);
+        if (c.nickname === user.nickname) comments.push(c);
       });
     }
     const data = JSON.stringify({ wishes, comments }, null, 2);
@@ -107,8 +114,7 @@ export default function SettingsScreen() {
   };
 
   const handleDeleteContent = async () => {
-    const nickname = await AsyncStorage.getItem('nickname');
-    if (!nickname) return Alert.alert('No nickname set');
+    if (!user?.nickname) return Alert.alert('No nickname set');
     const confirm = await new Promise<boolean>((resolve) => {
       Alert.alert('Delete All', 'Are you sure?', [
         { text: 'Cancel', onPress: () => resolve(false) },
@@ -116,7 +122,7 @@ export default function SettingsScreen() {
       ]);
     });
     if (!confirm) return;
-    const wishes = await getWishesByNickname(nickname);
+    const wishes = await getWishesByNickname(user.nickname);
     for (const w of wishes) {
       await deleteDoc(doc(db, 'wishes', w.id));
     }
@@ -124,7 +130,7 @@ export default function SettingsScreen() {
     for (const wish of all) {
       const list = await getWishComments(wish.id);
       for (const c of list) {
-        if (c.nickname === nickname) {
+        if (c.nickname === user.nickname) {
           await deleteDoc(doc(db, 'wishes', wish.id, 'comments', c.id));
         }
       }
