@@ -5,13 +5,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { Audio } from 'expo-av';
 import {
-import {
   getWish,
   listenWishComments,
   addComment,
   updateCommentReaction,
-  Wish,
-  Comment,
 } from '../../helpers/firestore';
 
 import {
@@ -19,6 +16,8 @@ import {
   collection,
   serverTimestamp,
   increment,
+  doc,
+  updateDoc,
 } from 'firebase/firestore'; // ✅ Keep only if used directly in this file
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -75,23 +74,19 @@ export default function WishDetailScreen() {
   const animationRefs = useRef<{ [key: string]: Animated.Value }>({});
 
   const fetchWish = useCallback(async () => {
-setLoading(true);
-setError(null);
-try {
-  const data = await getWish(id as string);
-  if (data) {
-    setWish(data);
-  }
-} catch (err) {
-  console.error('❌ Failed to load wish:', err);
-  setError('Failed to load wish');
-} finally {
-  setLoading(false);
-}
-
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getWish(id as string);
+      if (data) {
+        setWish(data);
+      }
+    } catch (err) {
+      console.error('❌ Failed to load wish:', err);
+      setError('Failed to load wish');
+    } finally {
+      setLoading(false);
     }
-  }, [id]);
-
   }, [id]);
 
   useEffect(() => {
@@ -401,21 +396,7 @@ try {
   </>
 )}
 
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <Text style={styles.likes}>❤️ {wish.likes}</Text>
-        )}
 
-        {wish.audioUrl && (
-          <TouchableOpacity onPress={playAudio} style={{ marginTop: 10 }}>
-            <Text style={{ color: '#a78bfa' }}>▶ Play Audio</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    )}
-  </>
-)}
 
 <FlatList
   ref={flatListRef}
