@@ -1,22 +1,30 @@
 // app/wish/[id].tsx — detail view of a single wish
 import { formatDistanceToNow } from 'date-fns';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { Audio } from 'expo-av';
 import {
+import {
+  getWish,
+  listenWishComments,
+  addComment,
+  updateCommentReaction,
+  Wish,
+  Comment,
+} from '../../helpers/firestore';
+
+import {
   addDoc,
   collection,
-  doc,
-  getDoc,
-  onSnapshot,
-  orderBy,
-  query,
   serverTimestamp,
-  updateDoc,
-} from 'firebase/firestore';
+  increment,
+} from 'firebase/firestore'; // ✅ Keep only if used directly in this file
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -27,6 +35,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import ReportDialog from '../../components/ReportDialog';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 
@@ -40,7 +49,10 @@ interface Comment {
   userReactions?: Record<string, string>;
 }
 
+
 const emojiOptions = ['❤️', '😂', '😢', '👍'];
+// Approximate height of a single comment item including margins
+const COMMENT_ITEM_HEIGHT = 80;
 
 export default function WishDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -50,46 +62,79 @@ export default function WishDetailScreen() {
   const [nickname, setNickname] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
   const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [reportTarget, setReportTarget] = useState<{ type: 'wish' | 'comment'; id: string } | null>(null);
+  const [reportVisible, setReportVisible] = useState(false);
+  const [hasVoted, setHasVoted] = useState(false);
+  const [fulfillment, setFulfillment] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const flatListRef = useRef<FlatList>(null);
+
+  const flatListRef = useRef<FlatList<Comment>>(null);
+
   const animationRefs = useRef<{ [key: string]: Animated.Value }>({});
 
   const fetchWish = useCallback(async () => {
-    const ref = doc(db, 'wishes', id as string);
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      setWish({ id: snap.id, ...(snap.data() as Omit<Wish, 'id'>) });
+setLoading(true);
+setError(null);
+try {
+  const data = await getWish(id as string);
+  if (data) {
+    setWish(data);
+  }
+} catch (err) {
+  console.error('❌ Failed to load wish:', err);
+  setError('Failed to load wish');
+} finally {
+  setLoading(false);
+}
+
     }
   }, [id]);
 
+  }, [id]);
+
   useEffect(() => {
-    fetchWish();
-  }, [fetchWish]);
+    const checkVote = async () => {
+      const voted = await AsyncStorage.getItem('votedPolls');
+      const list = voted ? JSON.parse(voted) : [];
+      if (list.includes(id)) setHasVoted(true);
+    };
+    checkVote();
+  }, [id]);
 
   const subscribeToComments = useCallback(() => {
-    const commentsRef = collection(db, 'wishes', id as string, 'comments');
-    const q = query(commentsRef, orderBy('timestamp', 'asc'));
-
-    return onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((d) => {
-        const commentId = d.id;
-        if (!animationRefs.current[commentId]) {
-          animationRefs.current[commentId] = new Animated.Value(0);
-        }
-        const data = d.data() as Omit<Comment, 'id'> & { parentId?: string };
-        return { id: d.id, ...data };
-      }) as Comment[];
-
-      const sorted = [...list].sort((a, b) => {
-        const aCount = Object.values(a.reactions || {}).reduce((s, v) => s + v, 0);
-        const bCount = Object.values(b.reactions || {}).reduce((s, v) => s + v, 0);
-        return bCount - aCount;
-      });
-      setComments(sorted);
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 300);
+setLoading(true);
+try {
+  const unsubscribe = listenWishComments(id as string, (list) => {
+    list.forEach((d) => {
+      const commentId = d.id;
+      if (!animationRefs.current[commentId]) {
+        animationRefs.current[commentId] = new Animated.Value(0);
+      }
     });
+
+    const sorted = [...list].sort((a, b) => {
+      const aCount = Object.values(a.reactions || {}).reduce((s, v) => s + v, 0);
+      const bCount = Object.values(b.reactions || {}).reduce((s, v) => s + v, 0);
+      return bCount - aCount;
+    });
+
+    setComments(sorted);
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 300);
+    setLoading(false);
+  });
+
+  return unsubscribe;
+} catch (err) {
+  console.error('❌ Failed to load comments:', err);
+  setError('Failed to load comments');
+  setLoading(false);
+  return () => {};
+}
+
   }, [id]);
 
   useEffect(() => {
@@ -117,52 +162,102 @@ export default function WishDetailScreen() {
   const handlePostComment = useCallback(async () => {
     if (!comment.trim()) return;
     try {
-      const commentsRef = collection(db, 'wishes', id as string, 'comments');
-      await addDoc(commentsRef, {
+      await addComment(id as string, {
         text: comment.trim(),
         nickname: nickname.trim() || 'Anonymous',
-        timestamp: serverTimestamp(),
         parentId: replyTo,
         reactions: {},
         userReactions: {},
       });
       setComment('');
       setReplyTo(null);
+
+      if (wish?.pushToken) {
+        await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: wish.pushToken,
+            title: 'New comment on your wish 💬',
+            body: 'Someone left a comment on your wish.',
+          }),
+        });
+      }
     } catch (err) {
       console.error('❌ Failed to post comment:', err);
     }
-  }, [comment, id, nickname, replyTo]);
+  }, [comment, id, nickname, replyTo, wish]);
+
 
   const handleReact = useCallback(async (commentId: string, emoji: string) => {
     const comment = comments.find((c) => c.id === commentId);
     if (!comment) return;
     const currentUser = nickname.trim() || 'Anonymous';
     const prevEmoji = comment.userReactions?.[currentUser];
-    const newReactions = { ...(comment.reactions || {}) };
-    const newUserReactions = { ...(comment.userReactions || {}) };
-
-    if (prevEmoji && newReactions[prevEmoji]) {
-      newReactions[prevEmoji] -= 1;
-      if (newReactions[prevEmoji] === 0) delete newReactions[prevEmoji];
-    }
-
-    if (prevEmoji === emoji) {
-      delete newUserReactions[currentUser];
-    } else {
-      newUserReactions[currentUser] = emoji;
-      newReactions[emoji] = (newReactions[emoji] || 0) + 1;
-    }
 
     try {
-      const commentRef = doc(db, 'wishes', id as string, 'comments', commentId);
-      await updateDoc(commentRef, {
-        reactions: newReactions,
-        userReactions: newUserReactions,
-      });
+      await updateCommentReaction(id as string, commentId, emoji, prevEmoji, currentUser);
     } catch (err) {
       console.error('❌ Failed to update reaction:', err);
     }
   }, [comments, id, nickname]);
+
+  const handleReport = useCallback(
+    async (reason: string) => {
+      if (!reportTarget) return;
+      try {
+        await addDoc(collection(db, 'reports'), {
+          itemId: reportTarget.id,
+          type: reportTarget.type,
+          reason,
+          timestamp: serverTimestamp(),
+        });
+      } catch (err) {
+        console.error('❌ Failed to submit report:', err);
+      } finally {
+        setReportVisible(false);
+        setReportTarget(null);
+      }
+    },
+    [reportTarget]
+  );
+
+  const handleVote = useCallback(
+    async (option: 'A' | 'B') => {
+      if (!wish || hasVoted) return;
+      try {
+        const ref = doc(db, 'wishes', wish.id);
+        await updateDoc(ref, {
+          [option === 'A' ? 'votesA' : 'votesB']: increment(1),
+        });
+        const voted = await AsyncStorage.getItem('votedPolls');
+        const list = voted ? JSON.parse(voted) : [];
+        list.push(wish.id);
+        await AsyncStorage.setItem('votedPolls', JSON.stringify(list));
+        setHasVoted(true);
+      } catch (err) {
+        console.error('❌ Failed to vote:', err);
+      }
+    },
+    [hasVoted, wish]
+  );
+
+  const handleFulfillWish = useCallback(async () => {
+    if (!fulfillment.trim()) return;
+    try {
+      const fulfillRef = collection(db, 'wishes', id as string, 'fulfillments');
+      await addDoc(fulfillRef, {
+        text: fulfillment.trim(),
+        timestamp: serverTimestamp(),
+      });
+      setFulfillment('');
+    } catch (err) {
+      console.error('❌ Failed to fulfill wish:', err);
+    }
+  }, [fulfillment, id]);
 
 
   const renderCommentItem = useCallback(
@@ -218,6 +313,15 @@ export default function WishDetailScreen() {
               <TouchableOpacity onPress={() => setReplyTo(item.id)} style={{ marginLeft: 8 }}>
                 <Text style={{ color: '#a78bfa' }}>Reply</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setReportTarget({ type: 'comment', id: item.id });
+                  setReportVisible(true);
+                }}
+                style={{ marginLeft: 8 }}
+              >
+                <Text style={{ color: '#f87171' }}>Report</Text>
+              </TouchableOpacity>
             </View>
           </Animated.View>
           {replies.map((r) => renderCommentItem(r, level + 1))}
@@ -241,26 +345,92 @@ export default function WishDetailScreen() {
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
 
-        {wish && (
-          <View style={styles.wishBox}>
-            <Text style={styles.wishCategory}>#{wish.category}</Text>
-            <Text style={styles.wishText}>{wish.text}</Text>
-            <Text style={styles.likes}>❤️ {wish.likes}</Text>
-            {wish.audioUrl && (
-              <TouchableOpacity onPress={playAudio} style={{ marginTop: 10 }}>
-                <Text style={{ color: '#a78bfa' }}>▶ Play Audio</Text>
-              </TouchableOpacity>
-            )}
+{loading ? (
+  <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
+) : error ? (
+  <Text style={styles.errorText}>{error}</Text>
+) : (
+  <>
+    {wish && (
+      <View style={styles.wishBox}>
+        <Text style={styles.wishCategory}>#{wish.category}</Text>
+        <Text style={styles.wishText}>{wish.text}</Text>
+
+        {wish.isPoll ? (
+          <View style={{ marginTop: 8 }}>
+            <TouchableOpacity
+              style={styles.pollOption}
+              disabled={hasVoted}
+              onPress={() => handleVote('A')}
+            >
+              <Text style={styles.pollOptionText}>
+                {wish.optionA} - {wish.votesA || 0}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.pollOption}
+              disabled={hasVoted}
+              onPress={() => handleVote('B')}
+            >
+              <Text style={styles.pollOptionText}>
+                {wish.optionB} - {wish.votesB || 0}
+              </Text>
+            </TouchableOpacity>
           </View>
+        ) : (
+          <Text style={styles.likes}>❤️ {wish.likes}</Text>
         )}
 
-        <FlatList
-          ref={flatListRef}
-          data={comments.filter((c) => !c.parentId)}
-          keyExtractor={(item) => item.id}
-          renderItem={renderComment}
-          contentContainerStyle={{ paddingBottom: 80 }}
-        />
+        {wish.audioUrl && (
+          <TouchableOpacity onPress={playAudio} style={{ marginTop: 10 }}>
+            <Text style={{ color: '#a78bfa' }}>▶ Play Audio</Text>
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          onPress={() => {
+            setReportTarget({ type: 'wish', id: wish.id });
+            setReportVisible(true);
+          }}
+          style={{ marginTop: 8 }}
+        >
+          <Text style={{ color: '#f87171' }}>Report</Text>
+        </TouchableOpacity>
+      </View>
+    )}
+  </>
+)}
+
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <Text style={styles.likes}>❤️ {wish.likes}</Text>
+        )}
+
+        {wish.audioUrl && (
+          <TouchableOpacity onPress={playAudio} style={{ marginTop: 10 }}>
+            <Text style={{ color: '#a78bfa' }}>▶ Play Audio</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    )}
+  </>
+)}
+
+<FlatList
+  ref={flatListRef}
+  data={comments.filter((c) => !c.parentId)}
+  keyExtractor={(item) => item.id}
+  renderItem={renderComment}
+  contentContainerStyle={{ paddingBottom: 80 }}
+  initialNumToRender={10}
+  getItemLayout={(_, index) => ({
+    length: COMMENT_ITEM_HEIGHT,
+    offset: COMMENT_ITEM_HEIGHT * index,
+    index,
+  })}
+/>
+
 
         {replyTo && (
           <View style={styles.replyInfo}>
@@ -292,6 +462,27 @@ export default function WishDetailScreen() {
         <TouchableOpacity style={styles.button} onPress={handlePostComment}>
           <Text style={styles.buttonText}>Post Comment</Text>
         </TouchableOpacity>
+        <ReportDialog
+          visible={reportVisible}
+          onClose={() => {
+            setReportVisible(false);
+            setReportTarget(null);
+          }}
+          onSubmit={handleReport}
+        />
+
+        <TextInput
+          style={styles.input}
+          placeholder="Fulfillment text or link"
+          placeholderTextColor="#aaa"
+          value={fulfillment}
+          onChangeText={setFulfillment}
+        />
+
+        <TouchableOpacity style={styles.button} onPress={handleFulfillWish}>
+          <Text style={styles.buttonText}>Fulfill Wish</Text>
+        </TouchableOpacity>
+
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -333,6 +524,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 8,
   },
+  pollOption: {
+    backgroundColor: '#2e2e2e',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 6,
+  },
+  pollOptionText: {
+    color: '#fff',
+    textAlign: 'center',
+  },
   commentBox: {
     backgroundColor: '#1a1a1a',
     padding: 10,
@@ -364,6 +565,11 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
     marginBottom: 10,
+  },
+  errorText: {
+    color: '#f87171',
+    textAlign: 'center',
+    marginTop: 20,
   },
   button: {
     backgroundColor: '#8b5cf6',
