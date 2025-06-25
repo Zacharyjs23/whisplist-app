@@ -28,6 +28,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  Switch,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -39,6 +40,11 @@ interface Wish {
   category: string;
   likes: number;
   pushToken?: string;
+  isPoll?: boolean;
+  optionA?: string;
+  optionB?: string;
+  votesA?: number;
+  votesB?: number;
 }
 
 export default function IndexScreen() {
@@ -48,6 +54,9 @@ export default function IndexScreen() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [pushToken, setPushToken] = useState<string | null>(null);
+  const [isPoll, setIsPoll] = useState(false);
+  const [optionA, setOptionA] = useState('');
+  const [optionB, setOptionB] = useState('');
 
   useEffect(() => {
     registerForPushNotificationsAsync().then(setPushToken);
@@ -75,9 +84,19 @@ export default function IndexScreen() {
         likes: 0,
         timestamp: serverTimestamp(),
         pushToken: pushToken || '',
+        ...(isPoll && {
+          isPoll: true,
+          optionA: optionA.trim(),
+          optionB: optionB.trim(),
+          votesA: 0,
+          votesB: 0,
+        }),
       });
       setWish('');
       setCategory('general');
+      setOptionA('');
+      setOptionB('');
+      setIsPoll(false);
     } catch (error) {
       console.error('❌ Failed to post wish:', error);
     }
@@ -161,6 +180,30 @@ export default function IndexScreen() {
           onChangeText={setCategory}
         />
 
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+          <Text style={{ color: '#fff', marginRight: 8 }}>Poll Mode</Text>
+          <Switch value={isPoll} onValueChange={setIsPoll} />
+        </View>
+
+        {isPoll && (
+          <>
+            <TextInput
+              style={styles.input}
+              placeholder="Option A"
+              placeholderTextColor="#999"
+              value={optionA}
+              onChangeText={setOptionA}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Option B"
+              placeholderTextColor="#999"
+              value={optionB}
+              onChangeText={setOptionB}
+            />
+          </>
+        )}
+
         <Pressable
           style={[styles.button, { opacity: wish.trim() === '' ? 0.5 : 1 }]}
           onPress={handlePostWish}
@@ -186,7 +229,14 @@ export default function IndexScreen() {
                 <View style={styles.wishItem}>
                   <Text style={{ color: '#a78bfa', fontSize: 12 }}>#{item.category}</Text>
                   <Text style={styles.wishText}>{item.text}</Text>
-                  <Text style={styles.likeText}>❤️ {item.likes}</Text>
+                  {item.isPoll ? (
+                    <View style={{ marginTop: 6 }}>
+                      <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
+                      <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.likeText}>❤️ {item.likes}</Text>
+                  )}
                 </View>
               </TouchableOpacity>
             )}
@@ -259,6 +309,10 @@ const styles = StyleSheet.create({
   likeText: {
     color: '#a78bfa',
     marginTop: 6,
+    fontSize: 14,
+  },
+  pollText: {
+    color: '#fff',
     fontSize: 14,
   },
   noResults: {

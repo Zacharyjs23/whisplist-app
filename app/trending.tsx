@@ -9,6 +9,11 @@ interface Wish {
   text: string;
   category: string;
   likes: number;
+  isPoll?: boolean;
+  optionA?: string;
+  optionB?: string;
+  votesA?: number;
+  votesB?: number;
 }
 
 export default function TrendingScreen() {
@@ -34,7 +39,14 @@ export default function TrendingScreen() {
       <View style={styles.wishItem}>
         <Text style={styles.wishCategory}>#{item.category}</Text>
         <Text style={styles.wishText}>{item.text}</Text>
-        <Text style={styles.likes}>❤️ {item.likes}</Text>
+        {item.isPoll ? (
+          <View style={{ marginTop: 6 }}>
+            <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
+            <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
+          </View>
+        ) : (
+          <Text style={styles.likes}>❤️ {item.likes}</Text>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -96,5 +108,9 @@ const styles = StyleSheet.create({
     color: '#f472b6',
     fontSize: 14,
     fontWeight: '500',
+  },
+  pollText: {
+    color: '#fff',
+    fontSize: 14,
   },
 });
