@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { listenTrendingWishes, Wish } from '../helpers/firestore';
+import { listenTrendingWishes } from '../helpers/firestore';
 import ReportDialog from '../components/ReportDialog';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'; // Only include if still used
 import { db } from '../firebase';
@@ -18,29 +18,20 @@ import type { Wish } from '../types/Wish';
 
 
 export default function TrendingScreen() {
-  const router = useRouter();
   const [wishes, setWishes] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
   const [reportVisible, setReportVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
 
   useEffect(() => {
-try {
-  const unsubscribe = listenTrendingWishes((data) => {
-    setWishes(data);
-    setLoading(false);
-  });
-  return unsubscribe;
-} catch (err) {
-  console.error('❌ Failed to load wishes:', err);
-  setError('Failed to load wishes');
-  setLoading(false);
-  return () => {};
-}
-
-    return () => unsubscribe();
+    const unsubscribe = listenTrendingWishes((data) => {
+      setWishes(data);
+      setLoading(false);
+    });
+    return unsubscribe;
   }, []);
 
   const handleReport = async (reason: string) => {
@@ -60,33 +51,38 @@ try {
     }
   };
 
-  const renderWish = ({ item }: { item: Wish }) => (
-    <View style={styles.wishItem}>
-      <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)}>
-        <Text style={styles.wishCategory}>#{item.category}</Text>
-        <Text style={styles.wishText}>{item.text}</Text>
-        {item.isPoll ? (
-          <View style={{ marginTop: 6 }}>
-            <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
-            <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
-          </View>
-        ) : (
-          <Text style={styles.likes}>❤️ {item.likes}</Text>
-        )}
-      </View>
-
-      <TouchableOpacity
-        onPress={() => {
-          setReportTarget(item.id);
-          setReportVisible(true);
-        }}
-        style={{ marginTop: 4 }}
-      >
-        <Text style={{ color: '#f87171' }}>Report</Text>
-      </TouchableOpacity>
+const renderWish = ({ item }: { item: Wish }) => (
+  <View style={styles.wishItem}>
+    <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)}>
+      <Text style={styles.wishCategory}>#{item.category}</Text>
+      <Text style={styles.wishText}>{item.text}</Text>
+      {item.isPoll ? (
+        <View style={{ marginTop: 6 }}>
+          <Text style={styles.pollText}>
+            {item.optionA}: {item.votesA || 0}
+          </Text>
+          <Text style={styles.pollText}>
+            {item.optionB}: {item.votesB || 0}
+          </Text>
+        </View>
+      ) : (
+        <Text style={styles.likes}>❤️ {item.likes}</Text>
+      )}
     </TouchableOpacity>
 
-  );
+    <TouchableOpacity
+      onPress={() => {
+        setReportTarget(item.id);
+        setReportVisible(true);
+      }}
+      style={{ marginTop: 4 }}
+    >
+      <Text style={{ color: '#f87171' }}>Report</Text>
+    </TouchableOpacity>
+  </View>
+);
+
+
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -164,7 +160,5 @@ const styles = StyleSheet.create({
     color: '#f87171',
     textAlign: 'center',
     marginTop: 20,
-  },
-
   },
 });

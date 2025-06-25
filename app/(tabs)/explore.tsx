@@ -1,20 +1,10 @@
 // app/(tabs)/explore.tsx — Visually Enhanced Explore Screen with Pull-to-Refresh
 import {
-import {
   listenTrendingWishes,
   listenWishes,
-  Wish,
 } from '../../helpers/firestore';
 
-import {
-  addDoc,
-  collection,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-} from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -28,7 +18,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import ReportDialog from '../components/ReportDialog';
+import ReportDialog from '../../components/ReportDialog';
 import { Picker } from '@react-native-picker/picker';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
@@ -48,25 +38,35 @@ export default function ExploreScreen() {
   const [reportTarget, setReportTarget] = useState<string | null>(null);
 
   useEffect(() => {
-try {
-  const unsubscribe = listenTrendingWishes((data) => {
-    setTopWishes(data.slice(0, 3));
+useEffect(() => {
+  try {
+    const unsubscribe = listenTrendingWishes((data) => {
+      setTopWishes(data.slice(0, 3));
+    });
+    return unsubscribe;
+  } catch (err) {
+    console.error('❌ Failed to load top wishes:', err);
+    setError('Failed to load wishes');
+    return () => {};
+  }
+}, []);
+
+const fetchWishes = () => {
+  setLoading(true);
+  const source = trendingMode ? listenTrendingWishes : listenWishes;
+  const unsubscribe = source((all: Wish[]) => {
+    const filtered = all.filter((wish) => {
+      const inCategory =
+        trendingMode || !selectedCategory || wish.category === selectedCategory;
+      const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+      return inCategory && inSearch;
+    });
+    setFilteredWishes(filtered);
+    setLoading(false);
   });
   return unsubscribe;
-} catch (err) {
-  console.error('❌ Failed to load top wishes:', err);
-  setError('Failed to load wishes');
-  return () => {};
-}
+};
 
-    return () => unsubscribe();
-  }, []);
-
-  const fetchWishes = () => {
-    setLoading(true);
-    const source = trendingMode ? listenTrendingWishes : listenWishes;
-    const unsubscribe = source((all: Wish[]) => {
-      const filtered = all.filter(wish => {
         const inCategory =
           trendingMode || !selectedCategory || wish.category === selectedCategory;
         const inSearch = wish.text
@@ -76,9 +76,29 @@ try {
       });
       setFilteredWishes(filtered);
       setLoading(false);
-    });
-    return unsubscribe;
-  };
+const fetchWishes = () => {
+  setLoading(true);
+  const source = trendingMode ? listenTrendingWishes : listenWishes;
+  const unsubscribe = source(
+    (all: Wish[]) => {
+      const filtered = all.filter((wish) => {
+        const inCategory =
+          trendingMode || !selectedCategory || wish.category === selectedCategory;
+        const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+        return inCategory && inSearch;
+      });
+      setFilteredWishes(filtered);
+      setLoading(false);
+    },
+    (err) => {
+      console.error('❌ Failed to load wishes:', err);
+      setError('Failed to load wishes');
+      setLoading(false);
+    }
+  );
+  return unsubscribe;
+};
+
 
   useEffect(() => {
     const unsubscribe = fetchWishes();
@@ -113,20 +133,21 @@ try {
 
   const renderWish = ({ item }: { item: Wish }) => (
     <View style={styles.wishItem}>
-      <TouchableOpacity onPress={() => { /* navigate */ }}>
-        <Text style={styles.wishCategory}>
-          #{item.category} {item.audioUrl ? '🔊' : ''}
-        </Text>
-        <Text style={styles.wishText}>{item.text}</Text>
-        {item.isPoll ? (
-          <View style={{ marginTop: 6 }}>
-            <Text style={styles.pollText}>{item.optionA}: {item.votesA ?? 0}</Text>
-            <Text style={styles.pollText}>{item.optionB}: {item.votesB ?? 0}</Text>
-          </View>
-        ) : (
-          <Text style={styles.likes}>❤️ {item.likes}</Text>
-        )}
-      </TouchableOpacity>
+<TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)}>
+  <Text style={styles.wishCategory}>
+    #{item.category} {item.audioUrl ? '🔊' : ''}
+  </Text>
+  <Text style={styles.wishText}>{item.text}</Text>
+  {item.isPoll ? (
+    <View style={{ marginTop: 6 }}>
+      <Text style={styles.pollText}>{item.optionA}: {item.votesA ?? 0}</Text>
+      <Text style={styles.pollText}>{item.optionB}: {item.votesB ?? 0}</Text>
+    </View>
+  ) : (
+    <Text style={styles.likes}>❤️ {item.likes}</Text>
+  )}
+</TouchableOpacity>
+
 
       <TouchableOpacity
         onPress={() => {
@@ -134,6 +155,7 @@ try {
           setReportVisible(true);
         }}
         style={{ marginTop: 4 }}>
+
         <Text style={{ color: '#f87171' }}>Report</Text>
       </TouchableOpacity>
     </View>
@@ -336,8 +358,6 @@ const styles = StyleSheet.create({
     color: '#f87171',
     textAlign: 'center',
     marginTop: 20,
-  },
-
   },
   noResults: {
     color: '#ccc',

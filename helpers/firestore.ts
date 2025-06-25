@@ -1,15 +1,6 @@
 import { collection, query, orderBy, limit, onSnapshot, addDoc, doc, updateDoc, increment, getDoc, serverTimestamp, getDocs, where } from 'firebase/firestore';
 import { db } from '../firebase';
-
-export interface Wish {
-  id: string;
-  text: string;
-  category: string;
-  likes: number;
-  pushToken?: string;
-  audioUrl?: string;
-  [key: string]: any;
-}
+import type { Wish } from '../types/Wish';
 
 export interface Comment {
   id: string;
