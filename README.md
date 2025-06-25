@@ -52,3 +52,7 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## Push notifications
+
+The app registers a device for Expo push notifications. When someone likes or comments on one of your wishes, a notification is sent to the push token saved with that wish.

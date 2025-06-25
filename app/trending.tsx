@@ -20,17 +20,26 @@ export default function TrendingScreen() {
   const router = useRouter();
   const [wishes, setWishes] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(20));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...(doc.data() as Omit<Wish, 'id'>),
-      }));
-      setWishes(data as Wish[]);
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const data = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...(doc.data() as Omit<Wish, 'id'>),
+        }));
+        setWishes(data as Wish[]);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('❌ Failed to load wishes:', err);
+        setError('Failed to load wishes');
+        setLoading(false);
+      }
+    );
     return () => unsubscribe();
   }, []);
 
@@ -58,6 +67,8 @@ export default function TrendingScreen() {
         <Text style={styles.title}>Trending Wishes 🔥</Text>
         {loading ? (
           <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
+        ) : error ? (
+          <Text style={styles.errorText}>{error}</Text>
         ) : (
           <FlatList
             data={wishes}
@@ -112,5 +123,12 @@ const styles = StyleSheet.create({
   pollText: {
     color: '#fff',
     fontSize: 14,
+  },
+  errorText: {
+    color: '#f87171',
+    textAlign: 'center',
+    marginTop: 20,
+  },
+
   },
 });
