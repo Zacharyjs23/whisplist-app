@@ -1,9 +1,7 @@
 // app/(tabs)/explore.tsx — Visually Enhanced Explore Screen with Pull-to-Refresh
 import {
-import {
   listenTrendingWishes,
   listenWishes,
-  Wish,
 } from '../../helpers/firestore';
 
 import {
@@ -28,7 +26,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import ReportDialog from '../components/ReportDialog';
+import ReportDialog from '../../components/ReportDialog';
 import { Picker } from '@react-native-picker/picker';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
@@ -48,53 +46,26 @@ export default function ExploreScreen() {
   const [reportTarget, setReportTarget] = useState<string | null>(null);
 
   useEffect(() => {
-try {
-  const unsubscribe = listenTrendingWishes((data) => {
-    setTopWishes(data.slice(0, 3));
-  });
-  return unsubscribe;
-} catch (err) {
-  console.error('❌ Failed to load top wishes:', err);
-  setError('Failed to load wishes');
-  return () => {};
-}
-
-    return () => unsubscribe();
+    const unsubscribe = listenTrendingWishes((data) => {
+      setTopWishes(data.slice(0, 3));
+    });
+    return unsubscribe;
   }, []);
 
   const fetchWishes = () => {
     setLoading(true);
-setLoading(true);
-const unsubscribe = (trendingMode ? listenTrendingWishes : listenWishes)((all: Wish[]) => {
-  const filtered = all.filter((wish) => {
-    const inCategory =
-      trendingMode || !selectedCategory || wish.category === selectedCategory;
-    const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
-    return inCategory && inSearch;
-  });
-  setFilteredWishes(filtered);
-  setLoading(false);
-});
-
-return unsubscribe;
-
-        const inCategory =
-          trendingMode || !selectedCategory || wish.category === selectedCategory;
-        const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
-        return inCategory && inSearch;
-      });
-      setFilteredWishes(filtered);
-      setLoading(false);
-    },
-    (err) => {
-      console.error('❌ Failed to load wishes:', err);
-      setError('Failed to load wishes');
-      setLoading(false);
-    }
-  );
-  return unsubscribe;
-};
-
+    const unsubscribe = (trendingMode ? listenTrendingWishes : listenWishes)(
+      (all: Wish[]) => {
+        const filtered = all.filter((wish) => {
+          const inCategory =
+            trendingMode || !selectedCategory || wish.category === selectedCategory;
+          const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+          return inCategory && inSearch;
+        });
+        setFilteredWishes(filtered);
+        setLoading(false);
+      }
+    );
     return unsubscribe;
   };
 
@@ -357,8 +328,6 @@ const styles = StyleSheet.create({
     color: '#f87171',
     textAlign: 'center',
     marginTop: 20,
-  },
-
   },
   noResults: {
     color: '#ccc',
