@@ -2,7 +2,6 @@
 import {
   listenTrendingWishes,
   listenWishes,
-  Wish,
 } from '../../helpers/firestore';
 
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
@@ -39,17 +38,18 @@ export default function ExploreScreen() {
   const [reportTarget, setReportTarget] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const unsubscribe = listenTrendingWishes((data) => {
-        setTopWishes(data.slice(0, 3));
-      });
-      return unsubscribe;
-    } catch (err) {
-      console.error('❌ Failed to load top wishes:', err);
-      setError('Failed to load wishes');
-      return () => {};
-    }
-  }, []);
+useEffect(() => {
+  try {
+    const unsubscribe = listenTrendingWishes((data) => {
+      setTopWishes(data.slice(0, 3));
+    });
+    return unsubscribe;
+  } catch (err) {
+    console.error('❌ Failed to load top wishes:', err);
+    setError('Failed to load wishes');
+    return () => {};
+  }
+}, []);
 
 const fetchWishes = () => {
   setLoading(true);
@@ -58,9 +58,7 @@ const fetchWishes = () => {
       const filtered = all.filter((wish) => {
         const inCategory =
           trendingMode || !selectedCategory || wish.category === selectedCategory;
-        const inSearch = wish.text
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase());
+        const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
         return inCategory && inSearch;
       });
       setFilteredWishes(filtered);
@@ -74,6 +72,7 @@ const fetchWishes = () => {
   );
   return unsubscribe;
 };
+
 
   useEffect(() => {
     const unsubscribe = fetchWishes();
