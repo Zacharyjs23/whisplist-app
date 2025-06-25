@@ -9,9 +9,9 @@ import {
   addWish,
   likeWish,
   getWish,
-  Wish,
 } from '../../helpers/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -29,7 +29,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import ReportDialog from '../components/ReportDialog';
+import ReportDialog from '../../components/ReportDialog';
 import { db, storage } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 
@@ -52,24 +52,16 @@ export default function IndexScreen() {
   const [isRecording, setIsRecording] = useState(false);
 
 
-  useEffect(() => {
-    registerForPushNotificationsAsync().then(setPushToken);
+useEffect(() => {
+  registerForPushNotificationsAsync().then(setPushToken);
 
-try {
   const unsubscribe = listenWishes((w) => {
     setWishList(w);
     setLoading(false);
   });
-  return unsubscribe;
-} catch (err) {
-  console.error('❌ Failed to load wishes:', err);
-  setError('Failed to load wishes');
-  setLoading(false);
-  return () => {};
-}
 
-    return () => unsubscribe();
-  }, []);
+  return () => unsubscribe();
+}, []);
 
   const startRecording = async () => {
     try {
@@ -274,9 +266,7 @@ try {
           <Text style={styles.buttonText}>
             {isRecording ? 'Stop Recording' : 'Record Audio'}
           </Text>
-        </TouchableOpac
-
-        )}
+        </TouchableOpacity>
 
         <Pressable
           style={[styles.button, { opacity: wish.trim() === '' ? 0.5 : 1 }]}
@@ -427,8 +417,6 @@ const styles = StyleSheet.create({
     color: '#f87171',
     textAlign: 'center',
     marginTop: 20,
-  },
-
   },
   noResults: {
     color: '#ccc',
