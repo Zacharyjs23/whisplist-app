@@ -15,6 +15,7 @@ import {
     StatusBar,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
@@ -35,6 +36,7 @@ export default function ExploreScreen() {
   const [topWishes, setTopWishes] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
   const [trendingMode, setTrendingMode] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const topQuery = query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(3));
@@ -50,9 +52,12 @@ export default function ExploreScreen() {
     const baseQuery = query(collection(db, 'wishes'), orderBy(trendingMode ? 'likes' : 'timestamp', 'desc'));
     const unsubscribe = onSnapshot(baseQuery, (snapshot) => {
       const all = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Wish[];
-      const filtered = trendingMode
-        ? all
-        : all.filter((wish) => selectedCategories.size === 0 || selectedCategories.has(wish.category));
+      const filtered = all.filter((wish) => {
+        const inCategory =
+          trendingMode || selectedCategories.size === 0 || selectedCategories.has(wish.category);
+        const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+        return inCategory && inSearch;
+      });
       setFilteredWishes(filtered);
       setLoading(false);
     });
@@ -62,22 +67,23 @@ export default function ExploreScreen() {
   useEffect(() => {
     const unsubscribe = fetchWishes();
     return () => unsubscribe();
-  }, [selectedCategories, trendingMode]);
+  }, [selectedCategories, trendingMode, searchTerm]);
 
   const handleReload = () => {
     fetchWishes();
   };
 
-  const toggleCategory = (cat: string) => {
-    if (cat === 'trending') {
-      setTrendingMode(true);
+  const toggleTrending = (mode: boolean) => {
+    setTrendingMode(mode);
+    if (mode) {
       setSelectedCategories(new Set());
-    } else {
-      setTrendingMode(false);
-      const newSet = new Set(selectedCategories);
-      newSet.has(cat) ? newSet.delete(cat) : newSet.add(cat);
-      setSelectedCategories(newSet);
     }
+  };
+
+  const toggleCategory = (cat: string) => {
+    const newSet = new Set(selectedCategories);
+    newSet.has(cat) ? newSet.delete(cat) : newSet.add(cat);
+    setSelectedCategories(newSet);
   };
 
   const renderWish = ({ item }: { item: Wish }) => (
@@ -94,25 +100,44 @@ export default function ExploreScreen() {
       <View style={styles.container}>
         <Text style={styles.title}>Explore Wishes 🧭</Text>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryBar}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search wishes..."
+          placeholderTextColor="#aaa"
+          value={searchTerm}
+          onChangeText={setSearchTerm}
+        />
+
+        <View style={styles.toggleBar}>
           <TouchableOpacity
-            onPress={() => toggleCategory('trending')}
-            style={[styles.categoryButton, trendingMode && styles.activeCategory]}
+            onPress={() => toggleTrending(false)}
+            style={[styles.toggleButton, !trendingMode && styles.activeToggle]}
           >
-            <Text style={[styles.categoryText, trendingMode && styles.activeCategoryText]}>🔥 Trending</Text>
+            <Text style={[styles.toggleText, !trendingMode && styles.activeToggleText]}>Latest</Text>
           </TouchableOpacity>
-          {allCategories.map((cat) => (
-            <TouchableOpacity
-              key={cat}
-              onPress={() => toggleCategory(cat)}
-              style={[styles.categoryButton, selectedCategories.has(cat) && styles.activeCategory]}
-            >
-              <Text style={[styles.categoryText, selectedCategories.has(cat) && styles.activeCategoryText]}>
-                {cat.charAt(0).toUpperCase() + cat.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+          <TouchableOpacity
+            onPress={() => toggleTrending(true)}
+            style={[styles.toggleButton, trendingMode && styles.activeToggle]}
+          >
+            <Text style={[styles.toggleText, trendingMode && styles.activeToggleText]}>🔥 Trending</Text>
+          </TouchableOpacity>
+        </View>
+
+        {!trendingMode && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryBar}>
+            {allCategories.map((cat) => (
+              <TouchableOpacity
+                key={cat}
+                onPress={() => toggleCategory(cat)}
+                style={[styles.categoryButton, selectedCategories.has(cat) && styles.activeCategory]}
+              >
+                <Text style={[styles.categoryText, selectedCategories.has(cat) && styles.activeCategoryText]}>
+                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
 
         {!trendingMode && topWishes.length > 0 && (
           <View style={styles.topSection}>
@@ -160,6 +185,36 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 16,
     textAlign: 'center',
+  },
+  searchInput: {
+    backgroundColor: '#1e1e1e',
+    color: '#fff',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  toggleBar: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  toggleButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: '#1e1e1e',
+    marginHorizontal: 4,
+  },
+  activeToggle: {
+    backgroundColor: '#8b5cf6',
+  },
+  toggleText: {
+    color: '#aaa',
+  },
+  activeToggleText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
   categoryBar: {
     flexGrow: 0,
