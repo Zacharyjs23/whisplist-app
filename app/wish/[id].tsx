@@ -1,30 +1,30 @@
-// app/wish/[id].tsx — Updated to restore Back button
+// app/wish/[id].tsx — Updated to restore Back button and include getUserData()
 import { formatDistanceToNow } from 'date-fns';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import {
-    addDoc,
-    collection,
-    doc,
-    getDoc,
-    onSnapshot,
-    orderBy,
-    query,
-    serverTimestamp,
-    updateDoc,
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
 } from 'firebase/firestore';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    Animated,
-    FlatList,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Animated,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { db } from '../../firebase';
 
@@ -137,6 +137,25 @@ export default function WishDetailScreen() {
       });
     } catch (err) {
       console.error('❌ Failed to update reaction:', err);
+    }
+  };
+
+  // Fetch user data from Firestore
+  const getUserData = async (userId: string) => {
+    try {
+      const userRef = doc(db, 'users', userId);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        console.log('User data:', userData);
+        return userData;
+      } else {
+        console.warn('No such user found');
+        return null;
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      return null;
     }
   };
 
