@@ -1,11 +1,11 @@
-// app/(tabs)/profile/index.tsx — Enhanced Profile Screen with Analytics
+// app/(tabs)/profile.tsx — Enhanced Profile Screen with Analytics
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import {
   getWishesByNickname,
   getAllWishes,
   getWishComments,
-} from '../../../helpers/firestore';
+} from '../../helpers/firestore';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
