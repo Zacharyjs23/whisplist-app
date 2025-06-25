@@ -5,15 +5,7 @@ import {
   Wish,
 } from '../../helpers/firestore';
 
-import {
-  addDoc,
-  collection,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-} from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 import React, { useEffect, useState } from 'react';
 import {
