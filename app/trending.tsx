@@ -9,23 +9,37 @@ interface Wish {
   text: string;
   category: string;
   likes: number;
+  isPoll?: boolean;
+  optionA?: string;
+  optionB?: string;
+  votesA?: number;
+  votesB?: number;
 }
 
 export default function TrendingScreen() {
   const router = useRouter();
   const [wishes, setWishes] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(20));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...(doc.data() as Omit<Wish, 'id'>),
-      }));
-      setWishes(data as Wish[]);
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const data = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...(doc.data() as Omit<Wish, 'id'>),
+        }));
+        setWishes(data as Wish[]);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('❌ Failed to load wishes:', err);
+        setError('Failed to load wishes');
+        setLoading(false);
+      }
+    );
     return () => unsubscribe();
   }, []);
 
@@ -34,7 +48,14 @@ export default function TrendingScreen() {
       <View style={styles.wishItem}>
         <Text style={styles.wishCategory}>#{item.category}</Text>
         <Text style={styles.wishText}>{item.text}</Text>
-        <Text style={styles.likes}>❤️ {item.likes}</Text>
+        {item.isPoll ? (
+          <View style={{ marginTop: 6 }}>
+            <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
+            <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
+          </View>
+        ) : (
+          <Text style={styles.likes}>❤️ {item.likes}</Text>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -46,6 +67,8 @@ export default function TrendingScreen() {
         <Text style={styles.title}>Trending Wishes 🔥</Text>
         {loading ? (
           <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
+        ) : error ? (
+          <Text style={styles.errorText}>{error}</Text>
         ) : (
           <FlatList
             data={wishes}
@@ -96,5 +119,16 @@ const styles = StyleSheet.create({
     color: '#f472b6',
     fontSize: 14,
     fontWeight: '500',
+  },
+  pollText: {
+    color: '#fff',
+    fontSize: 14,
+  },
+  errorText: {
+    color: '#f87171',
+    textAlign: 'center',
+    marginTop: 20,
+  },
+
   },
 });

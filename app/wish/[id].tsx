@@ -1,21 +1,24 @@
 // app/wish/[id].tsx — detail view of a single wish
 import { formatDistanceToNow } from 'date-fns';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
+import { Audio } from 'expo-av';
 import {
   addDoc,
   collection,
   doc,
-  getDoc,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
+  increment,
   updateDoc,
 } from 'firebase/firestore';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -33,7 +36,16 @@ interface Wish {
   text: string;
   category: string;
   likes: number;
+  isPoll?: boolean;
+  optionA?: string;
+  optionB?: string;
+  votesA?: number;
+  votesB?: number;
+  pushToken?: string;
+  audioUrl?: string;
+
 }
+
 
 interface Comment {
   id: string;
@@ -57,51 +69,101 @@ export default function WishDetailScreen() {
   const [nickname, setNickname] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
   const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [hasVoted, setHasVoted] = useState(false);
+  const [fulfillment, setFulfillment] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+
   const flatListRef = useRef<FlatList<Comment>>(null);
+
   const animationRefs = useRef<{ [key: string]: Animated.Value }>({});
 
   const fetchWish = useCallback(async () => {
-    const ref = doc(db, 'wishes', id as string);
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      setWish({ id: snap.id, ...(snap.data() as Omit<Wish, 'id'>) });
+    setLoading(true);
+    setError(null);
+    try {
+      const ref = doc(db, 'wishes', id as string);
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        setWish({ id: snap.id, ...(snap.data() as Omit<Wish, 'id'>) });
+      }
+    } catch (err) {
+      console.error('❌ Failed to load wish:', err);
+      setError('Failed to load wish');
+    } finally {
+      setLoading(false);
     }
   }, [id]);
 
+  }, [id]);
+
   useEffect(() => {
-    fetchWish();
-  }, [fetchWish]);
+    const checkVote = async () => {
+      const voted = await AsyncStorage.getItem('votedPolls');
+      const list = voted ? JSON.parse(voted) : [];
+      if (list.includes(id)) setHasVoted(true);
+    };
+    checkVote();
+  }, [id]);
 
   const subscribeToComments = useCallback(() => {
     const commentsRef = collection(db, 'wishes', id as string, 'comments');
     const q = query(commentsRef, orderBy('timestamp', 'asc'));
 
-    return onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((d) => {
-        const commentId = d.id;
-        if (!animationRefs.current[commentId]) {
-          animationRefs.current[commentId] = new Animated.Value(0);
-        }
-        const data = d.data() as Omit<Comment, 'id'> & { parentId?: string };
-        return { id: d.id, ...data };
-      }) as Comment[];
+    setLoading(true);
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const list = snapshot.docs.map((d) => {
+          const commentId = d.id;
+          if (!animationRefs.current[commentId]) {
+            animationRefs.current[commentId] = new Animated.Value(0);
+          }
+          const data = d.data() as Omit<Comment, 'id'> & { parentId?: string };
+          return { id: d.id, ...data };
+        }) as Comment[];
 
-      const sorted = [...list].sort((a, b) => {
-        const aCount = Object.values(a.reactions || {}).reduce((s, v) => s + v, 0);
-        const bCount = Object.values(b.reactions || {}).reduce((s, v) => s + v, 0);
-        return bCount - aCount;
-      });
-      setComments(sorted);
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 300);
-    });
+        const sorted = [...list].sort((a, b) => {
+          const aCount = Object.values(a.reactions || {}).reduce((s, v) => s + v, 0);
+          const bCount = Object.values(b.reactions || {}).reduce((s, v) => s + v, 0);
+          return bCount - aCount;
+        });
+        setComments(sorted);
+        setLoading(false);
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 300);
+      },
+      (err) => {
+        console.error('❌ Failed to load comments:', err);
+        setError('Failed to load comments');
+        setLoading(false);
+      }
+    );
   }, [id]);
 
   useEffect(() => {
     const unsubscribe = subscribeToComments();
     return unsubscribe;
   }, [subscribeToComments]);
+
+  const playAudio = useCallback(async () => {
+    if (!wish?.audioUrl) return;
+    try {
+      const { sound: newSound } = await Audio.Sound.createAsync({ uri: wish.audioUrl });
+      setSound(newSound);
+      await newSound.playAsync();
+    } catch (err) {
+      console.error('❌ Failed to play audio:', err);
+    }
+  }, [wish]);
+
+  useEffect(() => {
+    return () => {
+      sound?.unloadAsync();
+    };
+  }, [sound]);
 
   const handlePostComment = useCallback(async () => {
     if (!comment.trim()) return;
@@ -117,10 +179,26 @@ export default function WishDetailScreen() {
       });
       setComment('');
       setReplyTo(null);
+
+      if (wish?.pushToken) {
+        await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: wish.pushToken,
+            title: 'New comment on your wish 💬',
+            body: 'Someone left a comment on your wish.',
+          }),
+        });
+      }
     } catch (err) {
       console.error('❌ Failed to post comment:', err);
     }
-  }, [comment, id, nickname, replyTo]);
+  }, [comment, id, nickname, replyTo, wish]);
+
 
   const handleReact = useCallback(async (commentId: string, emoji: string) => {
     const comment = comments.find((c) => c.id === commentId);
@@ -152,6 +230,41 @@ export default function WishDetailScreen() {
       console.error('❌ Failed to update reaction:', err);
     }
   }, [comments, id, nickname]);
+
+  const handleVote = useCallback(
+    async (option: 'A' | 'B') => {
+      if (!wish || hasVoted) return;
+      try {
+        const ref = doc(db, 'wishes', wish.id);
+        await updateDoc(ref, {
+          [option === 'A' ? 'votesA' : 'votesB']: increment(1),
+        });
+        const voted = await AsyncStorage.getItem('votedPolls');
+        const list = voted ? JSON.parse(voted) : [];
+        list.push(wish.id);
+        await AsyncStorage.setItem('votedPolls', JSON.stringify(list));
+        setHasVoted(true);
+      } catch (err) {
+        console.error('❌ Failed to vote:', err);
+      }
+    },
+    [hasVoted, wish]
+  );
+
+  const handleFulfillWish = useCallback(async () => {
+    if (!fulfillment.trim()) return;
+    try {
+      const fulfillRef = collection(db, 'wishes', id as string, 'fulfillments');
+      await addDoc(fulfillRef, {
+        text: fulfillment.trim(),
+        timestamp: serverTimestamp(),
+      });
+      setFulfillment('');
+    } catch (err) {
+      console.error('❌ Failed to fulfill wish:', err);
+    }
+  }, [fulfillment, id]);
+
 
 
   const renderCommentItem = useCallback(
@@ -230,27 +343,66 @@ export default function WishDetailScreen() {
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
 
-        {wish && (
-          <View style={styles.wishBox}>
-            <Text style={styles.wishCategory}>#{wish.category}</Text>
-            <Text style={styles.wishText}>{wish.text}</Text>
-            <Text style={styles.likes}>❤️ {wish.likes}</Text>
+{loading ? (
+  <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
+) : error ? (
+  <Text style={styles.errorText}>{error}</Text>
+) : (
+  <>
+    {wish && (
+      <View style={styles.wishBox}>
+        <Text style={styles.wishCategory}>#{wish.category}</Text>
+        <Text style={styles.wishText}>{wish.text}</Text>
+
+        {wish.isPoll ? (
+          <View style={{ marginTop: 8 }}>
+            <TouchableOpacity
+              style={styles.pollOption}
+              disabled={hasVoted}
+              onPress={() => handleVote('A')}
+            >
+              <Text style={styles.pollOptionText}>
+                {wish.optionA} - {wish.votesA || 0}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.pollOption}
+              disabled={hasVoted}
+              onPress={() => handleVote('B')}
+            >
+              <Text style={styles.pollOptionText}>
+                {wish.optionB} - {wish.votesB || 0}
+              </Text>
+            </TouchableOpacity>
           </View>
+        ) : (
+          <Text style={styles.likes}>❤️ {wish.likes}</Text>
         )}
 
-        <FlatList
-          ref={flatListRef}
-          data={comments.filter((c) => !c.parentId)}
-          keyExtractor={(item) => item.id}
-          renderItem={renderComment}
-          contentContainerStyle={{ paddingBottom: 80 }}
-          initialNumToRender={10}
-          getItemLayout={(_, index) => ({
-            length: COMMENT_ITEM_HEIGHT,
-            offset: COMMENT_ITEM_HEIGHT * index,
-            index,
-          })}
-        />
+        {wish.audioUrl && (
+          <TouchableOpacity onPress={playAudio} style={{ marginTop: 10 }}>
+            <Text style={{ color: '#a78bfa' }}>▶ Play Audio</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    )}
+  </>
+)}
+
+<FlatList
+  ref={flatListRef}
+  data={comments.filter((c) => !c.parentId)}
+  keyExtractor={(item) => item.id}
+  renderItem={renderComment}
+  contentContainerStyle={{ paddingBottom: 80 }}
+  initialNumToRender={10}
+  getItemLayout={(_, index) => ({
+    length: COMMENT_ITEM_HEIGHT,
+    offset: COMMENT_ITEM_HEIGHT * index,
+    index,
+  })}
+/>
+
 
         {replyTo && (
           <View style={styles.replyInfo}>
@@ -281,6 +433,18 @@ export default function WishDetailScreen() {
 
         <TouchableOpacity style={styles.button} onPress={handlePostComment}>
           <Text style={styles.buttonText}>Post Comment</Text>
+        </TouchableOpacity>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Fulfillment text or link"
+          placeholderTextColor="#aaa"
+          value={fulfillment}
+          onChangeText={setFulfillment}
+        />
+
+        <TouchableOpacity style={styles.button} onPress={handleFulfillWish}>
+          <Text style={styles.buttonText}>Fulfill Wish</Text>
         </TouchableOpacity>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -323,6 +487,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 8,
   },
+  pollOption: {
+    backgroundColor: '#2e2e2e',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 6,
+  },
+  pollOptionText: {
+    color: '#fff',
+    textAlign: 'center',
+  },
   commentBox: {
     backgroundColor: '#1a1a1a',
     padding: 10,
@@ -354,6 +528,11 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
     marginBottom: 10,
+  },
+  errorText: {
+    color: '#f87171',
+    textAlign: 'center',
+    marginTop: 20,
   },
   button: {
     backgroundColor: '#8b5cf6',
