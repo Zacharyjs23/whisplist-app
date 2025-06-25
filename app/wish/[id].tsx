@@ -32,6 +32,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Image,
   View,
   Dimensions,
 } from 'react-native';
@@ -353,6 +354,9 @@ try {
       <View style={styles.wishBox}>
         <Text style={styles.wishCategory}>#{wish.category}</Text>
         <Text style={styles.wishText}>{wish.text}</Text>
+        {wish.imageUrl && (
+          <Image source={{ uri: wish.imageUrl }} style={styles.preview} />
+        )}
 
         {wish.isPoll ? (
           <View style={{ marginTop: 8 }}>
@@ -519,6 +523,12 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     marginTop: 4,
+  },
+  preview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 10,
+    marginTop: 8,
   },
   likes: {
     color: '#a78bfa',
