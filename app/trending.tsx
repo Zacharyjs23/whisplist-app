@@ -3,13 +3,7 @@ import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestor
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { db } from '../firebase';
-
-interface Wish {
-  id: string;
-  text: string;
-  category: string;
-  likes: number;
-}
+import type { Wish } from '../types/Wish';
 
 export default function TrendingScreen() {
   const router = useRouter();

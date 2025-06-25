@@ -34,15 +34,7 @@ import {
   View,
 } from 'react-native';
 import { db, storage } from '../../firebase';
-
-interface Wish {
-  id: string;
-  text: string;
-  category: string;
-  likes: number;
-  pushToken?: string;
-  audioUrl?: string;
-}
+import type { Wish } from '../../types/Wish';
 
 export default function IndexScreen() {
   const [wish, setWish] = useState('');

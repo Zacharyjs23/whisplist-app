@@ -20,14 +20,7 @@ import {
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { db } from '../../firebase';
-
-interface Wish {
-  id: string;
-  text: string;
-  category: string;
-  likes: number;
-  audioUrl?: string;
-}
+import type { Wish } from '../../types/Wish';
 
 const allCategories = ['love', 'health', 'career', 'general', 'money', 'friendship', 'fitness'];
 

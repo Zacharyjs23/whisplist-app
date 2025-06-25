@@ -28,14 +28,7 @@ import {
   View,
 } from 'react-native';
 import { db } from '../../firebase';
-
-interface Wish {
-  id: string;
-  text: string;
-  category: string;
-  likes: number;
-  audioUrl?: string;
-}
+import type { Wish } from '../../types/Wish';
 
 interface Comment {
   id: string;
