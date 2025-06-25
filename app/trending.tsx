@@ -83,6 +83,7 @@ const renderWish = ({ item }: { item: Wish }) => (
 );
 
 
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#0e0e0e" />

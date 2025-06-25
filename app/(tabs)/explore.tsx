@@ -107,32 +107,29 @@ const fetchWishes = () => {
 
   const renderWish = ({ item }: { item: Wish }) => (
     <View style={styles.wishItem}>
-<View>
-  <Text style={styles.wishCategory}>
-    #{item.category} {item.audioUrl ? '🔊' : ''}
-  </Text>
-  <Text style={styles.wishText}>{item.text}</Text>
+      <Text style={styles.wishCategory}>
+        #{item.category} {item.audioUrl ? '🔊' : ''}
+      </Text>
+      <Text style={styles.wishText}>{item.text}</Text>
 
-  {item.isPoll ? (
-    <View style={{ marginTop: 6 }}>
-      <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
-      <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
-    </View>
-  ) : (
-    <Text style={styles.likes}>❤️ {item.likes}</Text>
-  )}
+      {item.isPoll ? (
+        <View style={{ marginTop: 6 }}>
+          <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
+          <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
+        </View>
+      ) : (
+        <Text style={styles.likes}>❤️ {item.likes}</Text>
+      )}
 
-  <TouchableOpacity
-    onPress={() => {
-      setReportTarget(item.id);
-      setReportVisible(true);
-    }}
-    style={{ marginTop: 4 }}
-  >
-    <Text style={{ color: '#f87171' }}>Report</Text>
-  </TouchableOpacity>
-</View>
-
+      <TouchableOpacity
+        onPress={() => {
+          setReportTarget(item.id);
+          setReportVisible(true);
+        }}
+        style={{ marginTop: 4 }}
+      >
+        <Text style={{ color: '#f87171' }}>Report</Text>
+      </TouchableOpacity>
     </View>
   );
 
