@@ -10,7 +10,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.WhispList"
+      "bundleIdentifier": "com.anonymous.WhispList",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "This app uses the microphone to record audio."
+      }
     },
     "android": {
       "adaptiveIcon": {
