@@ -9,6 +9,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Image,
   View,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
@@ -108,6 +109,9 @@ export default function ExploreScreen() {
     #{item.category} {item.audioUrl ? '🔊' : ''}
   </Text>
   <Text style={styles.wishText}>{item.text}</Text>
+  {item.imageUrl && (
+    <Image source={{ uri: item.imageUrl }} style={styles.preview} />
+  )}
   {item.isPoll ? (
     <View style={{ marginTop: 6 }}>
       <Text style={styles.pollText}>{item.optionA}: {item.votesA ?? 0}</Text>
@@ -313,6 +317,12 @@ const styles = StyleSheet.create({
   wishText: {
     color: '#fff',
     fontSize: 16,
+  },
+  preview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 10,
+    marginTop: 8,
   },
   likes: {
     marginTop: 8,

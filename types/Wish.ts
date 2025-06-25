@@ -5,6 +5,7 @@ export interface Wish {
   likes: number;
   pushToken?: string;
   audioUrl?: string;
+  imageUrl?: string;
   isPoll?: boolean;
   optionA?: string;
   optionB?: string;

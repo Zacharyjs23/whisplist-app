@@ -15,6 +15,8 @@ import {
   getWish,
 } from '../../helpers/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+// eslint-disable-next-line import/no-unresolved
+import * as ImagePicker from 'expo-image-picker';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
@@ -31,6 +33,7 @@ import {
   TextInput,
   Switch,
   TouchableOpacity,
+  Image,
   View,
 } from 'react-native';
 import ReportDialog from '../../components/ReportDialog';
@@ -55,6 +58,7 @@ export default function IndexScreen() {
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [includeAudio, setIncludeAudio] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
 
 useEffect(() => {
@@ -109,17 +113,40 @@ useEffect(() => {
     }
   };
 
+  const pickImage = async () => {
+    const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!granted) {
+      Alert.alert('Permission required', 'Media access is needed to select images');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      setSelectedImage(result.assets[0].uri);
+    }
+  };
+
   const handlePostWish = async () => {
     if (wish.trim() === '') return;
 
     try {
       let audioUrl = '';
+      let imageUrl = '';
       if (includeAudio && recordedUri) {
         const resp = await fetch(recordedUri);
         const blob = await resp.blob();
         const storageRef = ref(storage, `audio/${Date.now()}.m4a`);
         await uploadBytes(storageRef, blob);
         audioUrl = await getDownloadURL(storageRef);
+      }
+      if (selectedImage) {
+        const resp = await fetch(selectedImage);
+        const blob = await resp.blob();
+        const imageRef = ref(storage, `images/${Date.now()}`);
+        await uploadBytes(imageRef, blob);
+        imageUrl = await getDownloadURL(imageRef);
       }
       await addWish({
         text: wish,
@@ -133,6 +160,7 @@ useEffect(() => {
           votesB: 0,
         }),
         ...(audioUrl && { audioUrl }),
+        ...(imageUrl && { imageUrl }),
       });
 
       setWish('');
@@ -142,6 +170,7 @@ useEffect(() => {
       setIsPoll(false);
       setRecordedUri(null);
       setIncludeAudio(false);
+      setSelectedImage(null);
 
     } catch (error) {
       console.error('❌ Failed to post wish:', error);
@@ -295,6 +324,15 @@ useEffect(() => {
           </TouchableOpacity>
         )}
 
+        {selectedImage && (
+          <Image source={{ uri: selectedImage }} style={styles.preview} />
+        )}
+        <TouchableOpacity style={styles.button} onPress={pickImage}>
+          <Text style={styles.buttonText}>
+            {selectedImage ? 'Change Image' : 'Add Image'}
+          </Text>
+        </TouchableOpacity>
+
         <Pressable
           style={[styles.button, { opacity: wish.trim() === '' ? 0.5 : 1 }]}
           onPress={handlePostWish}
@@ -324,6 +362,9 @@ useEffect(() => {
       #{item.category} {item.audioUrl ? '🔊' : ''}
     </Text>
     <Text style={styles.wishText}>{item.text}</Text>
+    {item.imageUrl && (
+      <Image source={{ uri: item.imageUrl }} style={styles.preview} />
+    )}
     {item.isPoll ? (
       <View style={{ marginTop: 6 }}>
         <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
@@ -401,6 +442,12 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 10,
     alignItems: 'center',
+    marginBottom: 10,
+  },
+  preview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 10,
     marginBottom: 10,
   },
   buttonText: {
