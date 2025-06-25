@@ -26,6 +26,7 @@ interface Wish {
   text: string;
   category: string;
   likes: number;
+  audioUrl?: string;
 }
 
 const allCategories = ['love', 'health', 'career', 'general', 'money', 'friendship'];
@@ -88,7 +89,7 @@ export default function ExploreScreen() {
 
   const renderWish = ({ item }: { item: Wish }) => (
     <View style={styles.wishItem}>
-      <Text style={styles.wishCategory}>#{item.category}</Text>
+      <Text style={styles.wishCategory}>#{item.category} {item.audioUrl ? '🔊' : ''}</Text>
       <Text style={styles.wishText}>{item.text}</Text>
       <Text style={styles.likes}>❤️ {item.likes}</Text>
     </View>
