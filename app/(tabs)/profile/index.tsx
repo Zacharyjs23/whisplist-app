@@ -5,6 +5,7 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  ActivityIndicator,
   Dimensions,
   FlatList,
   StatusBar as RNStatusBar,
@@ -27,12 +28,17 @@ export default function ProfileScreen() {
   const [stats, setStats] = useState({ totalLikes: 0, topWish: '', firstWish: '' });
   const [badges, setBadges] = useState<string[]>([]);
   const [categoryData, setCategoryData] = useState<{ category: string; count: number }[]>([]);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
     const loadData = async () => {
+      setLoading(true);
       const stored = await AsyncStorage.getItem('nickname');
-      if (!stored) return;
+      if (!stored) {
+        setLoading(false);
+        return;
+      }
       setNickname(stored);
       setInputName(stored);
 
@@ -118,6 +124,7 @@ export default function ProfileScreen() {
       if (sameDayWishes >= 3) badgeList.push('🌈 3 Wishes Today');
 
       setBadges(badgeList);
+      setLoading(false);
     };
     loadData();
   }, []);
@@ -133,6 +140,10 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.safeArea}>
       <RNStatusBar barStyle="light-content" backgroundColor="#0e0e0e" />
       <View style={styles.container}>
+        {loading ? (
+          <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
+        ) : (
+          <>
         <Text style={styles.header}>👤 {nickname || 'Anonymous'}</Text>
         {streak > 1 && <Text style={styles.streak}>🔥 {streak}-day wish streak!</Text>}
         <Text style={styles.stats}>❤️ Total Likes: {stats.totalLikes}</Text>
@@ -211,6 +222,8 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           )}
         />
+          </>
+        )}
       </View>
     </SafeAreaView>
   );
