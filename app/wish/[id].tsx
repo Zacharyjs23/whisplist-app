@@ -29,6 +29,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import ReportDialog from '../../components/ReportDialog';
 import { db } from '../../firebase';
 
 interface Wish {
@@ -69,6 +70,8 @@ export default function WishDetailScreen() {
   const [nickname, setNickname] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
   const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [reportTarget, setReportTarget] = useState<{ type: 'wish' | 'comment'; id: string } | null>(null);
+  const [reportVisible, setReportVisible] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
   const [fulfillment, setFulfillment] = useState('');
   const [loading, setLoading] = useState(true);
@@ -231,6 +234,26 @@ export default function WishDetailScreen() {
     }
   }, [comments, id, nickname]);
 
+  const handleReport = useCallback(
+    async (reason: string) => {
+      if (!reportTarget) return;
+      try {
+        await addDoc(collection(db, 'reports'), {
+          itemId: reportTarget.id,
+          type: reportTarget.type,
+          reason,
+          timestamp: serverTimestamp(),
+        });
+      } catch (err) {
+        console.error('❌ Failed to submit report:', err);
+      } finally {
+        setReportVisible(false);
+        setReportTarget(null);
+      }
+    },
+    [reportTarget]
+  );
+
   const handleVote = useCallback(
     async (option: 'A' | 'B') => {
       if (!wish || hasVoted) return;
@@ -264,7 +287,6 @@ export default function WishDetailScreen() {
       console.error('❌ Failed to fulfill wish:', err);
     }
   }, [fulfillment, id]);
-
 
 
   const renderCommentItem = useCallback(
@@ -319,6 +341,15 @@ export default function WishDetailScreen() {
               ))}
               <TouchableOpacity onPress={() => setReplyTo(item.id)} style={{ marginLeft: 8 }}>
                 <Text style={{ color: '#a78bfa' }}>Reply</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setReportTarget({ type: 'comment', id: item.id });
+                  setReportVisible(true);
+                }}
+                style={{ marginLeft: 8 }}
+              >
+                <Text style={{ color: '#f87171' }}>Report</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -384,6 +415,32 @@ export default function WishDetailScreen() {
             <Text style={{ color: '#a78bfa' }}>▶ Play Audio</Text>
           </TouchableOpacity>
         )}
+
+        <TouchableOpacity
+          onPress={() => {
+            setReportTarget({ type: 'wish', id: wish.id });
+            setReportVisible(true);
+          }}
+          style={{ marginTop: 8 }}
+        >
+          <Text style={{ color: '#f87171' }}>Report</Text>
+        </TouchableOpacity>
+      </View>
+    )}
+  </>
+)}
+
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <Text style={styles.likes}>❤️ {wish.likes}</Text>
+        )}
+
+        {wish.audioUrl && (
+          <TouchableOpacity onPress={playAudio} style={{ marginTop: 10 }}>
+            <Text style={{ color: '#a78bfa' }}>▶ Play Audio</Text>
+          </TouchableOpacity>
+        )}
       </View>
     )}
   </>
@@ -434,6 +491,14 @@ export default function WishDetailScreen() {
         <TouchableOpacity style={styles.button} onPress={handlePostComment}>
           <Text style={styles.buttonText}>Post Comment</Text>
         </TouchableOpacity>
+        <ReportDialog
+          visible={reportVisible}
+          onClose={() => {
+            setReportVisible(false);
+            setReportTarget(null);
+          }}
+          onSubmit={handleReport}
+        />
 
         <TextInput
           style={styles.input}
@@ -446,6 +511,7 @@ export default function WishDetailScreen() {
         <TouchableOpacity style={styles.button} onPress={handleFulfillWish}>
           <Text style={styles.buttonText}>Fulfill Wish</Text>
         </TouchableOpacity>
+
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

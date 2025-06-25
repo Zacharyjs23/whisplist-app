@@ -34,7 +34,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import ReportDialog from '../components/ReportDialog';
 import { db, storage } from '../../firebase';
+
 
 interface Wish {
   id: string;
@@ -59,6 +61,8 @@ export default function IndexScreen() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [pushToken, setPushToken] = useState<string | null>(null);
+  const [reportVisible, setReportVisible] = useState(false);
+  const [reportTarget, setReportTarget] = useState<string | null>(null);
   const [isPoll, setIsPoll] = useState(false);
   const [optionA, setOptionA] = useState('');
   const [optionB, setOptionB] = useState('');
@@ -208,6 +212,23 @@ export default function IndexScreen() {
     }
   };
 
+  const handleReport = async (reason: string) => {
+    if (!reportTarget) return;
+    try {
+      await addDoc(collection(db, 'reports'), {
+        itemId: reportTarget,
+        type: 'wish',
+        reason,
+        timestamp: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('❌ Failed to submit report:', err);
+    } finally {
+      setReportVisible(false);
+      setReportTarget(null);
+    }
+  };
+
   const filteredWishes = wishList.filter((wish) =>
     wish.text.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -309,23 +330,44 @@ export default function IndexScreen() {
             data={filteredWishes}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
-              <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)}>
-                <View style={styles.wishItem}>
-                  <Text style={{ color: '#a78bfa', fontSize: 12 }}>#{item.category} {item.audioUrl ? '🔊' : ''}</Text>
-                  <Text style={styles.wishText}>{item.text}</Text>
-                  {item.isPoll ? (
-                    <View style={{ marginTop: 6 }}>
-                      <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
-                      <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.likeText}>❤️ {item.likes}</Text>
-                  )}
-                </View>
-              </TouchableOpacity>
+<View style={styles.wishItem}>
+  <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)}>
+    <Text style={{ color: '#a78bfa', fontSize: 12 }}>
+      #{item.category} {item.audioUrl ? '🔊' : ''}
+    </Text>
+    <Text style={styles.wishText}>{item.text}</Text>
+    {item.isPoll ? (
+      <View style={{ marginTop: 6 }}>
+        <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
+        <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
+      </View>
+    ) : (
+      <Text style={styles.likeText}>❤️ {item.likes}</Text>
+    )}
+  </TouchableOpacity>
+
+  <TouchableOpacity
+    onPress={() => {
+      setReportTarget(item.id);
+      setReportVisible(true);
+    }}
+    style={{ marginTop: 4 }}
+  >
+    <Text style={{ color: '#f87171' }}>Report</Text>
+  </TouchableOpacity>
+</View>
+
             )}
           />
         )}
+        <ReportDialog
+          visible={reportVisible}
+          onClose={() => {
+            setReportVisible(false);
+            setReportTarget(null);
+          }}
+          onSubmit={handleReport}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

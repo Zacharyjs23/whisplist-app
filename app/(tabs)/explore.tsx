@@ -1,10 +1,12 @@
 // app/(tabs)/explore.tsx — Visually Enhanced Explore Screen with Pull-to-Refresh
 import {
+    addDoc,
     collection,
     limit,
     onSnapshot,
     orderBy,
     query,
+    serverTimestamp,
 } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
@@ -18,7 +20,9 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import ReportDialog from '../components/ReportDialog';
 import { Picker } from '@react-native-picker/picker';
+
 import { db } from '../../firebase';
 
 interface Wish {
@@ -45,6 +49,8 @@ export default function ExploreScreen() {
   const [error, setError] = useState<string | null>(null);
   const [trendingMode, setTrendingMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [reportVisible, setReportVisible] = useState(false);
+  const [reportTarget, setReportTarget] = useState<string | null>(null);
 
   useEffect(() => {
     const topQuery = query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(3));
@@ -109,18 +115,51 @@ const fetchWishes = () => {
   };
 
 
+  const handleReport = async (reason: string) => {
+    if (!reportTarget) return;
+    try {
+      await addDoc(collection(db, 'reports'), {
+        itemId: reportTarget,
+        type: 'wish',
+        reason,
+        timestamp: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('❌ Failed to submit report:', err);
+    } finally {
+      setReportVisible(false);
+      setReportTarget(null);
+    }
+  };
+
   const renderWish = ({ item }: { item: Wish }) => (
     <View style={styles.wishItem}>
-      <Text style={styles.wishCategory}>#{item.category} {item.audioUrl ? '🔊' : ''}</Text>
-      <Text style={styles.wishText}>{item.text}</Text>
-      {item.isPoll ? (
-        <View style={{ marginTop: 6 }}>
-          <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
-          <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
-        </View>
-      ) : (
-        <Text style={styles.likes}>❤️ {item.likes}</Text>
-      )}
+<View>
+  <Text style={styles.wishCategory}>
+    #{item.category} {item.audioUrl ? '🔊' : ''}
+  </Text>
+  <Text style={styles.wishText}>{item.text}</Text>
+
+  {item.isPoll ? (
+    <View style={{ marginTop: 6 }}>
+      <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
+      <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
+    </View>
+  ) : (
+    <Text style={styles.likes}>❤️ {item.likes}</Text>
+  )}
+
+  <TouchableOpacity
+    onPress={() => {
+      setReportTarget(item.id);
+      setReportVisible(true);
+    }}
+    style={{ marginTop: 4 }}
+  >
+    <Text style={{ color: '#f87171' }}>Report</Text>
+  </TouchableOpacity>
+</View>
+
     </View>
   );
 
@@ -197,6 +236,14 @@ const fetchWishes = () => {
             contentContainerStyle={{ paddingBottom: 80 }}
           />
         )}
+        <ReportDialog
+          visible={reportVisible}
+          onClose={() => {
+            setReportVisible(false);
+            setReportTarget(null);
+          }}
+          onSubmit={handleReport}
+        />
       </View>
     </SafeAreaView>
   );
