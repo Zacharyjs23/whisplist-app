@@ -27,11 +27,11 @@ export default function ReportDialog({ visible, onClose, onSubmit }: ReportDialo
             onChangeText={setReason}
           />
           <View style={styles.buttons}>
-            <TouchableOpacity onPress={onClose} style={[styles.button, styles.cancel]}>
+            <TouchableOpacity onPress={onClose} style={[styles.button, styles.cancel]} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Text style={styles.buttonText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleSubmit} style={styles.button}>
-              <Text style={styles.buttonText}>Submit</Text>
+            <TouchableOpacity onPress={handleSubmit} style={styles.button} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={styles.buttonText}>Send Report</Text>
             </TouchableOpacity>
           </View>
         </View>

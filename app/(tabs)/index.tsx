@@ -60,6 +60,9 @@ export default function IndexScreen() {
   const [includeAudio, setIncludeAudio] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [giftLink, setGiftLink] = useState('');
+  const [posting, setPosting] = useState(false);
+
+  const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 
 
 useEffect(() => {
@@ -81,6 +84,20 @@ useEffect(() => {
   });
 
   return () => unsubscribe();
+}, []);
+
+useEffect(() => {
+  const showWelcome = async () => {
+    const seen = await AsyncStorage.getItem('seenWelcome');
+    if (!seen) {
+      Alert.alert(
+        'Welcome to WhispList',
+        'Share your wishes anonymously and tap a wish to read or comment.'
+      );
+      await AsyncStorage.setItem('seenWelcome', 'true');
+    }
+  };
+  showWelcome();
 }, []);
 
   const startRecording = async () => {
@@ -142,6 +159,7 @@ useEffect(() => {
   const handlePostWish = async () => {
     if (wish.trim() === '') return;
 
+    setPosting(true);
     try {
       let audioUrl = '';
       let imageUrl = '';
@@ -184,9 +202,11 @@ useEffect(() => {
       setIncludeAudio(false);
       setSelectedImage(null);
       setGiftLink('');
-
+      Alert.alert('Wish posted!');
     } catch (error) {
       console.error('❌ Failed to post wish:', error);
+    } finally {
+      setPosting(false);
     }
   };
 
@@ -258,6 +278,7 @@ useEffect(() => {
         <Text style={styles.title}>WhispList ✨</Text>
         <Text style={styles.subtitle}>Post a wish and see what dreams grow 🌱</Text>
 
+        <Text style={styles.label}>Search</Text>
         <TextInput
           style={styles.input}
           placeholder="Search wishes..."
@@ -266,6 +287,7 @@ useEffect(() => {
           onChangeText={setSearchTerm}
         />
 
+        <Text style={styles.label}>Wish</Text>
         <TextInput
           style={styles.input}
           placeholder="What's your wish?"
@@ -274,6 +296,7 @@ useEffect(() => {
           onChangeText={setWish}
         />
 
+        <Text style={styles.label}>Category</Text>
         <TextInput
           style={styles.input}
           placeholder="Category (e.g., love, health, career)"
@@ -282,6 +305,7 @@ useEffect(() => {
           onChangeText={setCategory}
         />
 
+        <Text style={styles.label}>Gift Link</Text>
         <TextInput
           style={styles.input}
           placeholder="Gift link (optional)"
@@ -298,7 +322,7 @@ useEffect(() => {
 
         {/* Audio toggle */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-          <Text style={{ color: '#fff', marginRight: 8 }}>Add Audio</Text>
+          <Text style={{ color: '#fff', marginRight: 8 }}>Include Audio</Text>
           <Switch
             value={includeAudio}
             onValueChange={(v) => {
@@ -313,6 +337,7 @@ useEffect(() => {
 
         {isPoll && (
           <>
+            <Text style={styles.label}>Option A</Text>
             <TextInput
               style={styles.input}
               placeholder="Option A"
@@ -320,6 +345,7 @@ useEffect(() => {
               value={optionA}
               onChangeText={setOptionA}
             />
+            <Text style={styles.label}>Option B</Text>
             <TextInput
               style={styles.input}
               placeholder="Option B"
@@ -338,6 +364,7 @@ useEffect(() => {
               { backgroundColor: isRecording ? '#ef4444' : '#22c55e' },
             ]}
             onPress={isRecording ? stopRecording : startRecording}
+            hitSlop={HIT_SLOP}
           >
             <Text style={styles.buttonText}>
               {isRecording ? 'Stop Recording' : 'Record Audio'}
@@ -348,18 +375,23 @@ useEffect(() => {
         {selectedImage && (
           <Image source={{ uri: selectedImage }} style={styles.preview} />
         )}
-        <TouchableOpacity style={styles.button} onPress={pickImage}>
+        <TouchableOpacity style={styles.button} onPress={pickImage} hitSlop={HIT_SLOP}>
           <Text style={styles.buttonText}>
-            {selectedImage ? 'Change Image' : 'Add Image'}
+            {selectedImage ? 'Change Image' : 'Attach Image'}
           </Text>
         </TouchableOpacity>
 
         <Pressable
-          style={[styles.button, { opacity: wish.trim() === '' ? 0.5 : 1 }]}
+          style={[styles.button, { opacity: wish.trim() === '' || posting ? 0.5 : 1 }]}
           onPress={handlePostWish}
-          disabled={wish.trim() === ''}
+          disabled={wish.trim() === '' || posting}
+          hitSlop={HIT_SLOP}
         >
-          <Text style={styles.buttonText}>Post Wish</Text>
+          {posting ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Post Wish</Text>
+          )}
         </Pressable>
 
         <TouchableOpacity onPress={() => router.push('/auth')} style={styles.authButton}>
@@ -378,7 +410,7 @@ useEffect(() => {
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
 <View style={styles.wishItem}>
-  <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)}>
+  <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)} hitSlop={HIT_SLOP}>
     <Text style={{ color: '#a78bfa', fontSize: 12 }}>
       #{item.category} {item.audioUrl ? '🔊' : ''}
     </Text>
@@ -406,6 +438,7 @@ useEffect(() => {
       setReportVisible(true);
     }}
     style={{ marginTop: 4 }}
+    hitSlop={HIT_SLOP}
   >
     <Text style={{ color: '#f87171' }}>Report</Text>
   </TouchableOpacity>
@@ -448,6 +481,10 @@ const styles = StyleSheet.create({
     color: '#ccc',
     textAlign: 'center',
     marginBottom: 20,
+  },
+  label: {
+    color: '#ccc',
+    marginBottom: 4,
   },
   input: {
     backgroundColor: '#1e1e1e',

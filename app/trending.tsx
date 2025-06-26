@@ -85,6 +85,7 @@ const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => router.push(`/wish/${item.id}`)}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
         <Text
           style={[styles.wishCategory, { color: Colors[colorScheme].tint }]}
@@ -119,6 +120,7 @@ const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
           setReportVisible(true);
         }}
         style={{ marginTop: 4 }}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
         <Text style={{ color: '#f87171' }}>Report</Text>
       </TouchableOpacity>
