@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import * as React from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+  type ReactElement,
+} from 'react';
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -54,7 +62,7 @@ const AuthContext = createContext<AuthContextValue>({
   pickImage: async () => undefined,
 });
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider = ({ children }: { children: ReactNode }): ReactElement => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
