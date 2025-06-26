@@ -55,4 +55,7 @@ Join our community of developers creating universal apps.
 
 ## Push notifications
 
-The app registers a device for Expo push notifications. When someone likes or comments on one of your wishes, a notification is sent to the push token saved with that wish.
+The app registers a device for Expo push notifications. A Firebase Cloud
+Function in `functions/index.js` listens for Firestore updates and sends a
+notification whenever a wish gets a new like or comment. The push token saved
+with each wish is used so the creator receives the message automatically.
