@@ -39,6 +39,7 @@ import {
 import ReportDialog from '../../components/ReportDialog';
 import { db, storage } from '../../firebase';
 import type { Wish } from '../../types/Wish';
+import { useAuth } from '@/contexts/AuthContext';
 
 
 export default function IndexScreen() {
@@ -61,6 +62,8 @@ export default function IndexScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [giftLink, setGiftLink] = useState('');
   const [posting, setPosting] = useState(false);
+  const [useProfilePost, setUseProfilePost] = useState(true);
+  const { user, profile } = useAuth();
 
   const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 
@@ -181,6 +184,10 @@ useEffect(() => {
         text: wish,
         category: category.trim().toLowerCase(),
         pushToken: pushToken || '',
+        userId: user?.uid,
+        displayName: useProfilePost ? profile?.displayName || '' : '',
+        photoURL: useProfilePost ? profile?.photoURL || '' : '',
+        isAnonymous: !useProfilePost,
         ...(giftLink.trim() && { giftLink: giftLink.trim() }),
         ...(isPoll && {
           isPoll: true,
@@ -335,6 +342,12 @@ useEffect(() => {
           />
         </View>
 
+        {/* Post anonymously */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+          <Text style={{ color: '#fff', marginRight: 8 }}>Post with profile</Text>
+          <Switch value={useProfilePost} onValueChange={setUseProfilePost} />
+        </View>
+
         {isPoll && (
           <>
             <Text style={styles.label}>Option A</Text>
@@ -411,6 +424,9 @@ useEffect(() => {
             renderItem={({ item }) => (
 <View style={styles.wishItem}>
   <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)} hitSlop={HIT_SLOP}>
+    {!item.isAnonymous && item.displayName ? (
+      <Text style={styles.author}>by {item.displayName}</Text>
+    ) : null}
     <Text style={{ color: '#a78bfa', fontSize: 12 }}>
       #{item.category} {item.audioUrl ? '🔊' : ''}
     </Text>
@@ -553,6 +569,11 @@ const styles = StyleSheet.create({
   pollText: {
     color: '#fff',
     fontSize: 14,
+  },
+  author: {
+    color: '#ccc',
+    fontSize: 12,
+    marginBottom: 2,
   },
   errorText: {
     color: '#f87171',

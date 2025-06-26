@@ -3,6 +3,10 @@ export interface Wish {
   text: string;
   category: string;
   likes: number;
+  userId?: string;
+  displayName?: string;
+  photoURL?: string;
+  isAnonymous?: boolean;
   boostedUntil?: any;
   pushToken?: string;
   audioUrl?: string;

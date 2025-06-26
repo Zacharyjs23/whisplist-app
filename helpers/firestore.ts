@@ -5,7 +5,10 @@ import type { Wish } from '../types/Wish';
 export interface Comment {
   id: string;
   text: string;
-  nickname?: string;
+  userId?: string;
+  displayName?: string;
+  photoURL?: string;
+  isAnonymous?: boolean;
   timestamp?: any;
   parentId?: string;
   reactions?: Record<string, number>;

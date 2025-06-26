@@ -87,6 +87,9 @@ const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
         onPress={() => router.push(`/wish/${item.id}`)}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
+        {!item.isAnonymous && item.displayName && (
+          <Text style={styles.author}>by {item.displayName}</Text>
+        )}
         <Text
           style={[styles.wishCategory, { color: Colors[colorScheme].tint }]}
         >
@@ -201,6 +204,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 6,
     fontWeight: '600',
+  },
+  author: {
+    color: '#ccc',
+    fontSize: 12,
+    marginBottom: 2,
   },
   wishText: {
     fontSize: 16,
