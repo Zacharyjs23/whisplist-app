@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useRouter, useNavigation } from 'expo-router';
+import React, { useEffect, useState, useLayoutEffect, useRef } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -10,12 +10,15 @@ import {
   TouchableOpacity,
   Image,
   View,
+  Animated,
+  useColorScheme,
 } from 'react-native';
 import { listenTrendingWishes } from '../helpers/firestore';
 import ReportDialog from '../components/ReportDialog';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'; // Only include if still used
 import { db } from '../firebase';
 import type { Wish } from '../types/Wish';
+import { Colors } from '../constants/Colors';
 
 
 export default function TrendingScreen() {
@@ -25,6 +28,12 @@ export default function TrendingScreen() {
   const [reportTarget, setReportTarget] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const navigation = useNavigation();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ title: 'Trending' });
+  }, [navigation]);
 
 
   useEffect(() => {
@@ -52,55 +61,100 @@ export default function TrendingScreen() {
     }
   };
 
-const renderWish = ({ item }: { item: Wish }) => (
-  <View style={styles.wishItem}>
-    <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)}>
-      <Text style={styles.wishCategory}>#{item.category}</Text>
-      <Text style={styles.wishText}>{item.text}</Text>
-      {item.imageUrl && (
-        <Image source={{ uri: item.imageUrl }} style={styles.preview} />
-      )}
-      {item.isPoll ? (
-        <View style={{ marginTop: 6 }}>
-          <Text style={styles.pollText}>
-            {item.optionA}: {item.votesA || 0}
-          </Text>
-          <Text style={styles.pollText}>
-            {item.optionB}: {item.votesB || 0}
-          </Text>
-        </View>
-      ) : (
-        <Text style={styles.likes}>❤️ {item.likes}</Text>
-      )}
-    </TouchableOpacity>
+const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
-    <TouchableOpacity
-      onPress={() => {
-        setReportTarget(item.id);
-        setReportVisible(true);
-      }}
-      style={{ marginTop: 4 }}
+  React.useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.wishItem,
+        {
+          opacity: fadeAnim,
+          backgroundColor: colorScheme === 'dark' ? '#1a1a1a' : '#ffffff',
+        },
+      ]}
     >
-      <Text style={{ color: '#f87171' }}>Report</Text>
-    </TouchableOpacity>
-  </View>
-);
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => router.push(`/wish/${item.id}`)}
+      >
+        <Text
+          style={[styles.wishCategory, { color: Colors[colorScheme].tint }]}
+        >
+          #{item.category}
+        </Text>
+        <Text style={[styles.wishText, { color: Colors[colorScheme].text }]}> 
+          {item.text}
+        </Text>
+        {item.imageUrl && (
+          <Image source={{ uri: item.imageUrl }} style={styles.preview} />
+        )}
+        {item.isPoll ? (
+          <View style={{ marginTop: 6 }}>
+            <Text style={[styles.pollText, { color: Colors[colorScheme].text }]}> 
+              {item.optionA}: {item.votesA || 0}
+            </Text>
+            <Text style={[styles.pollText, { color: Colors[colorScheme].text }]}> 
+              {item.optionB}: {item.votesB || 0}
+            </Text>
+          </View>
+        ) : (
+          <Text style={[styles.likes, { color: Colors[colorScheme].tint }]}> 
+            ❤️ {item.likes}
+          </Text>
+        )}
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={() => {
+          setReportTarget(item.id);
+          setReportVisible(true);
+        }}
+        style={{ marginTop: 4 }}
+      >
+        <Text style={{ color: '#f87171' }}>Report</Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
 
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0e0e0e" />
+    <SafeAreaView
+      style={[
+        styles.safeArea,
+        { backgroundColor: Colors[colorScheme].background },
+      ]}
+    >
+      <StatusBar
+        barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'}
+        backgroundColor={Colors[colorScheme].background}
+      />
       <View style={styles.container}>
-        <Text style={styles.title}>Trending Wishes 🔥</Text>
+        <Text style={[styles.title, { color: Colors[colorScheme].text }]}>Trending Wishes 🔥</Text>
         {loading ? (
-          <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
+          <ActivityIndicator
+            size="large"
+            color="#a78bfa"
+            style={{ marginTop: 20 }}
+          />
         ) : error ? (
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={[styles.errorText, { color: Colors[colorScheme].tint }]}>
+            {error}
+          </Text>
         ) : (
           <FlatList
             data={wishes}
             keyExtractor={(item) => item.id}
-            renderItem={renderWish}
+            renderItem={({ item }) => <WishCard item={item} />}
             contentContainerStyle={{ paddingBottom: 80 }}
           />
         )}
@@ -120,34 +174,35 @@ const renderWish = ({ item }: { item: Wish }) => (
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#0e0e0e',
   },
   container: {
     flex: 1,
     padding: 20,
   },
   title: {
-    color: '#fff',
     fontSize: 24,
     fontWeight: '700',
     marginBottom: 16,
     textAlign: 'center',
   },
   wishItem: {
-    backgroundColor: '#1a1a1a',
     padding: 14,
     borderRadius: 12,
     marginBottom: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
   },
   wishCategory: {
-    color: '#a78bfa',
     fontSize: 13,
     marginBottom: 6,
     fontWeight: '600',
   },
   wishText: {
-    color: '#fff',
     fontSize: 16,
+    fontWeight: '500',
   },
   preview: {
     width: '100%',
@@ -162,11 +217,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   pollText: {
-    color: '#fff',
     fontSize: 14,
   },
   errorText: {
-    color: '#f87171',
     textAlign: 'center',
     marginTop: 20,
   },
