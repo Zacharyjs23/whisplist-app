@@ -9,6 +9,7 @@ import {
   listenWishComments,
   addComment,
   updateCommentReaction,
+  boostWish,
 } from '../../helpers/firestore';
 
 import {
@@ -258,6 +259,17 @@ try {
     }
   }, [fulfillment, id]);
 
+  const handleBoostWish = useCallback(async () => {
+    if (!wish) return;
+    try {
+      // Payment flow would occur here
+      await boostWish(wish.id, 24);
+      await fetchWish();
+    } catch (err) {
+      console.error('❌ Failed to boost wish:', err);
+    }
+  }, [fetchWish, wish]);
+
 
   const renderCommentItem = useCallback(
     (item: Comment, level = 0) => {
@@ -407,6 +419,10 @@ try {
             <Text style={{ color: '#a78bfa' }}>▶ Play Audio</Text>
           </TouchableOpacity>
         )}
+
+        <TouchableOpacity onPress={handleBoostWish} style={{ marginTop: 8 }}>
+          <Text style={{ color: '#facc15' }}>Boost Wish</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
           onPress={() => {

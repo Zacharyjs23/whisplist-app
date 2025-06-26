@@ -65,7 +65,17 @@ useEffect(() => {
   registerForPushNotificationsAsync().then(setPushToken);
 
   const unsubscribe = listenWishes((w) => {
-    setWishList(w);
+    const now = new Date();
+    const boosted = w.filter(
+      (wish) => wish.boostedUntil && wish.boostedUntil.toDate && wish.boostedUntil.toDate() > now
+    );
+    boosted.sort((a, b) =>
+      b.boostedUntil.toDate().getTime() - a.boostedUntil.toDate().getTime()
+    );
+    const normal = w.filter(
+      (wish) => !wish.boostedUntil || !wish.boostedUntil.toDate || wish.boostedUntil.toDate() <= now
+    );
+    setWishList([...boosted, ...normal]);
     setLoading(false);
   });
 
@@ -373,6 +383,10 @@ useEffect(() => {
     ) : (
       <Text style={styles.likeText}>❤️ {item.likes}</Text>
     )}
+    {item.boostedUntil && item.boostedUntil.toDate &&
+      item.boostedUntil.toDate() > new Date() && (
+        <Text style={styles.boostedLabel}>🚀 Boosted</Text>
+      )}
   </TouchableOpacity>
 
   <TouchableOpacity
@@ -482,6 +496,11 @@ const styles = StyleSheet.create({
     color: '#a78bfa',
     marginTop: 6,
     fontSize: 14,
+  },
+  boostedLabel: {
+    color: '#facc15',
+    fontSize: 12,
+    marginTop: 4,
   },
   pollText: {
     color: '#fff',
