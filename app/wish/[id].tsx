@@ -22,10 +22,12 @@ import {
 } from 'firebase/firestore'; // ✅ Keep only if used directly in this file
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Colors } from '../../constants/Colors';
 import {
   Animated,
   ActivityIndicator,
   FlatList,
+  useColorScheme,
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
@@ -61,6 +63,7 @@ const COMMENT_ITEM_HEIGHT = 80;
 export default function WishDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const colorScheme = useColorScheme();
   const [wish, setWish] = useState<Wish | null>(null);
   const [comment, setComment] = useState('');
   const [nickname, setNickname] = useState('');
@@ -346,15 +349,20 @@ try {
   const renderComment = useCallback(({ item }: { item: Comment }) => renderCommentItem(item), [renderCommentItem]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="light" backgroundColor="#0e0e0e" />
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: Colors[colorScheme].background }]}
+    >
+      <StatusBar
+        style={colorScheme === 'dark' ? 'light' : 'dark'}
+        backgroundColor={Colors[colorScheme].background}
+      />
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={80}
       >
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← Back</Text>
+          <Text style={[styles.backButtonText, { color: Colors[colorScheme].tint }]}>← Back</Text>
         </TouchableOpacity>
 
 {loading ? (
@@ -364,9 +372,14 @@ try {
 ) : (
   <>
     {wish && (
-      <View style={styles.wishBox}>
-        <Text style={styles.wishCategory}>#{wish.category}</Text>
-        <Text style={styles.wishText}>{wish.text}</Text>
+      <View
+        style={[
+          styles.wishBox,
+          { backgroundColor: colorScheme === 'dark' ? '#1e1e1e' : '#ffffff' },
+        ]}
+      >
+        <Text style={[styles.wishCategory, { color: Colors[colorScheme].tint }]}>#{wish.category}</Text>
+        <Text style={[styles.wishText, { color: Colors[colorScheme].text }]}>{wish.text}</Text>
         {wish.imageUrl && (
           <Image source={{ uri: wish.imageUrl }} style={styles.preview} />
         )}
@@ -378,7 +391,7 @@ try {
               disabled={hasVoted}
               onPress={() => handleVote('A')}
             >
-              <Text style={styles.pollOptionText}>
+              <Text style={[styles.pollOptionText, { color: Colors[colorScheme].text }]}>
                 {wish.optionA} - {wish.votesA || 0}
               </Text>
             </TouchableOpacity>
@@ -387,7 +400,7 @@ try {
               disabled={hasVoted}
               onPress={() => handleVote('B')}
             >
-              <Text style={styles.pollOptionText}>
+              <Text style={[styles.pollOptionText, { color: Colors[colorScheme].text }]}>
                 {wish.optionB} - {wish.votesB || 0}
               </Text>
             </TouchableOpacity>
@@ -412,7 +425,7 @@ try {
             />
           </View>
         ) : (
-          <Text style={styles.likes}>❤️ {wish.likes}</Text>
+          <Text style={[styles.likes, { color: Colors[colorScheme].tint }]}>❤️ {wish.likes}</Text>
         )}
 
         {wish.audioUrl && (
@@ -524,7 +537,6 @@ try {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#0e0e0e',
   },
   container: {
     flex: 1,
@@ -534,22 +546,20 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   backButtonText: {
-    color: '#a78bfa',
     fontSize: 16,
   },
   wishBox: {
-    backgroundColor: '#1e1e1e',
     padding: 14,
     borderRadius: 10,
     marginBottom: 20,
   },
   wishCategory: {
-    color: '#a78bfa',
     fontSize: 12,
+    fontWeight: '600',
   },
   wishText: {
-    color: '#fff',
     fontSize: 16,
+    fontWeight: '500',
     marginTop: 4,
   },
   preview: {
@@ -559,9 +569,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   likes: {
-    color: '#a78bfa',
     fontSize: 14,
     marginTop: 8,
+    fontWeight: '500',
   },
   pollOption: {
     backgroundColor: '#2e2e2e',
@@ -570,7 +580,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   pollOptionText: {
-    color: '#fff',
     textAlign: 'center',
   },
   commentBox: {
