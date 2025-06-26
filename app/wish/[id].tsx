@@ -76,6 +76,8 @@ export default function WishDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [postingComment, setPostingComment] = useState(false);
+  const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 
   const flatListRef = useRef<FlatList<Comment>>(null);
 
@@ -164,6 +166,7 @@ try {
 
   const handlePostComment = useCallback(async () => {
     if (!comment.trim()) return;
+    setPostingComment(true);
     try {
       await addComment(id as string, {
         text: comment.trim(),
@@ -189,8 +192,11 @@ try {
           }),
         });
       }
+      Alert.alert('Comment posted!');
     } catch (err) {
       console.error('❌ Failed to post comment:', err);
+    } finally {
+      setPostingComment(false);
     }
   }, [comment, id, nickname, replyTo, wish]);
 
@@ -334,6 +340,7 @@ try {
                   setReportVisible(true);
                 }}
                 style={{ marginLeft: 8 }}
+                hitSlop={HIT_SLOP}
               >
                 <Text style={{ color: '#f87171' }}>Report</Text>
               </TouchableOpacity>
@@ -361,7 +368,7 @@ try {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={80}
       >
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} hitSlop={HIT_SLOP}>
           <Text style={[styles.backButtonText, { color: Colors[colorScheme].tint }]}>← Back</Text>
         </TouchableOpacity>
 
@@ -453,6 +460,7 @@ try {
             setReportVisible(true);
           }}
           style={{ marginTop: 8 }}
+          hitSlop={HIT_SLOP}
         >
           <Text style={{ color: '#f87171' }}>Report</Text>
         </TouchableOpacity>
@@ -489,6 +497,7 @@ try {
           </View>
         )}
 
+        <Text style={styles.label}>Comment</Text>
         <TextInput
           style={styles.input}
           placeholder="Your comment"
@@ -497,6 +506,7 @@ try {
           onChangeText={setComment}
         />
 
+        <Text style={styles.label}>Nickname</Text>
         <TextInput
           style={styles.input}
           placeholder="Nickname (optional)"
@@ -505,8 +515,17 @@ try {
           onChangeText={setNickname}
         />
 
-        <TouchableOpacity style={styles.button} onPress={handlePostComment}>
-          <Text style={styles.buttonText}>Post Comment</Text>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handlePostComment}
+          disabled={postingComment}
+          hitSlop={HIT_SLOP}
+        >
+          {postingComment ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Send Comment</Text>
+          )}
         </TouchableOpacity>
         <ReportDialog
           visible={reportVisible}
@@ -517,6 +536,7 @@ try {
           onSubmit={handleReport}
         />
 
+        <Text style={styles.label}>Fulfillment</Text>
         <TextInput
           style={styles.input}
           placeholder="Fulfillment text or link"
@@ -525,7 +545,7 @@ try {
           onChangeText={setFulfillment}
         />
 
-        <TouchableOpacity style={styles.button} onPress={handleFulfillWish}>
+        <TouchableOpacity style={styles.button} onPress={handleFulfillWish} hitSlop={HIT_SLOP}>
           <Text style={styles.buttonText}>Fulfill Wish</Text>
         </TouchableOpacity>
 
@@ -606,6 +626,10 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 10,
     marginTop: 4,
+  },
+  label: {
+    color: '#ccc',
+    marginBottom: 4,
   },
   input: {
     backgroundColor: '#1e1e1e',

@@ -104,7 +104,7 @@ export default function ExploreScreen() {
 
   const renderWish = ({ item }: { item: Wish }) => (
     <View style={styles.wishItem}>
-<TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)}>
+<TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
   <Text style={styles.wishCategory}>
     #{item.category} {item.audioUrl ? '🔊' : ''}
   </Text>
@@ -128,7 +128,8 @@ export default function ExploreScreen() {
           setReportTarget(item.id);
           setReportVisible(true);
         }}
-        style={{ marginTop: 4 }}>
+        style={{ marginTop: 4 }}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
 
         <Text style={{ color: '#f87171' }}>Report</Text>
       </TouchableOpacity>
@@ -153,12 +154,14 @@ export default function ExploreScreen() {
           <TouchableOpacity
             onPress={() => toggleTrending(false)}
             style={[styles.toggleButton, !trendingMode && styles.activeToggle]}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Text style={[styles.toggleText, !trendingMode && styles.activeToggleText]}>Latest</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => toggleTrending(true)}
             style={[styles.toggleButton, trendingMode && styles.activeToggle]}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Text style={[styles.toggleText, trendingMode && styles.activeToggleText]}>🔥 Trending</Text>
           </TouchableOpacity>
