@@ -42,6 +42,12 @@ export async function likeWish(id: string) {
   return updateDoc(ref, { likes: increment(1) });
 }
 
+export async function boostWish(id: string, hours: number) {
+  const ref = doc(db, 'wishes', id);
+  const boostedUntil = new Date(Date.now() + hours * 60 * 60 * 1000);
+  return updateDoc(ref, { boostedUntil });
+}
+
 export async function getWish(id: string): Promise<Wish | null> {
   const snap = await getDoc(doc(db, 'wishes', id));
   return snap.exists() ? ({ id: snap.id, ...(snap.data() as Omit<Wish,'id'>) } as Wish) : null;
@@ -100,6 +106,7 @@ export async function getWishesByNickname(nickname: string): Promise<Wish[]> {
       text: data.text,
       category: data.category,
       likes: data.likes,
+      boostedUntil: data.boostedUntil,
       pushToken: data.pushToken,
       audioUrl: data.audioUrl,
       imageUrl: data.imageUrl,
@@ -122,6 +129,7 @@ export async function getAllWishes(): Promise<Wish[]> {
       text: data.text,
       category: data.category,
       likes: data.likes,
+      boostedUntil: data.boostedUntil,
       pushToken: data.pushToken,
       audioUrl: data.audioUrl,
       imageUrl: data.imageUrl,
