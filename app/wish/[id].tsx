@@ -27,7 +27,6 @@ import {
   Animated,
   ActivityIndicator,
   FlatList,
-  useColorScheme,
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
@@ -39,7 +38,9 @@ import {
   Switch,
   View,
   Dimensions,
+  Alert,
 } from 'react-native';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import { BarChart } from 'react-native-chart-kit';
 import { Linking } from 'react-native';
 import ReportDialog from '../../components/ReportDialog';
