@@ -7,6 +7,7 @@ export interface Wish {
   pushToken?: string;
   audioUrl?: string;
   imageUrl?: string;
+  giftLink?: string;
   isPoll?: boolean;
   optionA?: string;
   optionB?: string;
