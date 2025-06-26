@@ -1,3 +1,4 @@
+// Authentication screen handling login, sign-up, and guest access
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
