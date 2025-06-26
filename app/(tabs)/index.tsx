@@ -59,6 +59,7 @@ export default function IndexScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [includeAudio, setIncludeAudio] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [giftLink, setGiftLink] = useState('');
 
 
 useEffect(() => {
@@ -162,6 +163,7 @@ useEffect(() => {
         text: wish,
         category: category.trim().toLowerCase(),
         pushToken: pushToken || '',
+        ...(giftLink.trim() && { giftLink: giftLink.trim() }),
         ...(isPoll && {
           isPoll: true,
           optionA: optionA.trim(),
@@ -181,6 +183,7 @@ useEffect(() => {
       setRecordedUri(null);
       setIncludeAudio(false);
       setSelectedImage(null);
+      setGiftLink('');
 
     } catch (error) {
       console.error('❌ Failed to post wish:', error);
@@ -277,6 +280,14 @@ useEffect(() => {
           placeholderTextColor="#999"
           value={category}
           onChangeText={setCategory}
+        />
+
+        <TextInput
+          style={styles.input}
+          placeholder="Gift link (optional)"
+          placeholderTextColor="#999"
+          value={giftLink}
+          onChangeText={setGiftLink}
         />
 
         {/* Poll Mode Switch and Inputs */}

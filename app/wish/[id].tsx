@@ -38,6 +38,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { BarChart } from 'react-native-chart-kit';
+import { Linking } from 'react-native';
 import ReportDialog from '../../components/ReportDialog';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
@@ -417,6 +418,15 @@ try {
         {wish.audioUrl && (
           <TouchableOpacity onPress={playAudio} style={{ marginTop: 10 }}>
             <Text style={{ color: '#a78bfa' }}>▶ Play Audio</Text>
+          </TouchableOpacity>
+        )}
+
+        {wish.giftLink && (
+          <TouchableOpacity
+            onPress={() => Linking.openURL(wish.giftLink!)}
+            style={{ marginTop: 8 }}
+          >
+            <Text style={{ color: '#34d399' }}>Fulfill this wish</Text>
           </TouchableOpacity>
         )}
 
