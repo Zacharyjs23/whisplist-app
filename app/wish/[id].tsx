@@ -36,6 +36,7 @@ import {
   TextInput,
   TouchableOpacity,
   Image,
+  Switch,
   View,
   Dimensions,
 } from 'react-native';
@@ -44,11 +45,15 @@ import { Linking } from 'react-native';
 import ReportDialog from '../../components/ReportDialog';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Comment {
   id: string;
   text: string;
-  nickname?: string;
+  userId?: string;
+  displayName?: string;
+  photoURL?: string;
+  isAnonymous?: boolean;
   timestamp?: any;
   parentId?: string;
   reactions?: Record<string, number>;
@@ -66,7 +71,6 @@ export default function WishDetailScreen() {
   const colorScheme = useColorScheme();
   const [wish, setWish] = useState<Wish | null>(null);
   const [comment, setComment] = useState('');
-  const [nickname, setNickname] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [reportTarget, setReportTarget] = useState<{ type: 'wish' | 'comment'; id: string } | null>(null);
@@ -77,6 +81,8 @@ export default function WishDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [postingComment, setPostingComment] = useState(false);
+  const [useProfileComment, setUseProfileComment] = useState(true);
+  const { user, profile } = useAuth();
   const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 
   const flatListRef = useRef<FlatList<Comment>>(null);
@@ -170,7 +176,10 @@ try {
     try {
       await addComment(id as string, {
         text: comment.trim(),
-        nickname: nickname.trim() || 'Anonymous',
+        userId: user?.uid,
+        displayName: useProfileComment ? profile?.displayName || '' : '',
+        photoURL: useProfileComment ? profile?.photoURL || '' : '',
+        isAnonymous: !useProfileComment,
         parentId: replyTo,
         reactions: {},
         userReactions: {},
@@ -198,13 +207,13 @@ try {
     } finally {
       setPostingComment(false);
     }
-  }, [comment, id, nickname, replyTo, wish]);
+  }, [comment, id, replyTo, wish, user, profile, useProfileComment]);
 
 
   const handleReact = useCallback(async (commentId: string, emoji: string) => {
     const comment = comments.find((c) => c.id === commentId);
     if (!comment) return;
-    const currentUser = nickname.trim() || 'Anonymous';
+    const currentUser = user?.uid || 'anon';
     const prevEmoji = comment.userReactions?.[currentUser];
 
     try {
@@ -212,7 +221,7 @@ try {
     } catch (err) {
       console.error('❌ Failed to update reaction:', err);
     }
-  }, [comments, id, nickname]);
+  }, [comments, id, user]);
 
   const handleReport = useCallback(
     async (reason: string) => {
@@ -290,7 +299,7 @@ try {
         useNativeDriver: true,
       }).start();
 
-      const currentUser = nickname.trim() || 'Anonymous';
+      const currentUser = user?.uid || 'anon';
       const userReaction = item.userReactions?.[currentUser];
       const replies = comments.filter((c) => c.parentId === item.id);
 
@@ -311,7 +320,9 @@ try {
               ],
             }}
           >
-            <Text style={styles.nickname}>{item.nickname}</Text>
+            {!item.isAnonymous && (
+              <Text style={styles.nickname}>{item.displayName}</Text>
+            )}
             <Text style={styles.comment}>{item.text}</Text>
             <Text style={styles.timestamp}>
               {item.timestamp?.seconds
@@ -350,7 +361,7 @@ try {
         </View>
       );
     },
-    [comments, handleReact, nickname]
+    [comments, handleReact, user]
   );
 
   const renderComment = useCallback(({ item }: { item: Comment }) => renderCommentItem(item), [renderCommentItem]);
@@ -489,7 +500,7 @@ try {
         {replyTo && (
           <View style={styles.replyInfo}>
             <Text style={{ color: '#a78bfa' }}>
-              Replying to {comments.find((c) => c.id === replyTo)?.nickname}
+              Replying to {comments.find((c) => c.id === replyTo)?.displayName || 'Anonymous'}
             </Text>
             <TouchableOpacity onPress={() => setReplyTo(null)} style={{ marginLeft: 8 }}>
               <Text style={{ color: '#fff' }}>Cancel</Text>
@@ -506,14 +517,10 @@ try {
           onChangeText={setComment}
         />
 
-        <Text style={styles.label}>Nickname</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Nickname (optional)"
-          placeholderTextColor="#aaa"
-          value={nickname}
-          onChangeText={setNickname}
-        />
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+          <Text style={{ color: '#fff', marginRight: 8 }}>Comment with profile</Text>
+          <Switch value={useProfileComment} onValueChange={setUseProfileComment} />
+        </View>
 
         <TouchableOpacity
           style={styles.button}
