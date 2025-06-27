@@ -39,10 +39,10 @@ import {
   View,
   Dimensions,
   Alert,
+  Linking,
 } from 'react-native';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { BarChart } from 'react-native-chart-kit';
-import { Linking } from 'react-native';
 import ReportDialog from '../../components/ReportDialog';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
@@ -65,6 +65,7 @@ interface Comment {
 const emojiOptions = ['❤️', '😂', '😢', '👍'];
 // Approximate height of a single comment item including margins
 const COMMENT_ITEM_HEIGHT = 80;
+const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 
 export default function Page() {
   const { id } = useLocalSearchParams();
@@ -84,7 +85,6 @@ export default function Page() {
   const [postingComment, setPostingComment] = useState(false);
   const [useProfileComment, setUseProfileComment] = useState(true);
   const { user, profile } = useAuth();
-  const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 
   const flatListRef = useRef<FlatList<Comment>>(null);
 
