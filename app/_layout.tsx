@@ -5,9 +5,9 @@ import { Stack } from 'expo-router';
 import React from 'react';
 
 function LayoutInner() {
-  const { loading } = useAuth();
+  const { user, loading } = useAuth();
   if (loading) return null;
-  // Auth requirement temporarily disabled for development
+  // if (!user) return <Redirect href="/auth" />;
   return <Stack screenOptions={{ headerShown: false }} />;
 }
 

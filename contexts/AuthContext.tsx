@@ -108,6 +108,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
     return unsub;
   }, []);
 
+  // Temporary development bypass
+  useEffect(() => {
+    if (__DEV__ && !user && !loading) {
+      const fakeUser = {
+        uid: 'dev',
+        email: 'dev@test.com',
+        displayName: 'DevUser',
+      } as User;
+      setUser(fakeUser);
+      setProfile({
+        displayName: 'DevUser',
+        email: 'dev@test.com',
+        isAnonymous: false,
+      });
+    }
+  }, [user, loading]);
+
   const signUp = async (email: string, password: string) => {
     await createUserWithEmailAndPassword(auth, email, password);
   };
