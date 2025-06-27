@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
-export default function TabLayout() {
+export default function Layout() {
   const colorScheme = useColorScheme();
 
   return (

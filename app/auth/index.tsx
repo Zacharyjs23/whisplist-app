@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-export default function AuthScreen() {
+export default function Page() {
   const router = useRouter();
   const { signIn, signUp, signInWithGoogle, signInAnonymously } = useAuth();
   const [email, setEmail] = useState('');

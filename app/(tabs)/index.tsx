@@ -42,7 +42,7 @@ import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
 
 
-export default function IndexScreen() {
+export default function Page() {
   const [wish, setWish] = useState('');
   const [category, setCategory] = useState('general');
   const [wishList, setWishList] = useState<Wish[]>([]);

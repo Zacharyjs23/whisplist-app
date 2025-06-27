@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 
-export default function ProfileScreen() {
+export default function Page() {
   const { user, profile, updateProfile, pickImage, signOut } = useAuth();
   const [displayName, setDisplayName] = useState(profile?.displayName || '');
   const [bio, setBio] = useState(profile?.bio || '');

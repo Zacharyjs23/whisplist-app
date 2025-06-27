@@ -11,7 +11,7 @@ function LayoutInner() {
   return <Stack screenOptions={{ headerShown: false }} />;
 }
 
-export default function RootLayout() {
+export default function Layout() {
   return (
     <AuthProvider>
       <ThemeProvider>

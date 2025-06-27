@@ -66,7 +66,7 @@ const emojiOptions = ['❤️', '😂', '😢', '👍'];
 // Approximate height of a single comment item including margins
 const COMMENT_ITEM_HEIGHT = 80;
 
-export default function WishDetailScreen() {
+export default function Page() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const colorScheme = useColorScheme();
