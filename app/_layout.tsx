@@ -1,8 +1,8 @@
-import React from 'react';
-import { Redirect, Slot } from 'expo-router';
-import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AppContainer } from '@/components/AppContainer';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { Redirect, Slot } from 'expo-router';
+import React from 'react';
 
 function LayoutInner() {
   const { user, loading } = useAuth();
