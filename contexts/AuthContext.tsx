@@ -73,6 +73,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
+      if (!u) {
+        try {
+          await signInAnonymously(auth);
+        } catch (err) {
+          console.error('Anonymous sign-in failed', err);
+          setLoading(false);
+        }
+        return;
+      }
       setUser(u);
       if (u) {
         const ref = doc(db, 'users', u.uid);
