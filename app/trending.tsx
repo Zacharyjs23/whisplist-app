@@ -21,7 +21,7 @@ import type { Wish } from '../types/Wish';
 import { Colors } from '../constants/Colors';
 
 
-export default function TrendingScreen() {
+export default function Page() {
   const [wishes, setWishes] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
   const [reportVisible, setReportVisible] = useState(false);

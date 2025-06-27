@@ -27,7 +27,7 @@ import {
   getWishesByNickname,
 } from '../../helpers/firestore';
 
-export default function SettingsScreen() {
+export default function Page() {
   const { theme, toggleTheme } = useTheme();
 
   interface User {

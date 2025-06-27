@@ -23,7 +23,7 @@ import type { Wish } from '../../types/Wish';
 
 const allCategories = ['love', 'health', 'career', 'general', 'money', 'friendship', 'fitness'];
 
-export default function ExploreScreen() {
+export default function Page() {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [filteredWishes, setFilteredWishes] = useState<Wish[]>([]);
