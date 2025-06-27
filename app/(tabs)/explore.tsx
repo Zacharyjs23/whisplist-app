@@ -1,5 +1,5 @@
 // app/(tabs)/explore.tsx — Visually Enhanced Explore Screen with Pull-to-Refresh
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -42,7 +42,7 @@ export default function Page() {
     return unsubscribe;
   }, []);
 
-  const fetchWishes = () => {
+  const fetchWishes = useCallback(() => {
     setLoading(true);
     try {
       const source = trendingMode ? listenTrendingWishes : listenWishes;
@@ -69,12 +69,12 @@ export default function Page() {
       setLoading(false);
       return () => {};
     }
-  };
+  }, [trendingMode, selectedCategory, searchTerm]);
 
   useEffect(() => {
     const unsubscribe = fetchWishes();
     return () => unsubscribe();
-  }, [selectedCategory, trendingMode, searchTerm]);
+  }, [fetchWishes]);
 
   const handleReload = () => {
     fetchWishes();

@@ -26,7 +26,6 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [reportVisible, setReportVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const colorScheme = useColorScheme();
   const navigation = useNavigation();
@@ -151,10 +150,6 @@ const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
             color="#a78bfa"
             style={{ marginTop: 20 }}
           />
-        ) : error ? (
-          <Text style={[styles.errorText, { color: Colors[colorScheme].tint }]}>
-            {error}
-          </Text>
         ) : (
           <FlatList
             data={wishes}
@@ -228,9 +223,5 @@ const styles = StyleSheet.create({
   },
   pollText: {
     fontSize: 14,
-  },
-  errorText: {
-    textAlign: 'center',
-    marginTop: 20,
   },
 });
