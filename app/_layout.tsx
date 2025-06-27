@@ -1,4 +1,3 @@
-import React from 'react';
 import { Redirect, Stack } from 'expo-router';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AppContainer } from '@/components/AppContainer';
