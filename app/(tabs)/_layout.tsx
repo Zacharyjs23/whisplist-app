@@ -29,7 +29,7 @@ export default function Layout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="home-outline" color={color} size={size} />
           ),
         }}
@@ -38,7 +38,7 @@ export default function Layout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="person-circle-outline" color={color} size={size} />
           ),
         }}
@@ -47,7 +47,7 @@ export default function Layout() {
         name="settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="settings-outline" color={color} size={size} />
           ),
         }}
