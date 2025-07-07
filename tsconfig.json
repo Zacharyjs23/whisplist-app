@@ -5,7 +5,9 @@
     // Resolve aliases from the project root
     "baseUrl": "./",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ]
     }
   },
   "include": [
