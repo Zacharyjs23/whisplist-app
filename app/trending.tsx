@@ -21,6 +21,12 @@ import { db } from '../firebase';
 import type { Wish } from '../types/Wish';
 import { Colors } from '../constants/Colors';
 
+const typeInfo: Record<string, { emoji: string; color: string }> = {
+  wish: { emoji: '💭', color: '#1a1a1a' },
+  confession: { emoji: '😶\u200d🌫️', color: '#374151' },
+  advice: { emoji: '🧠', color: '#064e3b' },
+  dream: { emoji: '🌙', color: '#312e81' },
+};
 
 export default function Page() {
   const [wishes, setWishes] = useState<Wish[]>([]);
@@ -93,7 +99,8 @@ const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
         styles.wishItem,
         {
           opacity: fadeAnim,
-          backgroundColor: colorScheme === 'dark' ? '#1a1a1a' : '#ffffff',
+          backgroundColor:
+            typeInfo[item.type || 'wish'].color,
         },
       ]}
     >
@@ -108,7 +115,7 @@ const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
         <Text
           style={[styles.wishCategory, { color: Colors[colorScheme].tint }]}
         >
-          #{item.category}
+          {typeInfo[item.type || 'wish'].emoji} #{item.category}
         </Text>
         <Text style={[styles.wishText, { color: Colors[colorScheme].text }]}> 
           {item.text}

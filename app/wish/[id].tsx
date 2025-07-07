@@ -23,6 +23,13 @@ import {
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Colors } from '../../constants/Colors';
+
+const typeInfo: Record<string, { emoji: string; color: string }> = {
+  wish: { emoji: '💭', color: '#1e1e1e' },
+  confession: { emoji: '😶\u200d🌫️', color: '#374151' },
+  advice: { emoji: '🧠', color: '#064e3b' },
+  dream: { emoji: '🌙', color: '#312e81' },
+};
 import {
   Animated,
   ActivityIndicator,
@@ -389,10 +396,12 @@ try {
       <View
         style={[
           styles.wishBox,
-          { backgroundColor: colorScheme === 'dark' ? '#1e1e1e' : '#ffffff' },
+          { backgroundColor: typeInfo[wish.type || 'wish'].color },
         ]}
       >
-        <Text style={[styles.wishCategory, { color: Colors[colorScheme].tint }]}>#{wish.category}</Text>
+        <Text style={[styles.wishCategory, { color: Colors[colorScheme].tint }]}>
+          {typeInfo[wish.type || 'wish'].emoji} #{wish.category}
+        </Text>
         <Text style={[styles.wishText, { color: Colors[colorScheme].text }]}>{wish.text}</Text>
         {wish.imageUrl && (
           <Image source={{ uri: wish.imageUrl }} style={styles.preview} />

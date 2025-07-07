@@ -23,6 +23,13 @@ import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, limit } f
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 
+const typeInfo: Record<string, { emoji: string; color: string }> = {
+  wish: { emoji: '💭', color: '#1a1a1a' },
+  confession: { emoji: '😶\u200d🌫️', color: '#374151' },
+  advice: { emoji: '🧠', color: '#064e3b' },
+  dream: { emoji: '🌙', color: '#312e81' },
+};
+
 
 const allCategories = ['love', 'health', 'career', 'general', 'money', 'friendship', 'fitness'];
 
@@ -125,10 +132,10 @@ export default function Page() {
   };
 
   const renderWish = ({ item }: { item: Wish }) => (
-    <View style={styles.wishItem}>
-<TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+    <View style={[styles.wishItem, { backgroundColor: typeInfo[item.type || 'wish'].color }]}>
+      <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
   <Text style={styles.wishCategory}>
-    #{item.category} {item.audioUrl ? '🔊' : ''}
+    {typeInfo[item.type || 'wish'].emoji} #{item.category} {item.audioUrl ? '🔊' : ''}
   </Text>
   <Text style={styles.wishText}>{item.text}</Text>
   {item.imageUrl && (
