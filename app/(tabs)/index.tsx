@@ -11,11 +11,8 @@ import {
 import {
   listenWishes,
   addWish,
-  likeWish,
-  getWish,
 } from '../../helpers/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-// eslint-disable-next-line import/no-unresolved
 import * as ImagePicker from 'expo-image-picker';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
@@ -47,7 +44,6 @@ export default function Page() {
   const [category, setCategory] = useState('general');
   const [wishList, setWishList] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [pushToken, setPushToken] = useState<string | null>(null);
   const [reportVisible, setReportVisible] = useState(false);
@@ -217,42 +213,6 @@ useEffect(() => {
     }
   };
 
-  const handleLike = async (id: string) => {
-    try {
-      const liked = await AsyncStorage.getItem('likedWishes');
-      const likedWishes = liked ? JSON.parse(liked) : [];
-
-      if (likedWishes.includes(id)) {
-        console.log('⛔ Already liked');
-        return;
-      }
-
-      await likeWish(id);
-
-      const updatedLikes = [...likedWishes, id];
-      await AsyncStorage.setItem('likedWishes', JSON.stringify(updatedLikes));
-
-      const snap = await getWish(id);
-      const token = snap?.pushToken;
-
-      if (token) {
-        await fetch('https://exp.host/--/api/v2/push/send', {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            to: token,
-            title: 'Someone liked your wish! ❤️',
-            body: 'Your dream is spreading good vibes.',
-          }),
-        });
-      }
-    } catch (error) {
-      console.error('❌ Failed to like wish:', error);
-    }
-  };
 
   const handleReport = async (reason: string) => {
     if (!reportTarget) return;
@@ -413,8 +373,6 @@ useEffect(() => {
 
         {loading ? (
           <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
-        ) : error ? (
-          <Text style={styles.errorText}>{error}</Text>
         ) : filteredWishes.length === 0 ? (
           <Text style={styles.noResults}>No matching wishes 💭</Text>
         ) : (
@@ -574,11 +532,6 @@ const styles = StyleSheet.create({
     color: '#ccc',
     fontSize: 12,
     marginBottom: 2,
-  },
-  errorText: {
-    color: '#f87171',
-    textAlign: 'center',
-    marginTop: 20,
   },
   noResults: {
     color: '#ccc',
