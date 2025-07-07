@@ -4,10 +4,14 @@ const path = require('path');
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
 
-// Ensure Hermes can load CJS modules like firebase
-config.resolver.sourceExts.push('cjs');
+// Remove 'cjs' from assetExts and add it to sourceExts
+const assetExts = config.resolver.assetExts.filter(ext => ext !== 'cjs');
+const sourceExts = [...config.resolver.sourceExts, 'cjs'];
 
-// Support TypeScript paths such as "@/*" defined in tsconfig.json
+config.resolver.assetExts = assetExts;
+config.resolver.sourceExts = sourceExts;
+
+// Setup tsconfig alias @ -> project root
 config.resolver.alias = {
   ...config.resolver.alias,
   '@': path.resolve(__dirname),
