@@ -11,12 +11,15 @@ import {
   TouchableOpacity,
   Image,
   View,
+  RefreshControl,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useRouter } from 'expo-router';
 import ReportDialog from '../../components/ReportDialog';
 import { listenTrendingWishes, listenWishes } from '../../helpers/firestore';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 
@@ -34,6 +37,7 @@ export default function Page() {
   const [searchTerm, setSearchTerm] = useState('');
   const [reportVisible, setReportVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const unsubscribe = listenTrendingWishes((data) => {
@@ -76,9 +80,27 @@ export default function Page() {
     return () => unsubscribe();
   }, [fetchWishes]);
 
-  const handleReload = () => {
-    fetchWishes();
-  };
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const q = trendingMode
+        ? query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(20))
+        : query(collection(db, 'wishes'), orderBy('timestamp', 'desc'));
+      const snap = await getDocs(q);
+      const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
+      const filtered = all.filter((wish) => {
+        const inCategory =
+          trendingMode || !selectedCategory || wish.category === selectedCategory;
+        const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+        return inCategory && inSearch;
+      });
+      setFilteredWishes(filtered);
+    } catch (err) {
+      console.error('❌ Failed to refresh wishes:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [trendingMode, selectedCategory, searchTerm]);
 
   const toggleTrending = (mode: boolean) => {
     setTrendingMode(mode);
@@ -139,7 +161,10 @@ export default function Page() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#0e0e0e" />
-      <View style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.container}
+      >
         <Text style={styles.title}>Explore Wishes 🧭</Text>
 
         <TextInput
@@ -206,9 +231,10 @@ export default function Page() {
             data={filteredWishes}
             keyExtractor={(item) => item.id}
             renderItem={renderWish}
-            refreshing={loading}
-            onRefresh={handleReload}
-            contentContainerStyle={{ paddingBottom: 80 }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            contentContainerStyle={{ paddingBottom: 80, flexGrow: 1 }}
           />
         )}
         <ReportDialog
@@ -219,7 +245,7 @@ export default function Page() {
           }}
           onSubmit={handleReport}
         />
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

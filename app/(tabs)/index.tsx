@@ -14,7 +14,7 @@ import {
 } from '../../helpers/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -32,6 +32,7 @@ import {
   TouchableOpacity,
   Image,
   View,
+  RefreshControl,
 } from 'react-native';
 import ReportDialog from '../../components/ReportDialog';
 import { db, storage } from '../../firebase';
@@ -48,6 +49,7 @@ export default function Page() {
   const [pushToken, setPushToken] = useState<string | null>(null);
   const [reportVisible, setReportVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [isPoll, setIsPoll] = useState(false);
   const [optionA, setOptionA] = useState('');
   const [optionB, setOptionB] = useState('');
@@ -231,6 +233,29 @@ useEffect(() => {
     }
   };
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const snap = await getDocs(query(collection(db, 'wishes'), orderBy('timestamp', 'desc')));
+      const w = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
+      const now = new Date();
+      const boosted = w.filter(
+        (wish) => wish.boostedUntil && wish.boostedUntil.toDate && wish.boostedUntil.toDate() > now
+      );
+      boosted.sort(
+        (a, b) => b.boostedUntil!.toDate().getTime() - a.boostedUntil!.toDate().getTime()
+      );
+      const normal = w.filter(
+        (wish) => !wish.boostedUntil || !wish.boostedUntil.toDate || wish.boostedUntil.toDate() <= now
+      );
+      setWishList([...boosted, ...normal]);
+    } catch (err) {
+      console.error('❌ Failed to refresh wishes:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
   const filteredWishes = wishList.filter((wish) =>
     wish.text.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -379,6 +404,10 @@ useEffect(() => {
           <FlatList
             data={filteredWishes}
             keyExtractor={(item) => item.id}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            contentContainerStyle={{ paddingBottom: 80, flexGrow: 1 }}
             renderItem={({ item }) => (
 <View style={styles.wishItem}>
   <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)} hitSlop={HIT_SLOP}>
