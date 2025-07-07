@@ -40,6 +40,7 @@ import {
   Dimensions,
   Alert,
   Linking,
+  RefreshControl,
 } from 'react-native';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { BarChart } from 'react-native-chart-kit';
@@ -84,6 +85,7 @@ export default function Page() {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [postingComment, setPostingComment] = useState(false);
   const [useProfileComment, setUseProfileComment] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const { user, profile } = useAuth();
 
   const flatListRef = useRef<FlatList<Comment>>(null);
@@ -290,6 +292,12 @@ try {
     }
   }, [fetchWish, wish]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchWish();
+    setRefreshing(false);
+  }, [fetchWish]);
+
 
   const renderCommentItem = useCallback(
     (item: Comment, level = 0) => {
@@ -488,7 +496,8 @@ try {
   data={comments.filter((c) => !c.parentId)}
   keyExtractor={(item) => item.id}
   renderItem={renderComment}
-  contentContainerStyle={{ paddingBottom: 80 }}
+  refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+  contentContainerStyle={{ paddingBottom: 80, flexGrow: 1 }}
   initialNumToRender={10}
   getItemLayout={(_, index) => ({
     length: COMMENT_ITEM_HEIGHT,

@@ -1,5 +1,5 @@
 import { useRouter, useNavigation } from 'expo-router';
-import React, { useEffect, useState, useLayoutEffect, useRef } from 'react';
+import React, { useEffect, useState, useLayoutEffect, useRef, useCallback } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -11,11 +11,12 @@ import {
   Image,
   View,
   Animated,
+  RefreshControl,
 } from 'react-native';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { listenTrendingWishes } from '../helpers/firestore';
 import ReportDialog from '../components/ReportDialog';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore'; // Only include if still used
+import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Wish } from '../types/Wish';
 import { Colors } from '../constants/Colors';
@@ -26,6 +27,7 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [reportVisible, setReportVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
   const colorScheme = useColorScheme();
   const navigation = useNavigation();
@@ -59,6 +61,20 @@ export default function Page() {
       setReportTarget(null);
     }
   };
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const q = query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(20));
+      const snap = await getDocs(q);
+      const data = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) }));
+      setWishes(data as Wish[]);
+    } catch (err) {
+      console.error('❌ Failed to refresh wishes:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
 const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -155,7 +171,10 @@ const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
             data={wishes}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => <WishCard item={item} />}
-            contentContainerStyle={{ paddingBottom: 80 }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+            }
+            contentContainerStyle={{ paddingBottom: 80, flexGrow: 1 }}
           />
         )}
         <ReportDialog
