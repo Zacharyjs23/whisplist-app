@@ -32,15 +32,23 @@ import {
   View,
   RefreshControl,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import ReportDialog from '../../components/ReportDialog';
 import { db, storage } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
 
+const typeInfo: Record<string, { emoji: string; color: string }> = {
+  wish: { emoji: '💭', color: '#1e1e1e' },
+  confession: { emoji: '😶\u200d🌫️', color: '#374151' },
+  advice: { emoji: '🧠', color: '#064e3b' },
+  dream: { emoji: '🌙', color: '#312e81' },
+};
 
 export default function Page() {
   const [wish, setWish] = useState('');
   const [category, setCategory] = useState('general');
+  const [postType, setPostType] = useState<'wish' | 'confession' | 'advice' | 'dream'>('wish');
   const [wishList, setWishList] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -176,6 +184,7 @@ useEffect(() => {
       await addWish({
         text: wish,
         category: category.trim().toLowerCase(),
+        type: postType,
         userId: user?.uid,
         displayName: useProfilePost ? profile?.displayName || '' : '',
         photoURL: useProfilePost ? profile?.photoURL || '' : '',
@@ -201,6 +210,7 @@ useEffect(() => {
       setIncludeAudio(false);
       setSelectedImage(null);
       setGiftLink('');
+      setPostType('wish');
       Alert.alert('Wish posted!');
     } catch (error) {
       console.error('❌ Failed to post wish:', error);
@@ -290,6 +300,19 @@ useEffect(() => {
           value={category}
           onChangeText={setCategory}
         />
+
+        <Text style={styles.label}>Post Type</Text>
+        <Picker
+          selectedValue={postType}
+          onValueChange={(val) => setPostType(val)}
+          style={styles.input}
+          dropdownIconColor="#fff"
+        >
+          <Picker.Item label="Wish 💭" value="wish" />
+          <Picker.Item label="Confession 😶‍🌫️" value="confession" />
+          <Picker.Item label="Advice Request 🧠" value="advice" />
+          <Picker.Item label="Dream 🌙" value="dream" />
+        </Picker>
 
         <Text style={styles.label}>Gift Link</Text>
         <TextInput
@@ -403,13 +426,13 @@ useEffect(() => {
             }
             contentContainerStyle={{ paddingBottom: 80, flexGrow: 1 }}
             renderItem={({ item }) => (
-<View style={styles.wishItem}>
+<View style={[styles.wishItem, { backgroundColor: typeInfo[item.type || 'wish'].color }]}>
   <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)} hitSlop={HIT_SLOP}>
     {!item.isAnonymous && item.displayName ? (
       <Text style={styles.author}>by {item.displayName}</Text>
     ) : null}
     <Text style={{ color: '#a78bfa', fontSize: 12 }}>
-      #{item.category} {item.audioUrl ? '🔊' : ''}
+      {typeInfo[item.type || 'wish'].emoji} #{item.category} {item.audioUrl ? '🔊' : ''}
     </Text>
     <Text style={styles.wishText}>{item.text}</Text>
     {item.imageUrl && (

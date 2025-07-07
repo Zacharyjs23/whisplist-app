@@ -2,6 +2,10 @@ export interface Wish {
   id: string;
   text: string;
   category: string;
+  /**
+   * Type of post (e.g. "wish", "confession", "advice", "dream")
+   */
+  type?: string;
   likes: number;
   userId?: string;
   displayName?: string;
