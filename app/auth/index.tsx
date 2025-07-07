@@ -1,11 +1,11 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function Page() {
   const router = useRouter();
-  const { signIn, signUp, signInWithGoogle, signInAnonymously } = useAuth();
+  const { user, signIn, signUp, signInWithGoogle, signInAnonymously } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -18,7 +18,6 @@ export default function Page() {
       } else {
         await signUp(email, password);
       }
-      router.replace('/');
     } catch (err: any) {
       setError(err.message);
     }
@@ -27,7 +26,6 @@ export default function Page() {
   const handleGoogle = async () => {
     try {
       await signInWithGoogle();
-      router.replace('/');
     } catch (err: any) {
       setError(err.message);
     }
@@ -36,11 +34,16 @@ export default function Page() {
   const handleGuest = async () => {
     try {
       await signInAnonymously();
-      router.replace('/');
     } catch (err: any) {
       setError(err.message);
     }
   };
+
+  useEffect(() => {
+    if (user) {
+      router.replace('/');
+    }
+  }, [user, router]);
 
   return (
     <View style={styles.container}>
