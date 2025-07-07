@@ -8,7 +8,6 @@ export interface Wish {
   photoURL?: string;
   isAnonymous?: boolean;
   boostedUntil?: any;
-  pushToken?: string;
   audioUrl?: string;
   imageUrl?: string;
   giftLink?: string;

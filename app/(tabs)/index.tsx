@@ -1,7 +1,5 @@
 // app/(tabs)/index.tsx — Full Home Screen with SafeArea, StatusBar, and Wish Logic
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import {
   Audio,
@@ -46,7 +44,6 @@ export default function Page() {
   const [wishList, setWishList] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [pushToken, setPushToken] = useState<string | null>(null);
   const [reportVisible, setReportVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -67,8 +64,6 @@ export default function Page() {
 
 
 useEffect(() => {
-  registerForPushNotificationsAsync().then(setPushToken);
-
   const unsubscribe = listenWishes((w) => {
     const now = new Date();
     const boosted = w.filter(
@@ -181,7 +176,6 @@ useEffect(() => {
       await addWish({
         text: wish,
         category: category.trim().toLowerCase(),
-        pushToken: pushToken || '',
         userId: user?.uid,
         displayName: useProfilePost ? profile?.displayName || '' : '',
         photoURL: useProfilePost ? profile?.photoURL || '' : '',
@@ -569,36 +563,3 @@ const styles = StyleSheet.create({
   },
 });
 
-async function registerForPushNotificationsAsync(): Promise<string | null> {
-  let token;
-
-  if (Device.isDevice) {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-
-    if (finalStatus !== 'granted') {
-      Alert.alert('Permission required', 'Enable push notifications to get updates!');
-      return null;
-    }
-
-    token = (await Notifications.getExpoPushTokenAsync()).data;
-    console.log('Push token:', token);
-  } else {
-    Alert.alert('Physical device required', 'Push notifications only work on physical devices.');
-    return null;
-  }
-
-  if (Platform.OS === 'android') {
-    Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-    });
-  }
-
-  return token;
-}

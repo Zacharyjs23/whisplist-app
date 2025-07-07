@@ -190,20 +190,7 @@ try {
       setComment('');
       setReplyTo(null);
 
-      if (wish?.pushToken) {
-        await fetch('https://exp.host/--/api/v2/push/send', {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            to: wish.pushToken,
-            title: 'New comment on your wish 💬',
-            body: 'Someone left a comment on your wish.',
-          }),
-        });
-      }
+      // Push notifications are sent from Cloud Functions
       Alert.alert('Comment posted!');
     } catch (err) {
       console.error('❌ Failed to post comment:', err);
