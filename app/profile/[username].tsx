@@ -2,6 +2,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 
@@ -12,6 +14,7 @@ export default function Page() {
   const [wishes, setWishes] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
   const [privateProfile, setPrivateProfile] = useState(false);
+  const theme = useColorScheme();
 
   useEffect(() => {
     const load = async () => {
@@ -45,46 +48,46 @@ export default function Page() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color="#a78bfa" />
+      <View style={[styles.center, { backgroundColor: Colors[theme].background }]}>
+        <ActivityIndicator color={Colors[theme].tint} />
       </View>
     );
   }
 
   if (privateProfile || !profile) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.privateText}>This user has a private profile.</Text>
+      <View style={[styles.center, { backgroundColor: Colors[theme].background }]}>
+        <Text style={[styles.privateText, { color: Colors[theme].text }]}>This user has a private profile.</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: Colors[theme].background }]}>
       {profile.photoURL ? (
         <Image source={{ uri: profile.photoURL }} style={styles.avatar} />
       ) : (
         <View style={[styles.avatar, { backgroundColor: '#444' }]} />
       )}
-      <Text style={styles.displayName}>{profile.displayName}</Text>
+      <Text style={[styles.displayName, { color: Colors[theme].text }]}>{profile.displayName}</Text>
       <FlatList
         data={wishes}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <TouchableOpacity
             onPress={() => router.push(`/wish/${item.id}`)}
-            style={[styles.wishItem, { backgroundColor: '#1e1e1e' }]}
+            style={[styles.wishItem, { backgroundColor: Colors[theme].input }]}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Text style={styles.wishText}>{item.text}</Text>
+            <Text style={[styles.wishText, { color: Colors[theme].text }]}>{item.text}</Text>
             {item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.preview} />}
             {item.isPoll ? (
               <View style={{ marginTop: 6 }}>
-                <Text style={styles.wishText}>{item.optionA}: {item.votesA || 0}</Text>
-                <Text style={styles.wishText}>{item.optionB}: {item.votesB || 0}</Text>
+                <Text style={[styles.wishText, { color: Colors[theme].text }]}>{item.optionA}: {item.votesA || 0}</Text>
+                <Text style={[styles.wishText, { color: Colors[theme].text }]}>{item.optionB}: {item.votesB || 0}</Text>
               </View>
             ) : (
-              <Text style={styles.likeText}>❤️ {item.likes}</Text>
+              <Text style={[styles.likeText, { color: Colors[theme].tint }]}>❤️ {item.likes}</Text>
             )}
           </TouchableOpacity>
         )}
@@ -95,13 +98,13 @@ export default function Page() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0e0e0e', padding: 20 },
-  center: { flex: 1, backgroundColor: '#0e0e0e', alignItems: 'center', justifyContent: 'center' },
-  privateText: { color: '#fff' },
+  container: { flex: 1, padding: 20 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  privateText: {},
   avatar: { width: 100, height: 100, borderRadius: 50, alignSelf: 'center', marginBottom: 10 },
-  displayName: { color: '#fff', fontSize: 20, textAlign: 'center', marginBottom: 20 },
+  displayName: { fontSize: 20, textAlign: 'center', marginBottom: 20 },
   wishItem: { padding: 12, borderRadius: 8, marginBottom: 10 },
-  wishText: { color: '#fff', fontSize: 16 },
-  likeText: { color: '#a78bfa', marginTop: 6, fontSize: 14 },
+  wishText: { fontSize: 16 },
+  likeText: { marginTop: 6, fontSize: 14 },
   preview: { width: '100%', height: 200, borderRadius: 10, marginTop: 8 }
 });

@@ -2,10 +2,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 
 export default function Page() {
   const router = useRouter();
   const { user, signIn, signUp, signInWithGoogle, signInAnonymously } = useAuth();
+  const theme = useColorScheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -46,40 +49,40 @@ export default function Page() {
   }, [user, router]);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{mode === 'login' ? 'Login' : 'Sign Up'}</Text>
-      {error && <Text style={styles.error}>{error}</Text>}
+    <View style={[styles.container, { backgroundColor: Colors[theme].background }]}>
+      <Text style={[styles.title, { color: Colors[theme].text }]}>{mode === 'login' ? 'Login' : 'Sign Up'}</Text>
+      {error && <Text style={[styles.error, { color: '#f87171' }]}>{error}</Text>}
       <TextInput
-        style={styles.input}
+        style={[styles.input, { backgroundColor: Colors[theme].input, color: Colors[theme].text }]}
         placeholder="Email"
         placeholderTextColor="#888"
         value={email}
         onChangeText={setEmail}
       />
       <TextInput
-        style={styles.input}
+        style={[styles.input, { backgroundColor: Colors[theme].input, color: Colors[theme].text }]}
         placeholder="Password"
         placeholderTextColor="#888"
         secureTextEntry
         value={password}
         onChangeText={setPassword}
       />
-      <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-        <Text style={styles.buttonText}>{mode === 'login' ? 'Login' : 'Sign Up'}</Text>
+      <TouchableOpacity style={[styles.button, { backgroundColor: Colors[theme].tint }]} onPress={handleSubmit}>
+        <Text style={[styles.buttonText, { color: Colors[theme].text }]}>{mode === 'login' ? 'Login' : 'Sign Up'}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => setMode(mode === 'login' ? 'signup' : 'login')} style={styles.link}>
-        <Text style={styles.linkText}>
+        <Text style={[styles.linkText, { color: Colors[theme].tint }]}>
           {mode === 'login' ? "Don't have an account? Sign Up" : 'Already have an account? Login'}
         </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.altButton} onPress={handleGoogle}>
-        <Text style={styles.buttonText}>Continue with Google</Text>
+      <TouchableOpacity style={[styles.altButton, { backgroundColor: Colors[theme].input }]} onPress={handleGoogle}>
+        <Text style={[styles.buttonText, { color: Colors[theme].text }]}>Continue with Google</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.altButton} onPress={handleGuest}>
-        <Text style={styles.buttonText}>Continue as Guest</Text>
+      <TouchableOpacity style={[styles.altButton, { backgroundColor: Colors[theme].input }]} onPress={handleGuest}>
+        <Text style={[styles.buttonText, { color: Colors[theme].text }]}>Continue as Guest</Text>
       </TouchableOpacity>
     </View>
   );
@@ -90,25 +93,20 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0e0e0e',
     padding: 20,
   },
   title: {
-    color: '#fff',
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
   },
   input: {
-    backgroundColor: '#1e1e1e',
-    color: '#fff',
     padding: 12,
     borderRadius: 10,
     width: '100%',
     marginBottom: 10,
   },
   button: {
-    backgroundColor: '#8b5cf6',
     paddingVertical: 12,
     paddingHorizontal: 28,
     borderRadius: 12,
@@ -117,7 +115,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   altButton: {
-    backgroundColor: '#27272a',
     paddingVertical: 12,
     paddingHorizontal: 28,
     borderRadius: 12,
@@ -126,18 +123,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   buttonText: {
-    color: '#fff',
     fontWeight: '600',
     fontSize: 16,
   },
   link: {
     marginBottom: 10,
   },
-  linkText: {
-    color: '#a78bfa',
-  },
+  linkText: {},
   error: {
-    color: '#f87171',
     marginBottom: 10,
   },
 });
