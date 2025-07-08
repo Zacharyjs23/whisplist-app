@@ -584,12 +584,15 @@ useEffect(() => {
               {user && item.userId && user.uid !== item.userId && (
                 <TouchableOpacity
                   onPress={async () => {
+                    if (!user?.uid) return;
+                    if (!item.userId) return;
+
                     if (followStatus[item.userId]) {
-                      await unfollowUser(user.uid, item.userId!);
-                      setFollowStatus((prev) => ({ ...prev, [item.userId!]: false }));
+                      await unfollowUser(user.uid, item.userId);
+                      setFollowStatus((prev) => ({ ...prev, [item.userId]: false }));
                     } else {
-                      await followUser(user.uid, item.userId!);
-                      setFollowStatus((prev) => ({ ...prev, [item.userId!]: true }));
+                      await followUser(user.uid, item.userId);
+                      setFollowStatus((prev) => ({ ...prev, [item.userId]: true }));
                     }
                   }}
                   style={{ marginTop: 4 }}
