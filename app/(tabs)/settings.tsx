@@ -38,7 +38,7 @@ export default function Page() {
   const { theme, setTheme } = useTheme();
   const { profile, updateProfile } = useAuth();
 
-  const themeOptions: Theme[] = ['light', 'dark', 'neon', 'sunset'];
+  const themeOptions = Object.keys(Colors) as Theme[];
 
   interface User {
     id: string;
