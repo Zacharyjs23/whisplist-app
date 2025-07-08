@@ -4,7 +4,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
-import { Audio } from 'expo-av';
+import * as Audio from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
 import * as Notifications from 'expo-notifications';
 import { addDoc, collection, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
@@ -145,7 +145,7 @@ export default function Page() {
   };
 
   const permissionsInfo = async () => {
-    const mic = await Audio.getPermissionsAsync();
+    const mic = await Audio.getRecordingPermissionsAsync();
     const notif = await Notifications.getPermissionsAsync();
     Alert.alert('Permissions', `Microphone: ${mic.status}\nNotifications: ${notif.status}`);
   };

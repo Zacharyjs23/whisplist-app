@@ -2,10 +2,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import {
-  Audio,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  RecordingPresets,
+  AudioRecorder,
   InterruptionModeAndroid,
-  InterruptionModeIOS,
-} from 'expo-av';
+  InterruptionMode,
+} from 'expo-audio';
 import {
   listenWishes,
   addWish,
@@ -64,7 +67,7 @@ export default function Page() {
   const [isPoll, setIsPoll] = useState(false);
   const [optionA, setOptionA] = useState('');
   const [optionB, setOptionB] = useState('');
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [recording, setRecording] = useState<AudioRecorder | null>(null);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [includeAudio, setIncludeAudio] = useState(false);
@@ -161,24 +164,22 @@ useEffect(() => {
 
   const startRecording = async () => {
     try {
-      const { granted } = await Audio.requestPermissionsAsync();
+      const { granted } = await requestRecordingPermissionsAsync();
       if (!granted) {
         Alert.alert('Permission required', 'Microphone access is needed to record');
         return;
       }
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-        playsInSilentModeIOS: true,
+      await setAudioModeAsync({
+        allowsRecording: true,
+        interruptionMode: InterruptionMode.DoNotMix,
+        playsInSilentMode: true,
         interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
+        shouldPlayInBackground: false,
+        shouldRouteThroughEarpiece: false,
       });
-      const rec = new Audio.Recording();
-      await rec.prepareToRecordAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-      await rec.startAsync();
+      const rec = new AudioRecorder(RecordingPresets.HIGH_QUALITY);
+      await rec.prepareToRecordAsync();
+      rec.record();
       setRecording(rec);
       setIsRecording(true);
     } catch (err) {
@@ -189,8 +190,8 @@ useEffect(() => {
   const stopRecording = async () => {
     try {
       if (!recording) return;
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
+      await recording.stop();
+      const uri = recording.uri;
       setRecordedUri(uri);
     } catch (err) {
       console.error('❌ Failed to stop recording:', err);
