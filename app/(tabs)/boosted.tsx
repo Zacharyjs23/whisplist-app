@@ -13,7 +13,7 @@ import {
   Animated,
   RefreshControl,
 } from 'react-native';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { listenBoostedWishes } from '../../helpers/firestore';
 import ReportDialog from '../../components/ReportDialog';
 import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, doc, getDoc } from 'firebase/firestore';
@@ -36,7 +36,7 @@ export default function Page() {
   const [refreshing, setRefreshing] = useState(false);
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
   const router = useRouter();
-  const colorScheme = useColorScheme();
+  const { theme } = useTheme();
 
   useEffect(() => {
     const unsubscribe = listenBoostedWishes((data) => {
@@ -144,22 +144,22 @@ export default function Page() {
                 <Text style={styles.author}>by {item.displayName}</Text>
               </TouchableOpacity>
             )}
-          <Text style={[styles.wishCategory, { color: Colors[colorScheme].tint }]}> 
+          <Text style={[styles.wishCategory, { color: Colors[theme].tint }]}>
             {typeInfo[item.type || 'wish'].emoji} #{item.category}
           </Text>
-          <Text style={[styles.wishText, { color: Colors[colorScheme].text }]}>{item.text}</Text>
+          <Text style={[styles.wishText, { color: Colors[theme].text }]}>{item.text}</Text>
           {item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.preview} />}
           {item.isPoll ? (
             <View style={{ marginTop: 6 }}>
-              <Text style={[styles.pollText, { color: Colors[colorScheme].text }]}>
+              <Text style={[styles.pollText, { color: Colors[theme].text }]}> 
                 {item.optionA}: {item.votesA || 0}
               </Text>
-              <Text style={[styles.pollText, { color: Colors[colorScheme].text }]}>
+              <Text style={[styles.pollText, { color: Colors[theme].text }]}> 
                 {item.optionB}: {item.votesB || 0}
               </Text>
             </View>
           ) : (
-            <Text style={[styles.likes, { color: Colors[colorScheme].tint }]}>❤️ {item.likes}</Text>
+            <Text style={[styles.likes, { color: Colors[theme].tint }]}>❤️ {item.likes}</Text>
           )}
           {item.boostedUntil && item.boostedUntil.toDate && (
             <Text style={styles.boostedLabel}>🚀 Boosted</Text>
@@ -180,13 +180,13 @@ export default function Page() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: Colors[colorScheme].background }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: Colors[theme].background }]}>
       <StatusBar
-        barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'}
-        backgroundColor={Colors[colorScheme].background}
+        barStyle={theme === 'dark' || theme === 'neon' ? 'light-content' : 'dark-content'}
+        backgroundColor={Colors[theme].background}
       />
-      <View style={styles.container}>
-        <Text style={[styles.title, { color: Colors[colorScheme].text }]}>Boosted Wishes 🚀</Text>
+      <View style={[styles.container, { backgroundColor: Colors[theme].background }]}>
+        <Text style={[styles.title, { color: Colors[theme].text }]}>Boosted Wishes 🚀</Text>
         {loading ? (
           <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
         ) : (
