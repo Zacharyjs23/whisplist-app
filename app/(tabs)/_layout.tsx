@@ -35,6 +35,15 @@ export default function Layout() {
         }}
       />
       <Tabs.Screen
+        name="boosted"
+        options={{
+          title: 'Boosted',
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
+            <Ionicons name="rocket-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
