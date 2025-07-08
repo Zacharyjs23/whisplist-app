@@ -176,6 +176,7 @@ export default function Page() {
     <ThemedView style={styles.container}>
       <ThemedText style={styles.title}>Settings</ThemedText>
       <ThemedText style={styles.section}>Theme</ThemedText>
+      <ThemedText accessibilityRole="text">Current Theme: {theme}</ThemedText>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.themeList}>
         {Object.keys(Colors).map((t) => (
           <TouchableOpacity
