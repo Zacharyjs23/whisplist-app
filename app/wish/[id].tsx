@@ -3,7 +3,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
-import { Audio } from 'expo-av';
+import { createAudioPlayer, AudioPlayer } from 'expo-audio';
 import {
   getWish,
   listenWishComments,
@@ -94,7 +94,7 @@ export default function Page() {
   const [fulfillment, setFulfillment] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [sound, setSound] = useState<AudioPlayer | null>(null);
   const [postingComment, setPostingComment] = useState(false);
   const [useProfileComment, setUseProfileComment] = useState(true);
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
@@ -213,9 +213,9 @@ try {
   const playAudio = useCallback(async () => {
     if (!wish?.audioUrl) return;
     try {
-      const { sound: newSound } = await Audio.Sound.createAsync({ uri: wish.audioUrl });
-      setSound(newSound);
-      await newSound.playAsync();
+      const player = createAudioPlayer({ uri: wish.audioUrl });
+      setSound(player);
+      player.play();
     } catch (err) {
       console.error('❌ Failed to play audio:', err);
     }
@@ -223,7 +223,7 @@ try {
 
   useEffect(() => {
     return () => {
-      sound?.unloadAsync();
+      sound?.remove();
     };
   }, [sound]);
 
