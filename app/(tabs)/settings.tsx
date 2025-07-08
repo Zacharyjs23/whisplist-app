@@ -1,6 +1,7 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useTheme } from '@/contexts/ThemeContext';
+import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
@@ -29,7 +30,7 @@ import {
 } from '../../helpers/firestore';
 
 export default function Page() {
-  const { theme, toggleTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const { profile, updateProfile } = useAuth();
 
   interface User {
@@ -173,10 +174,18 @@ export default function Page() {
   return (
     <ThemedView style={styles.container}>
       <ThemedText style={styles.title}>Settings</ThemedText>
-      <View style={styles.row}>
-        <ThemedText style={styles.label}>Dark Mode</ThemedText>
-        <Switch value={theme === 'dark'} onValueChange={toggleTheme} />
-      </View>
+      <ThemedText style={styles.section}>Theme</ThemedText>
+      <Picker
+        selectedValue={theme}
+        onValueChange={(v) => setTheme(v as any)}
+        style={[styles.picker, { backgroundColor: Colors[theme].input, color: Colors[theme].text }]}
+      >
+        <Picker.Item label="Light" value="light" />
+        <Picker.Item label="Dark" value="dark" />
+        <Picker.Item label="Sunset" value="sunset" />
+        <Picker.Item label="Ocean" value="ocean" />
+        <Picker.Item label="Neon" value="neon" />
+      </Picker>
 
       <View style={styles.row}>
         <ThemedText style={styles.label}>Anonymize Username</ThemedText>
@@ -208,7 +217,10 @@ export default function Page() {
           setDefaultCategory(v);
           await AsyncStorage.setItem('defaultCategory', v);
         }}
-        style={styles.picker}
+        style={[
+          styles.picker,
+          { backgroundColor: Colors[theme].input, color: Colors[theme].text },
+        ]}
       >
         <Picker.Item label="General" value="general" />
         <Picker.Item label="Love" value="love" />
@@ -223,14 +235,17 @@ export default function Page() {
           setLanguage(v);
           await AsyncStorage.setItem('language', v);
         }}
-        style={styles.picker}
+        style={[
+          styles.picker,
+          { backgroundColor: Colors[theme].input, color: Colors[theme].text },
+        ]}
       >
         <Picker.Item label="English" value="en" />
         <Picker.Item label="Spanish" value="es" />
       </Picker>
 
       <TextInput
-        style={styles.input}
+        style={[styles.input, { backgroundColor: Colors[theme].input, color: Colors[theme].text }]}
         placeholder="Send feedback"
         placeholderTextColor="#888"
         value={feedback}
@@ -256,7 +271,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 20,
-    color: '#a78bfa',
     textAlign: 'center',
   },
   row: {
@@ -267,22 +281,16 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 16,
-    color: '#fff',
   },
   section: {
     marginTop: 20,
     marginBottom: 8,
-    color: '#a78bfa',
     fontSize: 16,
   },
   picker: {
-    backgroundColor: '#1e1e1e',
-    color: '#fff',
     marginBottom: 12,
   },
   input: {
-    backgroundColor: '#1e1e1e',
-    color: '#fff',
     padding: 10,
     borderRadius: 8,
     marginBottom: 12,

@@ -4,11 +4,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import usePushNotifications from '@/hooks/usePushNotifications';
+import { Colors } from '@/constants/Colors';
 
 export const AppContainer: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const theme = useColorScheme();
-  const backgroundColor = theme === 'dark' ? '#0e0e0e' : '#fff';
-  const barStyle = theme === 'dark' ? 'light-content' : 'dark-content';
+  const backgroundColor = Colors[theme].background;
+  const barStyle = theme === 'dark' || theme === 'neon' ? 'light-content' : 'dark-content';
   usePushNotifications();
 
   useEffect(() => {
