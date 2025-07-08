@@ -46,6 +46,7 @@ import {
   Alert,
   Linking,
   RefreshControl,
+  ScrollView,
 } from 'react-native';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { BarChart } from 'react-native-chart-kit';
@@ -438,6 +439,7 @@ try {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={80}
       >
+        <ScrollView contentContainerStyle={styles.contentContainer}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton} hitSlop={HIT_SLOP}>
           <Text style={[styles.backButtonText, { color: Colors[colorScheme].tint }]}>← Back</Text>
         </TouchableOpacity>
@@ -566,6 +568,7 @@ try {
   renderItem={renderComment}
   refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
   contentContainerStyle={{ paddingBottom: 80, flexGrow: 1 }}
+  scrollEnabled={false}
   initialNumToRender={10}
   getItemLayout={(_, index) => ({
     length: COMMENT_ITEM_HEIGHT,
@@ -628,7 +631,7 @@ try {
           onSubmit={handleReport}
         />
 
-        <Text style={styles.label}>Fulfillment</Text>
+<Text style={styles.label}>Fulfillment</Text>
         <TextInput
           style={styles.input}
           placeholder="Fulfillment text or link"
@@ -640,6 +643,7 @@ try {
         <TouchableOpacity style={styles.button} onPress={handleFulfillWish} hitSlop={HIT_SLOP}>
           <Text style={styles.buttonText}>Fulfill Wish</Text>
         </TouchableOpacity>
+        </ScrollView>
 
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -652,7 +656,11 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+  },
+  contentContainer: {
     padding: 20,
+    paddingBottom: 100,
+    flexGrow: 1,
   },
   backButton: {
     marginBottom: 10,

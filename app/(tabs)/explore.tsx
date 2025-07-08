@@ -14,6 +14,7 @@ import {
   RefreshControl,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useRouter } from 'expo-router';
@@ -172,7 +173,8 @@ export default function Page() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.container}
       >
-        <Text style={styles.title}>Explore Wishes 🧭</Text>
+        <ScrollView contentContainerStyle={styles.contentContainer}>
+          <Text style={styles.title}>Explore Wishes 🧭</Text>
 
         <TextInput
           style={styles.searchInput}
@@ -244,6 +246,7 @@ export default function Page() {
             contentContainerStyle={{ paddingBottom: 80, flexGrow: 1 }}
           />
         )}
+        </ScrollView>
         <ReportDialog
           visible={reportVisible}
           onClose={() => {
@@ -264,7 +267,11 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+  },
+  contentContainer: {
     padding: 20,
+    paddingBottom: 100,
+    flexGrow: 1,
   },
   title: {
     color: '#fff',
