@@ -104,24 +104,24 @@ export function listenBoostedWishes(cb: (wishes: Wish[]) => void) {
 }
 
 export async function followUser(currentUser: string, targetUser: string) {
-  const ref = doc(db, 'users', targetUser, 'followers', currentUser);
-  await setDoc(ref, { createdAt: serverTimestamp() });
+  const followerRef = doc(db, 'users', targetUser, 'followers', currentUser);
+  const followingRef = doc(db, 'users', currentUser, 'following', targetUser);
+  await Promise.all([
+    setDoc(followerRef, { createdAt: serverTimestamp() }),
+    setDoc(followingRef, { createdAt: serverTimestamp() }),
+  ]);
 }
 
 export async function unfollowUser(currentUser: string, targetUser: string) {
-  const ref = doc(db, 'users', targetUser, 'followers', currentUser);
-  await deleteDoc(ref);
+  const followerRef = doc(db, 'users', targetUser, 'followers', currentUser);
+  const followingRef = doc(db, 'users', currentUser, 'following', targetUser);
+  await Promise.all([deleteDoc(followerRef), deleteDoc(followingRef)]);
 }
 
 export async function getFollowingIds(userId: string): Promise<string[]> {
-  const q = query(
-    collectionGroup(db, 'followers'),
-    where(FieldPath.documentId(), '==', userId)
-  );
+  const q = query(collection(db, 'users', userId, 'following'));
   const snap = await getDocs(q);
-  return snap.docs
-    .map(d => d.ref.parent.parent?.id)
-    .filter((id): id is string => typeof id === 'string');
+  return snap.docs.map(d => d.id);
 }
 
 export async function addWish(data: Omit<Wish, 'id'>) {

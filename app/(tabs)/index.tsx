@@ -12,6 +12,8 @@ import {
   listenWishes,
   addWish,
   getFollowingIds,
+  followUser,
+  unfollowUser,
 } from '../../helpers/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -76,6 +78,7 @@ export default function Page() {
   const [posting, setPosting] = useState(false);
   const [useProfilePost, setUseProfilePost] = useState(true);
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
+  const [followStatus, setFollowStatus] = useState<Record<string, boolean>>({});
   const [streakCount, setStreakCount] = useState(0);
   const [dailyPrompt, setDailyPrompt] = useState('');
   const promptOpacity = useRef(new Animated.Value(0)).current;
@@ -116,6 +119,28 @@ useEffect(() => {
   };
   fetchStatus();
 }, [wishList]);
+
+useEffect(() => {
+  const fetchFollow = async () => {
+    if (!user) return;
+    const ids = Array.from(
+      new Set(
+        wishList
+          .map((w) => w.userId)
+          .filter((id): id is string => typeof id === 'string' && id !== user.uid)
+      )
+    );
+    await Promise.all(
+      ids.map(async (id) => {
+        if (followStatus[id] === undefined) {
+          const snap = await getDoc(doc(db, 'users', user.uid, 'following', id));
+          setFollowStatus((prev) => ({ ...prev, [id]: snap.exists() }));
+        }
+      })
+    );
+  };
+  fetchFollow();
+}, [wishList, user]);
 
 useEffect(() => {
   const showWelcome = async () => {
@@ -548,6 +573,26 @@ useEffect(() => {
                     <Text style={styles.boostedLabel}>🚀 Boosted</Text>
                   )}
               </TouchableOpacity>
+
+              {user && item.userId && user.uid !== item.userId && (
+                <TouchableOpacity
+                  onPress={async () => {
+                    if (followStatus[item.userId]) {
+                      await unfollowUser(user.uid, item.userId!);
+                      setFollowStatus((prev) => ({ ...prev, [item.userId!]: false }));
+                    } else {
+                      await followUser(user.uid, item.userId!);
+                      setFollowStatus((prev) => ({ ...prev, [item.userId!]: true }));
+                    }
+                  }}
+                  style={{ marginTop: 4 }}
+                  hitSlop={HIT_SLOP}
+                >
+                  <Text style={{ color: '#a78bfa' }}>
+                    {followStatus[item.userId] ? 'Unfollow' : 'Follow'}
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 onPress={() => {
