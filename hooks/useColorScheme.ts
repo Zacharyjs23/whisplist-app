@@ -3,5 +3,5 @@ import { ThemeContext } from '@/contexts/ThemeContext';
 
 export function useColorScheme() {
   const { theme } = useContext(ThemeContext);
-  return theme;
+  return theme.name;
 }

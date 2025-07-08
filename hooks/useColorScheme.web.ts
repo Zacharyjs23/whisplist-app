@@ -13,7 +13,7 @@ export function useColorScheme() {
   }, []);
 
   if (hasHydrated) {
-    return theme;
+    return theme.name;
   }
 
   return 'light';

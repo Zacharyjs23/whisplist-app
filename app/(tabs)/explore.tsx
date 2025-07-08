@@ -28,7 +28,6 @@ import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Colors } from '@/constants/Colors';
 
 const typeInfo: Record<string, { emoji: string; color: string }> = {
   wish: { emoji: '💭', color: '#1a1a1a' },
@@ -222,11 +221,11 @@ export default function Page() {
   );
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: Colors[theme].background }]}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors[theme].background} />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle="light-content" backgroundColor={theme.background} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={[styles.container, { backgroundColor: Colors[theme].background }]}
+        style={[styles.container, { backgroundColor: theme.background }]}
       >
         <FlatList
           data={filteredWishes}
@@ -242,7 +241,7 @@ export default function Page() {
         <TextInput
           style={[
             styles.searchInput,
-            { backgroundColor: Colors[theme].input, color: Colors[theme].text },
+            { backgroundColor: theme.input, color: theme.text },
           ]}
           placeholder="Search wishes..."
           placeholderTextColor="#aaa"
@@ -255,7 +254,7 @@ export default function Page() {
             onPress={() => toggleTrending(false)}
             style={[
               styles.toggleButton,
-              { backgroundColor: Colors[theme].input },
+              { backgroundColor: theme.input },
               !trendingMode && styles.activeToggle,
             ]}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -266,7 +265,7 @@ export default function Page() {
             onPress={() => toggleTrending(true)}
             style={[
               styles.toggleButton,
-              { backgroundColor: Colors[theme].input },
+              { backgroundColor: theme.input },
               trendingMode && styles.activeToggle,
             ]}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -278,7 +277,7 @@ export default function Page() {
         <Picker
           selectedValue={selectedCategory}
           onValueChange={(value) => setSelectedCategory(value)}
-          style={[styles.dropdown, { backgroundColor: Colors[theme].input, color: Colors[theme].text }]}
+          style={[styles.dropdown, { backgroundColor: theme.input, color: theme.text }]}
           dropdownIconColor="#fff"
         >
           <Picker.Item label="All Categories" value={null} />
@@ -297,7 +296,7 @@ export default function Page() {
             {topWishes.map((wish) => (
               <View
                 key={wish.id}
-                style={[styles.topWish, { backgroundColor: Colors[theme].input }]}
+                style={[styles.topWish, { backgroundColor: theme.input }]}
               >
                 <Text style={styles.topWishText}>{wish.text}</Text>
                 <Text style={styles.likes}>❤️ {wish.likes}</Text>

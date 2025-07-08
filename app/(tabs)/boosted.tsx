@@ -19,7 +19,6 @@ import ReportDialog from '../../components/ReportDialog';
 import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
-import { Colors } from '../../constants/Colors';
 
 const typeInfo: Record<string, { emoji: string; color: string }> = {
   wish: { emoji: '💭', color: '#1a1a1a' },
@@ -144,22 +143,22 @@ export default function Page() {
                 <Text style={styles.author}>by {item.displayName}</Text>
               </TouchableOpacity>
             )}
-          <Text style={[styles.wishCategory, { color: Colors[theme].tint }]}>
+          <Text style={[styles.wishCategory, { color: theme.tint }]}>
             {typeInfo[item.type || 'wish'].emoji} #{item.category}
           </Text>
-          <Text style={[styles.wishText, { color: Colors[theme].text }]}>{item.text}</Text>
+          <Text style={[styles.wishText, { color: theme.text }]}>{item.text}</Text>
           {item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.preview} />}
           {item.isPoll ? (
             <View style={{ marginTop: 6 }}>
-              <Text style={[styles.pollText, { color: Colors[theme].text }]}> 
+              <Text style={[styles.pollText, { color: theme.text }]}>
                 {item.optionA}: {item.votesA || 0}
               </Text>
-              <Text style={[styles.pollText, { color: Colors[theme].text }]}> 
+              <Text style={[styles.pollText, { color: theme.text }]}>
                 {item.optionB}: {item.votesB || 0}
               </Text>
             </View>
           ) : (
-            <Text style={[styles.likes, { color: Colors[theme].tint }]}>❤️ {item.likes}</Text>
+            <Text style={[styles.likes, { color: theme.tint }]}>❤️ {item.likes}</Text>
           )}
           {item.boostedUntil && item.boostedUntil.toDate && (
             <Text style={styles.boostedLabel}>🚀 Boosted</Text>
@@ -180,13 +179,13 @@ export default function Page() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: Colors[theme].background }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar
-        barStyle={theme === 'dark' || theme === 'neon' ? 'light-content' : 'dark-content'}
-        backgroundColor={Colors[theme].background}
+        barStyle={theme.name === 'dark' || theme.name === 'neon' ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.background}
       />
-      <View style={[styles.container, { backgroundColor: Colors[theme].background }]}>
-        <Text style={[styles.title, { color: Colors[theme].text }]}>Boosted Wishes 🚀</Text>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <Text style={[styles.title, { color: theme.text }]}>Boosted Wishes 🚀</Text>
         {loading ? (
           <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
         ) : (

@@ -4,18 +4,19 @@
  */
 
 import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export function useThemeColor(
   props: Partial<Record<keyof typeof Colors, string>>,
   colorName: keyof (typeof Colors)['light']
 ) {
-  const theme = (useColorScheme() ?? 'light') as keyof typeof Colors;
-  const colorFromProps = props[theme];
+  const { theme } = useTheme();
+  const themeName = theme.name as keyof typeof Colors;
+  const colorFromProps = props[themeName];
 
   if (colorFromProps) {
     return colorFromProps;
   } else {
-    return Colors[theme][colorName];
+    return theme[colorName];
   }
 }

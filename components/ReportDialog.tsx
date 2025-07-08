@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, View, TextInput, TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
 
 interface ReportDialogProps {
@@ -11,8 +11,8 @@ interface ReportDialogProps {
 
 export default function ReportDialog({ visible, onClose, onSubmit }: ReportDialogProps) {
   const [reason, setReason] = useState('');
-  const theme = useColorScheme();
-  const c = Colors[theme];
+  const { theme } = useTheme();
+  const c = theme;
   const styles = React.useMemo(() => createStyles(c), [c]);
 
   const handleSubmit = () => {

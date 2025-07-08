@@ -13,13 +13,12 @@ import {
   Animated,
   RefreshControl,
 } from 'react-native';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { listenTrendingWishes } from '../helpers/firestore';
 import ReportDialog from '../components/ReportDialog';
 import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Wish } from '../types/Wish';
-import { Colors } from '../constants/Colors';
 
 const typeInfo: Record<string, { emoji: string; color: string }> = {
   wish: { emoji: '💭', color: '#1a1a1a' },
@@ -36,7 +35,7 @@ export default function Page() {
   const [refreshing, setRefreshing] = useState(false);
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
   const router = useRouter();
-  const colorScheme = useColorScheme();
+  const { theme } = useTheme();
   const navigation = useNavigation();
 
   useLayoutEffect(() => {
@@ -135,15 +134,15 @@ const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
               onPress={() => router.push(`/profile/${item.displayName}`)}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={[styles.author, { color: Colors[colorScheme].text }]}>by {item.displayName}</Text>
+              <Text style={[styles.author, { color: theme.text }]}>by {item.displayName}</Text>
             </TouchableOpacity>
           )}
         <Text
-          style={[styles.wishCategory, { color: Colors[colorScheme].tint }]}
+          style={[styles.wishCategory, { color: theme.tint }]}
         >
           {typeInfo[item.type || 'wish'].emoji} #{item.category}
         </Text>
-        <Text style={[styles.wishText, { color: Colors[colorScheme].text }]}> 
+        <Text style={[styles.wishText, { color: theme.text }]}>
           {item.text}
         </Text>
         {item.imageUrl && (
@@ -151,15 +150,15 @@ const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
         )}
         {item.isPoll ? (
           <View style={{ marginTop: 6 }}>
-            <Text style={[styles.pollText, { color: Colors[colorScheme].text }]}> 
+            <Text style={[styles.pollText, { color: theme.text }]}>
               {item.optionA}: {item.votesA || 0}
             </Text>
-            <Text style={[styles.pollText, { color: Colors[colorScheme].text }]}> 
+            <Text style={[styles.pollText, { color: theme.text }]}>
               {item.optionB}: {item.votesB || 0}
             </Text>
           </View>
         ) : (
-          <Text style={[styles.likes, { color: Colors[colorScheme].tint }]}> 
+          <Text style={[styles.likes, { color: theme.tint }]}>
             ❤️ {item.likes}
           </Text>
         )}
@@ -173,7 +172,7 @@ const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
         style={{ marginTop: 4 }}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        <Text style={{ color: Colors[colorScheme].tint }}>Report</Text>
+        <Text style={{ color: theme.tint }}>Report</Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -182,21 +181,18 @@ const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
 
   return (
     <SafeAreaView
-      style={[
-        styles.safeArea,
-        { backgroundColor: Colors[colorScheme].background },
-      ]}
+      style={[styles.safeArea, { backgroundColor: theme.background }]}
     >
       <StatusBar
-        barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'}
-        backgroundColor={Colors[colorScheme].background}
+        barStyle={theme.name === 'dark' ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.background}
       />
       <View style={styles.container}>
-        <Text style={[styles.title, { color: Colors[colorScheme].text }]}>Trending Wishes 🔥</Text>
+        <Text style={[styles.title, { color: theme.text }]}>Trending Wishes 🔥</Text>
         {loading ? (
           <ActivityIndicator
             size="large"
-            color={Colors[colorScheme].tint}
+            color={theme.tint}
             style={{ marginTop: 20 }}
           />
         ) : (
