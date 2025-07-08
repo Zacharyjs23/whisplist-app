@@ -1,10 +1,15 @@
 import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { useTheme } from '@/contexts/ThemeContext';
+import { useTheme, Theme } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ScrollView, TouchableOpacity } from 'react-native';
+import {
+  ScrollView,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  View,
+} from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import * as Audio from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
@@ -21,7 +26,6 @@ import {
   StyleSheet,
   Switch,
   TextInput,
-  View,
 } from 'react-native';
 import { db, storage } from '../../firebase';
 import {
@@ -33,6 +37,8 @@ import {
 export default function Page() {
   const { theme, setTheme } = useTheme();
   const { profile, updateProfile } = useAuth();
+
+  const themeOptions: Theme[] = ['light', 'dark', 'neon', 'sunset'];
 
   interface User {
     id: string;
@@ -173,15 +179,25 @@ export default function Page() {
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <ThemedText style={styles.title}>Settings</ThemedText>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[
+          styles.container,
+          { backgroundColor: Colors[theme].background },
+        ]}
+      >
+        <ThemedText style={styles.title}>Settings</ThemedText>
       <ThemedText style={styles.section}>Theme</ThemedText>
       <ThemedText accessibilityRole="text">Current Theme: {theme}</ThemedText>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.themeList}>
-        {['light', 'dark', 'sunset', 'ocean', 'neon'].map((t) => (
+        {themeOptions.map((t) => (
           <TouchableOpacity
             key={t}
-            onPress={() => setTheme(t as any)}
+            onPress={() => setTheme(t)}
             style={[
               styles.themeItem,
               {
@@ -272,7 +288,8 @@ export default function Page() {
       <Button title="Permissions" onPress={permissionsInfo} />
       <Button title="Delete My Content" onPress={handleDeleteContent} />
       <Button title="Reset App Data" onPress={handleReset} />
-    </ThemedView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
