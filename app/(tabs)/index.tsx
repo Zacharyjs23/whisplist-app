@@ -11,10 +11,21 @@ import * as Audio from 'expo-audio';
 import {
   listenWishes,
   addWish,
+  getFollowingIds,
 } from '../../helpers/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
-import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  serverTimestamp,
+  getDocs,
+  query,
+  orderBy,
+  where,
+  doc,
+  getDoc,
+} from 'firebase/firestore';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   ActivityIndicator,
@@ -84,23 +95,13 @@ export default function Page() {
 
 
 useEffect(() => {
-  const unsubscribe = listenWishes((w) => {
-    const now = new Date();
-    const boosted = w.filter(
-      (wish) => wish.boostedUntil && wish.boostedUntil.toDate && wish.boostedUntil.toDate() > now
-    );
-    boosted.sort((a, b) =>
-      b.boostedUntil.toDate().getTime() - a.boostedUntil.toDate().getTime()
-    );
-    const normal = w.filter(
-      (wish) => !wish.boostedUntil || !wish.boostedUntil.toDate || wish.boostedUntil.toDate() <= now
-    );
-    setWishList([...boosted, ...normal]);
+  const unsubscribe = listenWishes(user?.uid ?? null, (w) => {
+    setWishList(w);
     setLoading(false);
   });
 
   return () => unsubscribe();
-}, []);
+}, [user]);
 
 useEffect(() => {
   const fetchStatus = async () => {
@@ -318,25 +319,36 @@ useEffect(() => {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const snap = await getDocs(query(collection(db, 'wishes'), orderBy('timestamp', 'desc')));
-      const w = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
+      const followingIds = user ? await getFollowingIds(user.uid) : [];
+
       const now = new Date();
-      const boosted = w.filter(
-        (wish) => wish.boostedUntil && wish.boostedUntil.toDate && wish.boostedUntil.toDate() > now
+      const boostedSnap = await getDocs(
+        query(
+          collection(db, 'wishes'),
+          where('boostedUntil', '>', now),
+          orderBy('boostedUntil', 'desc')
+        )
       );
-      boosted.sort(
-        (a, b) => b.boostedUntil!.toDate().getTime() - a.boostedUntil!.toDate().getTime()
-      );
-      const normal = w.filter(
-        (wish) => !wish.boostedUntil || !wish.boostedUntil.toDate || wish.boostedUntil.toDate() <= now
-      );
+      const boosted = boostedSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
+
+      let normal: Wish[] = [];
+      if (user && followingIds.length) {
+        const normalSnap = await getDocs(
+          query(
+            collection(db, 'wishes'),
+            where('userId', 'in', followingIds),
+            orderBy('timestamp', 'desc')
+          )
+        );
+        normal = normalSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
+      }
       setWishList([...boosted, ...normal]);
     } catch (err) {
       console.error('❌ Failed to refresh wishes:', err);
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [user]);
 
   const filteredWishes = wishList.filter((wish) =>
     wish.text.toLowerCase().includes(searchTerm.toLowerCase())
