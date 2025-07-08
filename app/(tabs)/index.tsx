@@ -34,6 +34,7 @@ import {
   View,
   RefreshControl,
   Animated,
+  ScrollView,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import ReportDialog from '../../components/ReportDialog';
@@ -349,8 +350,9 @@ useEffect(() => {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.container}
       >
-        <Text style={styles.title}>WhispList ✨</Text>
-        <Text style={styles.subtitle}>Post a wish and see what dreams grow 🌱</Text>
+        <ScrollView contentContainerStyle={styles.contentContainer}>
+          <Text style={styles.title}>WhispList ✨</Text>
+          <Text style={styles.subtitle}>Post a wish and see what dreams grow 🌱</Text>
         {streakCount > 0 && (
           <Text style={styles.streak}>
             🔥 You’ve posted {streakCount} days in a row!
@@ -557,6 +559,7 @@ useEffect(() => {
             )}
           />
         )}
+        </ScrollView>
         <ReportDialog
           visible={reportVisible}
           onClose={() => {
@@ -577,7 +580,11 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+  },
+  contentContainer: {
     padding: 20,
+    paddingBottom: 100,
+    flexGrow: 1,
   },
   title: {
     fontSize: 28,
