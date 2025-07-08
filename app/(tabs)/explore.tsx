@@ -67,7 +67,7 @@ export default function Page() {
       console.error('❌ Failed to load wishes:', err);
       setError('Failed to load wishes');
       setLoading(false);
-      return () => {};
+      return () => { };
     }
   }, [trendingMode, selectedCategory, searchTerm]);
 
@@ -104,23 +104,23 @@ export default function Page() {
 
   const renderWish = ({ item }: { item: Wish }) => (
     <View style={styles.wishItem}>
-<TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-  <Text style={styles.wishCategory}>
-    #{item.category} {item.audioUrl ? '🔊' : ''}
-  </Text>
-  <Text style={styles.wishText}>{item.text}</Text>
-  {item.imageUrl && (
-    <Image source={{ uri: item.imageUrl }} style={styles.preview} />
-  )}
-  {item.isPoll ? (
-    <View style={{ marginTop: 6 }}>
-      <Text style={styles.pollText}>{item.optionA}: {item.votesA ?? 0}</Text>
-      <Text style={styles.pollText}>{item.optionB}: {item.votesB ?? 0}</Text>
-    </View>
-  ) : (
-    <Text style={styles.likes}>❤️ {item.likes}</Text>
-  )}
-</TouchableOpacity>
+      <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <Text style={styles.wishCategory}>
+          #{item.category} {item.audioUrl ? '🔊' : ''}
+        </Text>
+        <Text style={styles.wishText}>{item.text}</Text>
+        {item.imageUrl && (
+          <Image source={{ uri: item.imageUrl }} style={styles.preview} />
+        )}
+        {item.isPoll ? (
+          <View style={{ marginTop: 6 }}>
+            <Text style={styles.pollText}>{item.optionA}: {item.votesA ?? 0}</Text>
+            <Text style={styles.pollText}>{item.optionB}: {item.votesB ?? 0}</Text>
+          </View>
+        ) : (
+          <Text style={styles.likes}>❤️ {item.likes}</Text>
+        )}
+      </TouchableOpacity>
 
 
       <TouchableOpacity
