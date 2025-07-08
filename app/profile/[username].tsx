@@ -1,37 +1,52 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 import { db } from '../../firebase';
+import { followUser, unfollowUser } from '../../helpers/firestore';
+import { useAuth } from '@/contexts/AuthContext';
 import type { Wish } from '../../types/Wish';
 
 export default function Page() {
   const { username } = useLocalSearchParams<{ username: string }>();
   const router = useRouter();
   const [profile, setProfile] = useState<any>(null);
+  const [profileId, setProfileId] = useState<string | null>(null);
   const [wishes, setWishes] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
   const [privateProfile, setPrivateProfile] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
   const theme = useColorScheme();
+  const { user } = useAuth();
 
   useEffect(() => {
     const load = async () => {
       if (!username) return;
-      const userSnap = await getDocs(query(collection(db, 'users'), where('displayName', '==', username)));
+      const userSnap = await getDocs(
+        query(collection(db, 'users'), where('displayName', '==', username))
+      );
       if (userSnap.empty) {
         setPrivateProfile(true);
         setLoading(false);
         return;
       }
-      const userData = userSnap.docs[0].data();
+      const userDoc = userSnap.docs[0];
+      const userData = userDoc.data();
+      setProfileId(userDoc.id);
       if (userData.publicProfileEnabled === false) {
         setPrivateProfile(true);
         setLoading(false);
         return;
       }
       setProfile(userData);
+      if (user && user.uid !== userDoc.id) {
+        const followSnap = await getDoc(
+          doc(db, 'users', user.uid, 'following', userDoc.id)
+        );
+        setIsFollowing(followSnap.exists());
+      }
       const q = query(
         collection(db, 'wishes'),
         where('displayName', '==', username),
@@ -70,6 +85,25 @@ export default function Page() {
         <View style={[styles.avatar, { backgroundColor: '#444' }]} />
       )}
       <Text style={[styles.displayName, { color: Colors[theme].text }]}>{profile.displayName}</Text>
+      {user && profileId && user.uid !== profileId && (
+        <TouchableOpacity
+          onPress={async () => {
+            if (isFollowing) {
+              await unfollowUser(user.uid, profileId);
+              setIsFollowing(false);
+            } else {
+              await followUser(user.uid, profileId);
+              setIsFollowing(true);
+            }
+          }}
+          style={{ marginBottom: 10 }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Text style={{ color: '#a78bfa', textAlign: 'center' }}>
+            {isFollowing ? 'Unfollow' : 'Follow'}
+          </Text>
+        </TouchableOpacity>
+      )}
       <FlatList
         data={wishes}
         keyExtractor={(item) => item.id}
