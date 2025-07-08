@@ -16,7 +16,7 @@ import {
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { listenTrendingWishes } from '../helpers/firestore';
 import ReportDialog from '../components/ReportDialog';
-import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Wish } from '../types/Wish';
 import { Colors } from '../constants/Colors';
@@ -34,6 +34,7 @@ export default function Page() {
   const [reportVisible, setReportVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
   const router = useRouter();
   const colorScheme = useColorScheme();
   const navigation = useNavigation();
@@ -50,6 +51,24 @@ export default function Page() {
     });
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    const fetchStatus = async () => {
+      const ids = Array.from(new Set(wishes.map((w) => w.userId).filter(Boolean)));
+      await Promise.all(
+        ids.map(async (id) => {
+          if (publicStatus[id] === undefined) {
+            const snap = await getDoc(doc(db, 'users', id));
+            setPublicStatus((prev) => ({
+              ...prev,
+              [id]: snap.exists() ? snap.data().publicProfileEnabled !== false : false,
+            }));
+          }
+        })
+      );
+    };
+    fetchStatus();
+  }, [wishes]);
 
   const handleReport = async (reason: string) => {
     if (!reportTarget) return;
@@ -109,9 +128,16 @@ const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
         onPress={() => router.push(`/wish/${item.id}`)}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        {!item.isAnonymous && item.displayName && (
-          <Text style={styles.author}>by {item.displayName}</Text>
-        )}
+        {!item.isAnonymous &&
+          item.displayName &&
+          publicStatus[item.userId || ''] && (
+            <TouchableOpacity
+              onPress={() => router.push(`/profile/${item.displayName}`)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={styles.author}>by {item.displayName}</Text>
+            </TouchableOpacity>
+          )}
         <Text
           style={[styles.wishCategory, { color: Colors[colorScheme].tint }]}
         >

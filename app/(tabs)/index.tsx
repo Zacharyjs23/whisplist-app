@@ -12,7 +12,7 @@ import {
 } from '../../helpers/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
-import { addDoc, collection, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -66,6 +66,7 @@ export default function Page() {
   const [giftLink, setGiftLink] = useState('');
   const [posting, setPosting] = useState(false);
   const [useProfilePost, setUseProfilePost] = useState(true);
+  const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
   const { user, profile } = useAuth();
 
   const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
@@ -89,6 +90,24 @@ useEffect(() => {
 
   return () => unsubscribe();
 }, []);
+
+useEffect(() => {
+  const fetchStatus = async () => {
+    const ids = Array.from(new Set(wishList.map((w) => w.userId).filter(Boolean)));
+    await Promise.all(
+      ids.map(async (id) => {
+        if (publicStatus[id] === undefined) {
+          const snap = await getDoc(doc(db, 'users', id));
+          setPublicStatus((prev) => ({
+            ...prev,
+            [id]: snap.exists() ? snap.data().publicProfileEnabled !== false : false,
+          }));
+        }
+      })
+    );
+  };
+  fetchStatus();
+}, [wishList]);
 
 useEffect(() => {
   const showWelcome = async () => {
@@ -428,9 +447,16 @@ useEffect(() => {
             renderItem={({ item }) => (
 <View style={[styles.wishItem, { backgroundColor: typeInfo[item.type || 'wish'].color }]}>
   <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)} hitSlop={HIT_SLOP}>
-    {!item.isAnonymous && item.displayName ? (
-      <Text style={styles.author}>by {item.displayName}</Text>
-    ) : null}
+    {!item.isAnonymous &&
+      item.displayName &&
+      publicStatus[item.userId || ''] && (
+        <TouchableOpacity
+          onPress={() => router.push(`/profile/${item.displayName}`)}
+          hitSlop={HIT_SLOP}
+        >
+          <Text style={styles.author}>by {item.displayName}</Text>
+        </TouchableOpacity>
+      )}
     <Text style={{ color: '#a78bfa', fontSize: 12 }}>
       {typeInfo[item.type || 'wish'].emoji} #{item.category} {item.audioUrl ? '🔊' : ''}
     </Text>

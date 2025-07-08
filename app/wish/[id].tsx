@@ -18,6 +18,7 @@ import {
   serverTimestamp,
   increment,
   doc,
+  getDoc,
   updateDoc,
 } from 'firebase/firestore'; // ✅ Keep only if used directly in this file
 
@@ -92,6 +93,7 @@ export default function Page() {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [postingComment, setPostingComment] = useState(false);
   const [useProfileComment, setUseProfileComment] = useState(true);
+  const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
   const [refreshing, setRefreshing] = useState(false);
   const { user, profile } = useAuth();
 
@@ -162,6 +164,26 @@ try {
     const unsubscribe = subscribeToComments();
     return unsubscribe;
   }, [subscribeToComments]);
+
+  useEffect(() => {
+    const fetchStatus = async () => {
+      const ids = new Set<string>();
+      if (wish?.userId) ids.add(wish.userId);
+      comments.forEach((c) => c.userId && ids.add(c.userId));
+      await Promise.all(
+        Array.from(ids).map(async (uid) => {
+          if (publicStatus[uid] === undefined) {
+            const snap = await getDoc(doc(db, 'users', uid));
+            setPublicStatus((prev) => ({
+              ...prev,
+              [uid]: snap.exists() ? snap.data().publicProfileEnabled !== false : false,
+            }));
+          }
+        })
+      );
+    };
+    fetchStatus();
+  }, [comments, wish]);
 
   const playAudio = useCallback(async () => {
     if (!wish?.audioUrl) return;
@@ -323,9 +345,15 @@ try {
               ],
             }}
           >
-            {!item.isAnonymous && (
-              <Text style={styles.nickname}>{item.displayName}</Text>
-            )}
+            {!item.isAnonymous &&
+              publicStatus[item.userId || ''] && (
+                <TouchableOpacity
+                  onPress={() => router.push(`/profile/${item.displayName}`)}
+                  hitSlop={HIT_SLOP}
+                >
+                  <Text style={styles.nickname}>{item.displayName}</Text>
+                </TouchableOpacity>
+              )}
             <Text style={styles.comment}>{item.text}</Text>
             <Text style={styles.timestamp}>
               {item.timestamp?.seconds
@@ -506,7 +534,14 @@ try {
         {replyTo && (
           <View style={styles.replyInfo}>
             <Text style={{ color: '#a78bfa' }}>
-              Replying to {comments.find((c) => c.id === replyTo)?.displayName || 'Anonymous'}
+              Replying to{' '}
+              {(() => {
+                const r = comments.find((c) => c.id === replyTo);
+                if (r && !r.isAnonymous && publicStatus[r.userId || '']) {
+                  return r.displayName;
+                }
+                return 'Anonymous';
+              })()}
             </Text>
             <TouchableOpacity onPress={() => setReplyTo(null)} style={{ marginLeft: 8 }}>
               <Text style={{ color: '#fff' }}>Cancel</Text>

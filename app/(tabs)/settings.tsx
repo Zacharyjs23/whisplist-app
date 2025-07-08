@@ -1,6 +1,7 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import { Audio } from 'expo-av';
@@ -29,6 +30,7 @@ import {
 
 export default function Page() {
   const { theme, toggleTheme } = useTheme();
+  const { profile, updateProfile } = useAuth();
 
   interface User {
     id: string;
@@ -44,6 +46,9 @@ export default function Page() {
   const [anonymize, setAnonymize] = useState(false);
   const [devMode, setDevMode] = useState(false);
   const [dailyQuote, setDailyQuote] = useState(false);
+  const [publicProfileEnabled, setPublicProfileEnabled] = useState(
+    profile?.publicProfileEnabled !== false
+  );
 
   useEffect(() => {
     const load = async () => {
@@ -61,9 +66,10 @@ export default function Page() {
       setDevMode(dev === 'true');
       setDailyQuote(quote === 'true');
       if (storedNickname) setUser({ id: 'local', nickname: storedNickname });
+      setPublicProfileEnabled(profile?.publicProfileEnabled !== false);
     };
     load();
-  }, []);
+  }, [profile]);
 
   const pickAvatar = async () => {
     const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -159,6 +165,11 @@ export default function Page() {
     await AsyncStorage.setItem('dailyQuote', val ? 'true' : 'false');
   };
 
+  const togglePublicProfile = async (val: boolean) => {
+    setPublicProfileEnabled(val);
+    await updateProfile({ publicProfileEnabled: val });
+  };
+
   return (
     <ThemedView style={styles.container}>
       <ThemedText style={styles.title}>Settings</ThemedText>
@@ -180,6 +191,11 @@ export default function Page() {
       <View style={styles.row}>
         <ThemedText style={styles.label}>Daily Quote</ThemedText>
         <Switch value={dailyQuote} onValueChange={toggleDailyQuote} />
+      </View>
+
+      <View style={styles.row}>
+        <ThemedText style={styles.label}>Public Profile Enabled</ThemedText>
+        <Switch value={publicProfileEnabled} onValueChange={togglePublicProfile} />
       </View>
 
       <Button title="Pick Avatar" onPress={pickAvatar} />
