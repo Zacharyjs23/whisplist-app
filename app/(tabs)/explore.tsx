@@ -1,7 +1,6 @@
 // app/(tabs)/explore.tsx — Visually Enhanced Explore Screen with Pull-to-Refresh
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   SafeAreaView,
   StatusBar,
@@ -168,6 +167,17 @@ export default function Page() {
     setTrendingMode(mode);
   };
 
+  const Skeleton: React.FC = () => (
+    <View style={styles.skeletonContainer}>
+      {[0, 1, 2].map((i) => (
+        <View
+          key={i}
+          style={[styles.skeletonItem, { backgroundColor: theme.input }]}
+        />
+      ))}
+    </View>
+  );
+
 
   const handleReport = async (reason: string) => {
     if (!reportTarget) return;
@@ -308,7 +318,7 @@ export default function Page() {
           }
           ListEmptyComponent={
             loading ? (
-              <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
+              <Skeleton />
             ) : error ? (
               <Text style={styles.errorText}>{error}</Text>
             ) : (
@@ -451,4 +461,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
   },
-});
+  skeletonContainer: {
+    paddingTop: 20,
+  },
+  skeletonItem: {
+    height: 80,
+    borderRadius: 12,
+    marginBottom: 12,
+  },});
