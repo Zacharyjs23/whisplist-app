@@ -34,7 +34,6 @@ import {
   View,
   RefreshControl,
   Animated,
-  ScrollView,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import ReportDialog from '../../components/ReportDialog';
@@ -350,23 +349,31 @@ useEffect(() => {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.container}
       >
-        <ScrollView contentContainerStyle={styles.contentContainer}>
-          <Text style={styles.title}>WhispList ✨</Text>
-          <Text style={styles.subtitle}>Post a wish and see what dreams grow 🌱</Text>
-        {streakCount > 0 && (
-          <Text style={styles.streak}>
-            🔥 You’ve posted {streakCount} days in a row!
-          </Text>
-        )}
+        <FlatList
+          data={filteredWishes}
+          keyExtractor={(item) => item.id}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          contentContainerStyle={styles.contentContainer}
+          ListHeaderComponent={
+            <>
+              <Text style={styles.title}>WhispList ✨</Text>
+              <Text style={styles.subtitle}>Post a wish and see what dreams grow 🌱</Text>
+              {streakCount > 0 && (
+                <Text style={styles.streak}>
+                  🔥 You’ve posted {streakCount} days in a row!
+                </Text>
+              )}
 
-        <Text style={styles.label}>Search</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Search wishes..."
-          placeholderTextColor="#999"
-          value={searchTerm}
-          onChangeText={setSearchTerm}
-        />
+              <Text style={styles.label}>Search</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Search wishes..."
+                placeholderTextColor="#999"
+                value={searchTerm}
+                onChangeText={setSearchTerm}
+              />
 
         <Text style={styles.label}>Wish</Text>
         <TextInput
@@ -497,69 +504,62 @@ useEffect(() => {
         <TouchableOpacity onPress={() => router.push('/auth')} style={styles.authButton}>
           <Text style={styles.authButtonText}>Go to Auth</Text>
         </TouchableOpacity>
+            </>
+          }
+          ListEmptyComponent={
+            loading ? (
+              <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
+            ) : (
+              <Text style={styles.noResults}>No matching wishes 💭</Text>
+            )
+          }
+          renderItem={({ item }) => (
+            <View style={[styles.wishItem, { backgroundColor: typeInfo[item.type || 'wish'].color }]}>
+              <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)} hitSlop={HIT_SLOP}>
+                {!item.isAnonymous &&
+                  item.displayName &&
+                  publicStatus[item.userId || ''] && (
+                    <TouchableOpacity
+                      onPress={() => router.push(`/profile/${item.displayName}`)}
+                      hitSlop={HIT_SLOP}
+                    >
+                      <Text style={styles.author}>by {item.displayName}</Text>
+                    </TouchableOpacity>
+                  )}
+                <Text style={{ color: '#a78bfa', fontSize: 12 }}>
+                  {typeInfo[item.type || 'wish'].emoji} #{item.category} {item.audioUrl ? '🔊' : ''}
+                </Text>
+                <Text style={styles.wishText}>{item.text}</Text>
+                {item.imageUrl && (
+                  <Image source={{ uri: item.imageUrl }} style={styles.preview} />
+                )}
+                {item.isPoll ? (
+                  <View style={{ marginTop: 6 }}>
+                    <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
+                    <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.likeText}>❤️ {item.likes}</Text>
+                )}
+                {item.boostedUntil && item.boostedUntil.toDate &&
+                  item.boostedUntil.toDate() > new Date() && (
+                    <Text style={styles.boostedLabel}>🚀 Boosted</Text>
+                  )}
+              </TouchableOpacity>
 
-        {loading ? (
-          <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
-        ) : filteredWishes.length === 0 ? (
-          <Text style={styles.noResults}>No matching wishes 💭</Text>
-        ) : (
-          <FlatList
-            data={filteredWishes}
-            keyExtractor={(item) => item.id}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            contentContainerStyle={{ paddingBottom: 80, flexGrow: 1 }}
-            renderItem={({ item }) => (
-<View style={[styles.wishItem, { backgroundColor: typeInfo[item.type || 'wish'].color }]}>
-  <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)} hitSlop={HIT_SLOP}>
-    {!item.isAnonymous &&
-      item.displayName &&
-      publicStatus[item.userId || ''] && (
-        <TouchableOpacity
-          onPress={() => router.push(`/profile/${item.displayName}`)}
-          hitSlop={HIT_SLOP}
-        >
-          <Text style={styles.author}>by {item.displayName}</Text>
-        </TouchableOpacity>
-      )}
-    <Text style={{ color: '#a78bfa', fontSize: 12 }}>
-      {typeInfo[item.type || 'wish'].emoji} #{item.category} {item.audioUrl ? '🔊' : ''}
-    </Text>
-    <Text style={styles.wishText}>{item.text}</Text>
-    {item.imageUrl && (
-      <Image source={{ uri: item.imageUrl }} style={styles.preview} />
-    )}
-    {item.isPoll ? (
-      <View style={{ marginTop: 6 }}>
-        <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
-        <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
-      </View>
-    ) : (
-      <Text style={styles.likeText}>❤️ {item.likes}</Text>
-    )}
-    {item.boostedUntil && item.boostedUntil.toDate &&
-      item.boostedUntil.toDate() > new Date() && (
-        <Text style={styles.boostedLabel}>🚀 Boosted</Text>
-      )}
-  </TouchableOpacity>
-
-  <TouchableOpacity
-    onPress={() => {
-      setReportTarget(item.id);
-      setReportVisible(true);
-    }}
-    style={{ marginTop: 4 }}
-    hitSlop={HIT_SLOP}
-  >
-    <Text style={{ color: '#f87171' }}>Report</Text>
-  </TouchableOpacity>
-</View>
-
-            )}
-          />
-        )}
-        </ScrollView>
+              <TouchableOpacity
+                onPress={() => {
+                  setReportTarget(item.id);
+                  setReportVisible(true);
+                }}
+                style={{ marginTop: 4 }}
+                hitSlop={HIT_SLOP}
+              >
+                <Text style={{ color: '#f87171' }}>Report</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        />
         <ReportDialog
           visible={reportVisible}
           onClose={() => {
