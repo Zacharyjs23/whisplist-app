@@ -9,15 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   View,
-} from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import * as Audio from 'expo-audio';
-import * as ImagePicker from 'expo-image-picker';
-import * as Notifications from 'expo-notifications';
-import { addDoc, collection, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import React, { useEffect, useState } from 'react';
-import {
   Alert,
   Button,
   Image,
@@ -27,6 +18,13 @@ import {
   Switch,
   TextInput,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
+import * as Audio from 'expo-audio';
+import * as ImagePicker from 'expo-image-picker';
+import * as Notifications from 'expo-notifications';
+import { addDoc, collection, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import React, { useEffect, useState } from 'react';
 import { db, storage } from '../../firebase';
 import {
   getAllWishes,
