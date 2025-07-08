@@ -13,7 +13,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
 import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -31,6 +31,7 @@ import {
   Image,
   View,
   RefreshControl,
+  Animated,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import ReportDialog from '../../components/ReportDialog';
@@ -53,7 +54,6 @@ const prompts = [
 
 export default function Page() {
   const [wish, setWish] = useState('');
-  const [category, setCategory] = useState('general');
   const [postType, setPostType] = useState<'wish' | 'confession' | 'advice' | 'dream'>('wish');
   const [wishList, setWishList] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,6 +75,7 @@ export default function Page() {
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
   const [streakCount, setStreakCount] = useState(0);
   const [dailyPrompt, setDailyPrompt] = useState('');
+  const promptOpacity = useRef(new Animated.Value(0)).current;
   const { user, profile } = useAuth();
 
   const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
@@ -145,13 +146,18 @@ useEffect(() => {
       await AsyncStorage.setItem('dailyPromptDate', today);
       await AsyncStorage.setItem('dailyPromptText', prompt);
     }
+    Animated.timing(promptOpacity, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
 
     const streak = await AsyncStorage.getItem('streakCount');
     if (streak) setStreakCount(parseInt(streak, 10));
   };
 
   loadPromptAndStreak();
-}, []);
+}, [promptOpacity]);
 
   const startRecording = async () => {
     try {
@@ -249,7 +255,7 @@ useEffect(() => {
       }
       await addWish({
         text: wish,
-        category: category.trim().toLowerCase(),
+        category: postType,
         type: postType,
         userId: user?.uid,
         displayName: useProfilePost ? profile?.displayName || '' : '',
@@ -268,7 +274,6 @@ useEffect(() => {
       });
 
       setWish('');
-      setCategory('general');
       setOptionA('');
       setOptionB('');
       setIsPoll(false);
@@ -355,12 +360,6 @@ useEffect(() => {
           onChangeText={setSearchTerm}
         />
 
-        {dailyPrompt !== '' && (
-          <View style={styles.promptCard}>
-            <Text style={styles.promptText}>{dailyPrompt}</Text>
-          </View>
-        )}
-
         <Text style={styles.label}>Wish</Text>
         <TextInput
           style={styles.input}
@@ -370,14 +369,14 @@ useEffect(() => {
           onChangeText={setWish}
         />
 
-        <Text style={styles.label}>Category</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Category (e.g., love, health, career)"
-          placeholderTextColor="#999"
-          value={category}
-          onChangeText={setCategory}
-        />
+        {dailyPrompt !== '' && (
+          <>
+            <Text style={styles.promptTitle}>Daily Prompt ✨</Text>
+            <Animated.View style={[styles.promptCard, { opacity: promptOpacity }]}> 
+              <Text style={styles.promptText}>{dailyPrompt}</Text>
+            </Animated.View>
+          </>
+        )}
 
         <Text style={styles.label}>Post Type</Text>
         <Picker
@@ -621,6 +620,13 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     marginBottom: 10,
+  },
+  promptTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 10,
+    marginBottom: 4,
   },
   promptText: {
     color: '#fff',
