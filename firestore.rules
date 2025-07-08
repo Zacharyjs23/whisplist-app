@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isBoosted() {
+      return resource.data.boostedUntil > request.time;
+    }
+    function isFollowerOf(userId) {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/users/$(userId)/followers/$(request.auth.uid));
+    }
+
+    match /wishes/{wishId} {
+      allow read: if isBoosted() || isFollowerOf(resource.data.userId);
+      allow write: if request.auth != null;
+    }
+
+    match /users/{userId}/followers/{followerId} {
+      allow read, write: if request.auth != null && request.auth.uid == followerId;
+    }
+  }
+}

@@ -18,10 +18,15 @@ import {
 import { Picker } from '@react-native-picker/picker';
 import { useRouter } from 'expo-router';
 import ReportDialog from '../../components/ReportDialog';
-import { listenTrendingWishes, listenWishes } from '../../helpers/firestore';
+import {
+  listenTrendingWishes,
+  listenWishes,
+  getFollowingIds,
+} from '../../helpers/firestore';
 import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
+import { useAuth } from '@/contexts/AuthContext';
 
 const typeInfo: Record<string, { emoji: string; color: string }> = {
   wish: { emoji: '💭', color: '#1a1a1a' },
@@ -35,6 +40,7 @@ const allCategories = ['love', 'health', 'career', 'general', 'money', 'friendsh
 
 export default function Page() {
   const router = useRouter();
+  const { user } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [filteredWishes, setFilteredWishes] = useState<Wish[]>([]);
   const [topWishes, setTopWishes] = useState<Wish[]>([]);
@@ -56,23 +62,39 @@ export default function Page() {
   const fetchWishes = useCallback(() => {
     setLoading(true);
     try {
-      const source = trendingMode ? listenTrendingWishes : listenWishes;
-      const unsubscribe = source((all: Wish[]) => {
-        try {
-          const filtered = all.filter((wish) => {
-            const inCategory =
-              trendingMode || !selectedCategory || wish.category === selectedCategory;
-            const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
-            return inCategory && inSearch;
+      const unsubscribe = trendingMode
+        ? listenTrendingWishes((all: Wish[]) => {
+            try {
+              const filtered = all.filter((wish) => {
+                const inCategory =
+                  trendingMode || !selectedCategory || wish.category === selectedCategory;
+                const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+                return inCategory && inSearch;
+              });
+              setFilteredWishes(filtered);
+            } catch (err) {
+              console.error('❌ Failed to filter wishes:', err);
+              setError('Failed to load wishes');
+            } finally {
+              setLoading(false);
+            }
+          })
+        : listenWishes(user?.uid ?? null, (all: Wish[]) => {
+            try {
+              const filtered = all.filter((wish) => {
+                const inCategory =
+                  trendingMode || !selectedCategory || wish.category === selectedCategory;
+                const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+                return inCategory && inSearch;
+              });
+              setFilteredWishes(filtered);
+            } catch (err) {
+              console.error('❌ Failed to filter wishes:', err);
+              setError('Failed to load wishes');
+            } finally {
+              setLoading(false);
+            }
           });
-          setFilteredWishes(filtered);
-        } catch (err) {
-          console.error('❌ Failed to filter wishes:', err);
-          setError('Failed to load wishes');
-        } finally {
-          setLoading(false);
-        }
-      });
       return unsubscribe;
     } catch (err) {
       console.error('❌ Failed to load wishes:', err);
@@ -80,7 +102,7 @@ export default function Page() {
       setLoading(false);
       return () => { };
     }
-  }, [trendingMode, selectedCategory, searchTerm]);
+  }, [trendingMode, selectedCategory, searchTerm, user]);
 
   useEffect(() => {
     const unsubscribe = fetchWishes();
@@ -90,24 +112,55 @@ export default function Page() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const q = trendingMode
-        ? query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(20))
-        : query(collection(db, 'wishes'), orderBy('timestamp', 'desc'));
-      const snap = await getDocs(q);
-      const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
-      const filtered = all.filter((wish) => {
-        const inCategory =
-          trendingMode || !selectedCategory || wish.category === selectedCategory;
-        const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
-        return inCategory && inSearch;
-      });
-      setFilteredWishes(filtered);
+      if (trendingMode) {
+        const q = query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(20));
+        const snap = await getDocs(q);
+        const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
+        const filtered = all.filter((wish) => {
+          const inCategory =
+            trendingMode || !selectedCategory || wish.category === selectedCategory;
+          const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+          return inCategory && inSearch;
+        });
+        setFilteredWishes(filtered);
+      } else {
+        const followingIds = user ? await getFollowingIds(user.uid) : [];
+
+        const now = new Date();
+        const boostedSnap = await getDocs(
+          query(
+            collection(db, 'wishes'),
+            where('boostedUntil', '>', now),
+            orderBy('boostedUntil', 'desc')
+          )
+        );
+        const boosted = boostedSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
+
+        let normal: Wish[] = [];
+        if (user && followingIds.length) {
+          const normalSnap = await getDocs(
+            query(
+              collection(db, 'wishes'),
+              where('userId', 'in', followingIds),
+              orderBy('timestamp', 'desc')
+            )
+          );
+          normal = normalSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
+        }
+        const all = [...boosted, ...normal];
+        const filtered = all.filter((wish) => {
+          const inCategory = !selectedCategory || wish.category === selectedCategory;
+          const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+          return inCategory && inSearch;
+        });
+        setFilteredWishes(filtered);
+      }
     } catch (err) {
       console.error('❌ Failed to refresh wishes:', err);
     } finally {
       setRefreshing(false);
     }
-  }, [trendingMode, selectedCategory, searchTerm]);
+  }, [trendingMode, selectedCategory, searchTerm, user]);
 
   const toggleTrending = (mode: boolean) => {
     setTrendingMode(mode);

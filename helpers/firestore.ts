@@ -1,4 +1,22 @@
-import { collection, query, orderBy, limit, onSnapshot, addDoc, doc, updateDoc, increment, getDoc, serverTimestamp, getDocs, where } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  orderBy,
+  limit,
+  onSnapshot,
+  addDoc,
+  doc,
+  updateDoc,
+  increment,
+  getDoc,
+  serverTimestamp,
+  getDocs,
+  where,
+  FieldPath,
+  collectionGroup,
+  setDoc,
+  deleteDoc,
+} from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Wish } from '../types/Wish';
 
@@ -24,12 +42,52 @@ export function listenTrendingWishes(cb: (wishes: Wish[]) => void) {
   });
 }
 
-export function listenWishes(cb: (wishes: Wish[]) => void) {
-  const q = query(collection(db, 'wishes'), orderBy('timestamp', 'desc'));
-  return onSnapshot(q, snap => {
-    const data = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Wish,'id'>) }));
-    cb(data as Wish[]);
+export function listenWishes(
+  userId: string | null,
+  cb: (wishes: Wish[]) => void
+) {
+  const now = new Date();
+  const boostedQuery = query(
+    collection(db, 'wishes'),
+    where('boostedUntil', '>', now),
+    orderBy('boostedUntil', 'desc')
+  );
+
+  let boosted: Wish[] = [];
+  let normal: Wish[] = [];
+
+  const unsubBoosted = onSnapshot(boostedQuery, snap => {
+    boosted = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Wish,'id'>) })) as Wish[];
+    cb([...boosted, ...normal]);
   });
+
+  let unsubNormal = () => {};
+
+  if (userId) {
+    getFollowingIds(userId).then(ids => {
+      if (ids.length === 0) {
+        normal = [];
+        cb([...boosted]);
+        return;
+      }
+      const normalQuery = query(
+        collection(db, 'wishes'),
+        where('userId', 'in', ids),
+        orderBy('timestamp', 'desc')
+      );
+      unsubNormal = onSnapshot(normalQuery, s => {
+        normal = s.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Wish,'id'>) })) as Wish[];
+        cb([...boosted, ...normal]);
+      });
+    });
+  } else {
+    cb([...boosted]);
+  }
+
+  return () => {
+    unsubBoosted();
+    unsubNormal();
+  };
 }
 
 export function listenBoostedWishes(cb: (wishes: Wish[]) => void) {
@@ -43,6 +101,27 @@ export function listenBoostedWishes(cb: (wishes: Wish[]) => void) {
     const data = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Wish,'id'>) }));
     cb(data as Wish[]);
   });
+}
+
+export async function followUser(currentUser: string, targetUser: string) {
+  const ref = doc(db, 'users', targetUser, 'followers', currentUser);
+  await setDoc(ref, { createdAt: serverTimestamp() });
+}
+
+export async function unfollowUser(currentUser: string, targetUser: string) {
+  const ref = doc(db, 'users', targetUser, 'followers', currentUser);
+  await deleteDoc(ref);
+}
+
+export async function getFollowingIds(userId: string): Promise<string[]> {
+  const q = query(
+    collectionGroup(db, 'followers'),
+    where(FieldPath.documentId(), '==', userId)
+  );
+  const snap = await getDocs(q);
+  return snap.docs
+    .map(d => d.ref.parent.parent?.id)
+    .filter((id): id is string => typeof id === 'string');
 }
 
 export async function addWish(data: Omit<Wish, 'id'>) {
