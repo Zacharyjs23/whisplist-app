@@ -1,5 +1,5 @@
 import { useRouter, useNavigation } from 'expo-router';
-import React, { useEffect, useState, useLayoutEffect, useRef } from 'react';
+import React, { useEffect, useState, useLayoutEffect, useRef, useCallback } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -11,21 +11,30 @@ import {
   Image,
   View,
   Animated,
+  RefreshControl,
 } from 'react-native';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { listenTrendingWishes } from '../helpers/firestore';
 import ReportDialog from '../components/ReportDialog';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore'; // Only include if still used
+import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Wish } from '../types/Wish';
 import { Colors } from '../constants/Colors';
 
+const typeInfo: Record<string, { emoji: string; color: string }> = {
+  wish: { emoji: '💭', color: '#1a1a1a' },
+  confession: { emoji: '😶\u200d🌫️', color: '#374151' },
+  advice: { emoji: '🧠', color: '#064e3b' },
+  dream: { emoji: '🌙', color: '#312e81' },
+};
 
 export default function Page() {
   const [wishes, setWishes] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
   const [reportVisible, setReportVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
   const router = useRouter();
   const colorScheme = useColorScheme();
   const navigation = useNavigation();
@@ -42,6 +51,24 @@ export default function Page() {
     });
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    const fetchStatus = async () => {
+      const ids = Array.from(new Set(wishes.map((w) => w.userId).filter(Boolean)));
+      await Promise.all(
+        ids.map(async (id) => {
+          if (publicStatus[id] === undefined) {
+            const snap = await getDoc(doc(db, 'users', id));
+            setPublicStatus((prev) => ({
+              ...prev,
+              [id]: snap.exists() ? snap.data().publicProfileEnabled !== false : false,
+            }));
+          }
+        })
+      );
+    };
+    fetchStatus();
+  }, [wishes]);
 
   const handleReport = async (reason: string) => {
     if (!reportTarget) return;
@@ -60,6 +87,20 @@ export default function Page() {
     }
   };
 
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const q = query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(20));
+      const snap = await getDocs(q);
+      const data = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) }));
+      setWishes(data as Wish[]);
+    } catch (err) {
+      console.error('❌ Failed to refresh wishes:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
 const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -77,7 +118,8 @@ const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
         styles.wishItem,
         {
           opacity: fadeAnim,
-          backgroundColor: colorScheme === 'dark' ? '#1a1a1a' : '#ffffff',
+          backgroundColor:
+            typeInfo[item.type || 'wish'].color,
         },
       ]}
     >
@@ -86,13 +128,20 @@ const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
         onPress={() => router.push(`/wish/${item.id}`)}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        {!item.isAnonymous && item.displayName && (
-          <Text style={styles.author}>by {item.displayName}</Text>
-        )}
+        {!item.isAnonymous &&
+          item.displayName &&
+          publicStatus[item.userId || ''] && (
+            <TouchableOpacity
+              onPress={() => router.push(`/profile/${item.displayName}`)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={styles.author}>by {item.displayName}</Text>
+            </TouchableOpacity>
+          )}
         <Text
           style={[styles.wishCategory, { color: Colors[colorScheme].tint }]}
         >
-          #{item.category}
+          {typeInfo[item.type || 'wish'].emoji} #{item.category}
         </Text>
         <Text style={[styles.wishText, { color: Colors[colorScheme].text }]}> 
           {item.text}
@@ -155,7 +204,10 @@ const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
             data={wishes}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => <WishCard item={item} />}
-            contentContainerStyle={{ paddingBottom: 80 }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+            }
+            contentContainerStyle={{ paddingBottom: 80, flexGrow: 1 }}
           />
         )}
         <ReportDialog

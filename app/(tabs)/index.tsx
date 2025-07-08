@@ -1,7 +1,5 @@
 // app/(tabs)/index.tsx — Full Home Screen with SafeArea, StatusBar, and Wish Logic
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import {
   Audio,
@@ -14,7 +12,7 @@ import {
 } from '../../helpers/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -32,22 +30,31 @@ import {
   TouchableOpacity,
   Image,
   View,
+  RefreshControl,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import ReportDialog from '../../components/ReportDialog';
 import { db, storage } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
 
+const typeInfo: Record<string, { emoji: string; color: string }> = {
+  wish: { emoji: '💭', color: '#1e1e1e' },
+  confession: { emoji: '😶\u200d🌫️', color: '#374151' },
+  advice: { emoji: '🧠', color: '#064e3b' },
+  dream: { emoji: '🌙', color: '#312e81' },
+};
 
 export default function Page() {
   const [wish, setWish] = useState('');
   const [category, setCategory] = useState('general');
+  const [postType, setPostType] = useState<'wish' | 'confession' | 'advice' | 'dream'>('wish');
   const [wishList, setWishList] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [pushToken, setPushToken] = useState<string | null>(null);
   const [reportVisible, setReportVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [isPoll, setIsPoll] = useState(false);
   const [optionA, setOptionA] = useState('');
   const [optionB, setOptionB] = useState('');
@@ -59,14 +66,13 @@ export default function Page() {
   const [giftLink, setGiftLink] = useState('');
   const [posting, setPosting] = useState(false);
   const [useProfilePost, setUseProfilePost] = useState(true);
+  const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
   const { user, profile } = useAuth();
 
   const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 
 
 useEffect(() => {
-  registerForPushNotificationsAsync().then(setPushToken);
-
   const unsubscribe = listenWishes((w) => {
     const now = new Date();
     const boosted = w.filter(
@@ -84,6 +90,24 @@ useEffect(() => {
 
   return () => unsubscribe();
 }, []);
+
+useEffect(() => {
+  const fetchStatus = async () => {
+    const ids = Array.from(new Set(wishList.map((w) => w.userId).filter(Boolean)));
+    await Promise.all(
+      ids.map(async (id) => {
+        if (publicStatus[id] === undefined) {
+          const snap = await getDoc(doc(db, 'users', id));
+          setPublicStatus((prev) => ({
+            ...prev,
+            [id]: snap.exists() ? snap.data().publicProfileEnabled !== false : false,
+          }));
+        }
+      })
+    );
+  };
+  fetchStatus();
+}, [wishList]);
 
 useEffect(() => {
   const showWelcome = async () => {
@@ -179,7 +203,7 @@ useEffect(() => {
       await addWish({
         text: wish,
         category: category.trim().toLowerCase(),
-        pushToken: pushToken || '',
+        type: postType,
         userId: user?.uid,
         displayName: useProfilePost ? profile?.displayName || '' : '',
         photoURL: useProfilePost ? profile?.photoURL || '' : '',
@@ -205,6 +229,7 @@ useEffect(() => {
       setIncludeAudio(false);
       setSelectedImage(null);
       setGiftLink('');
+      setPostType('wish');
       Alert.alert('Wish posted!');
     } catch (error) {
       console.error('❌ Failed to post wish:', error);
@@ -230,6 +255,29 @@ useEffect(() => {
       setReportTarget(null);
     }
   };
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const snap = await getDocs(query(collection(db, 'wishes'), orderBy('timestamp', 'desc')));
+      const w = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
+      const now = new Date();
+      const boosted = w.filter(
+        (wish) => wish.boostedUntil && wish.boostedUntil.toDate && wish.boostedUntil.toDate() > now
+      );
+      boosted.sort(
+        (a, b) => b.boostedUntil!.toDate().getTime() - a.boostedUntil!.toDate().getTime()
+      );
+      const normal = w.filter(
+        (wish) => !wish.boostedUntil || !wish.boostedUntil.toDate || wish.boostedUntil.toDate() <= now
+      );
+      setWishList([...boosted, ...normal]);
+    } catch (err) {
+      console.error('❌ Failed to refresh wishes:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   const filteredWishes = wishList.filter((wish) =>
     wish.text.toLowerCase().includes(searchTerm.toLowerCase())
@@ -271,6 +319,19 @@ useEffect(() => {
           value={category}
           onChangeText={setCategory}
         />
+
+        <Text style={styles.label}>Post Type</Text>
+        <Picker
+          selectedValue={postType}
+          onValueChange={(val) => setPostType(val)}
+          style={styles.input}
+          dropdownIconColor="#fff"
+        >
+          <Picker.Item label="Wish 💭" value="wish" />
+          <Picker.Item label="Confession 😶‍🌫️" value="confession" />
+          <Picker.Item label="Advice Request 🧠" value="advice" />
+          <Picker.Item label="Dream 🌙" value="dream" />
+        </Picker>
 
         <Text style={styles.label}>Gift Link</Text>
         <TextInput
@@ -379,14 +440,25 @@ useEffect(() => {
           <FlatList
             data={filteredWishes}
             keyExtractor={(item) => item.id}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            contentContainerStyle={{ paddingBottom: 80, flexGrow: 1 }}
             renderItem={({ item }) => (
-<View style={styles.wishItem}>
+<View style={[styles.wishItem, { backgroundColor: typeInfo[item.type || 'wish'].color }]}>
   <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)} hitSlop={HIT_SLOP}>
-    {!item.isAnonymous && item.displayName ? (
-      <Text style={styles.author}>by {item.displayName}</Text>
-    ) : null}
+    {!item.isAnonymous &&
+      item.displayName &&
+      publicStatus[item.userId || ''] && (
+        <TouchableOpacity
+          onPress={() => router.push(`/profile/${item.displayName}`)}
+          hitSlop={HIT_SLOP}
+        >
+          <Text style={styles.author}>by {item.displayName}</Text>
+        </TouchableOpacity>
+      )}
     <Text style={{ color: '#a78bfa', fontSize: 12 }}>
-      #{item.category} {item.audioUrl ? '🔊' : ''}
+      {typeInfo[item.type || 'wish'].emoji} #{item.category} {item.audioUrl ? '🔊' : ''}
     </Text>
     <Text style={styles.wishText}>{item.text}</Text>
     {item.imageUrl && (
@@ -540,36 +612,3 @@ const styles = StyleSheet.create({
   },
 });
 
-async function registerForPushNotificationsAsync(): Promise<string | null> {
-  let token;
-
-  if (Device.isDevice) {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-
-    if (finalStatus !== 'granted') {
-      Alert.alert('Permission required', 'Enable push notifications to get updates!');
-      return null;
-    }
-
-    token = (await Notifications.getExpoPushTokenAsync()).data;
-    console.log('Push token:', token);
-  } else {
-    Alert.alert('Physical device required', 'Push notifications only work on physical devices.');
-    return null;
-  }
-
-  if (Platform.OS === 'android') {
-    Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-    });
-  }
-
-  return token;
-}

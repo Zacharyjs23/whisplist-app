@@ -33,6 +33,7 @@ interface Profile {
   bio?: string;
   photoURL?: string | null;
   isAnonymous: boolean;
+  publicProfileEnabled?: boolean;
   createdAt?: any;
 }
 
@@ -88,7 +89,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
         const ref = doc(db, 'users', u.uid);
         const snap = await getDoc(ref);
         if (snap.exists()) {
-          setProfile(snap.data() as Profile);
+          const data = snap.data() as Profile;
+          if (data.publicProfileEnabled === undefined) {
+            data.publicProfileEnabled = true;
+          }
+          setProfile(data);
         } else {
           const data: Profile = {
             displayName: u.displayName,
@@ -96,6 +101,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
             bio: '',
             photoURL: u.photoURL,
             isAnonymous: u.isAnonymous,
+            publicProfileEnabled: true,
             createdAt: serverTimestamp(),
           };
           await setDoc(ref, data);
@@ -122,6 +128,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
         displayName: 'DevUser',
         email: 'dev@test.com',
         isAnonymous: false,
+        publicProfileEnabled: true,
       });
     }
   }, [user, loading]);
@@ -161,7 +168,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
       });
     }
     const snap = await getDoc(ref);
-    setProfile(snap.data() as Profile);
+    const newData = snap.data() as Profile;
+    if (newData.publicProfileEnabled === undefined) newData.publicProfileEnabled = true;
+    setProfile(newData);
   };
 
   const pickImage = async () => {

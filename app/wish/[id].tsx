@@ -18,11 +18,19 @@ import {
   serverTimestamp,
   increment,
   doc,
+  getDoc,
   updateDoc,
 } from 'firebase/firestore'; // ✅ Keep only if used directly in this file
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Colors } from '../../constants/Colors';
+
+const typeInfo: Record<string, { emoji: string; color: string }> = {
+  wish: { emoji: '💭', color: '#1e1e1e' },
+  confession: { emoji: '😶\u200d🌫️', color: '#374151' },
+  advice: { emoji: '🧠', color: '#064e3b' },
+  dream: { emoji: '🌙', color: '#312e81' },
+};
 import {
   Animated,
   ActivityIndicator,
@@ -40,6 +48,7 @@ import {
   Dimensions,
   Alert,
   Linking,
+  RefreshControl,
 } from 'react-native';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { BarChart } from 'react-native-chart-kit';
@@ -84,6 +93,8 @@ export default function Page() {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [postingComment, setPostingComment] = useState(false);
   const [useProfileComment, setUseProfileComment] = useState(true);
+  const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
+  const [refreshing, setRefreshing] = useState(false);
   const { user, profile } = useAuth();
 
   const flatListRef = useRef<FlatList<Comment>>(null);
@@ -154,6 +165,26 @@ try {
     return unsubscribe;
   }, [subscribeToComments]);
 
+  useEffect(() => {
+    const fetchStatus = async () => {
+      const ids = new Set<string>();
+      if (wish?.userId) ids.add(wish.userId);
+      comments.forEach((c) => c.userId && ids.add(c.userId));
+      await Promise.all(
+        Array.from(ids).map(async (uid) => {
+          if (publicStatus[uid] === undefined) {
+            const snap = await getDoc(doc(db, 'users', uid));
+            setPublicStatus((prev) => ({
+              ...prev,
+              [uid]: snap.exists() ? snap.data().publicProfileEnabled !== false : false,
+            }));
+          }
+        })
+      );
+    };
+    fetchStatus();
+  }, [comments, wish]);
+
   const playAudio = useCallback(async () => {
     if (!wish?.audioUrl) return;
     try {
@@ -188,20 +219,7 @@ try {
       setComment('');
       setReplyTo(null);
 
-      if (wish?.pushToken) {
-        await fetch('https://exp.host/--/api/v2/push/send', {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            to: wish.pushToken,
-            title: 'New comment on your wish 💬',
-            body: 'Someone left a comment on your wish.',
-          }),
-        });
-      }
+      // Push notifications are sent from Cloud Functions
       Alert.alert('Comment posted!');
     } catch (err) {
       console.error('❌ Failed to post comment:', err);
@@ -290,6 +308,12 @@ try {
     }
   }, [fetchWish, wish]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchWish();
+    setRefreshing(false);
+  }, [fetchWish]);
+
 
   const renderCommentItem = useCallback(
     (item: Comment, level = 0) => {
@@ -321,9 +345,15 @@ try {
               ],
             }}
           >
-            {!item.isAnonymous && (
-              <Text style={styles.nickname}>{item.displayName}</Text>
-            )}
+            {!item.isAnonymous &&
+              publicStatus[item.userId || ''] && (
+                <TouchableOpacity
+                  onPress={() => router.push(`/profile/${item.displayName}`)}
+                  hitSlop={HIT_SLOP}
+                >
+                  <Text style={styles.nickname}>{item.displayName}</Text>
+                </TouchableOpacity>
+              )}
             <Text style={styles.comment}>{item.text}</Text>
             <Text style={styles.timestamp}>
               {item.timestamp?.seconds
@@ -394,10 +424,12 @@ try {
       <View
         style={[
           styles.wishBox,
-          { backgroundColor: colorScheme === 'dark' ? '#1e1e1e' : '#ffffff' },
+          { backgroundColor: typeInfo[wish.type || 'wish'].color },
         ]}
       >
-        <Text style={[styles.wishCategory, { color: Colors[colorScheme].tint }]}>#{wish.category}</Text>
+        <Text style={[styles.wishCategory, { color: Colors[colorScheme].tint }]}>
+          {typeInfo[wish.type || 'wish'].emoji} #{wish.category}
+        </Text>
         <Text style={[styles.wishText, { color: Colors[colorScheme].text }]}>{wish.text}</Text>
         {wish.imageUrl && (
           <Image source={{ uri: wish.imageUrl }} style={styles.preview} />
@@ -488,7 +520,8 @@ try {
   data={comments.filter((c) => !c.parentId)}
   keyExtractor={(item) => item.id}
   renderItem={renderComment}
-  contentContainerStyle={{ paddingBottom: 80 }}
+  refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+  contentContainerStyle={{ paddingBottom: 80, flexGrow: 1 }}
   initialNumToRender={10}
   getItemLayout={(_, index) => ({
     length: COMMENT_ITEM_HEIGHT,
@@ -501,7 +534,14 @@ try {
         {replyTo && (
           <View style={styles.replyInfo}>
             <Text style={{ color: '#a78bfa' }}>
-              Replying to {comments.find((c) => c.id === replyTo)?.displayName || 'Anonymous'}
+              Replying to{' '}
+              {(() => {
+                const r = comments.find((c) => c.id === replyTo);
+                if (r && !r.isAnonymous && publicStatus[r.userId || '']) {
+                  return r.displayName;
+                }
+                return 'Anonymous';
+              })()}
             </Text>
             <TouchableOpacity onPress={() => setReplyTo(null)} style={{ marginLeft: 8 }}>
               <Text style={{ color: '#fff' }}>Cancel</Text>
