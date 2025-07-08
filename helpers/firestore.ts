@@ -124,6 +124,17 @@ export async function getWishesByNickname(nickname: string): Promise<Wish[]> {
   });
 }
 
+export async function getWishesByDisplayName(displayName: string): Promise<Wish[]> {
+  const q = query(
+    collection(db, 'wishes'),
+    where('displayName', '==', displayName),
+    where('isAnonymous', '==', false),
+    orderBy('timestamp', 'desc')
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Wish,'id'>) })) as Wish[];
+}
+
 export async function getAllWishes(): Promise<Wish[]> {
   const snap = await getDocs(collection(db, 'wishes'));
   return snap.docs.map(d => {
