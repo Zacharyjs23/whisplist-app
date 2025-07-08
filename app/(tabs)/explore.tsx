@@ -14,7 +14,6 @@ import {
   RefreshControl,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useRouter } from 'expo-router';
@@ -173,8 +172,16 @@ export default function Page() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.container}
       >
-        <ScrollView contentContainerStyle={styles.contentContainer}>
-          <Text style={styles.title}>Explore Wishes 🧭</Text>
+        <FlatList
+          data={filteredWishes}
+          keyExtractor={(item) => item.id}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          contentContainerStyle={styles.contentContainer}
+          ListHeaderComponent={
+            <>
+              <Text style={styles.title}>Explore Wishes 🧭</Text>
 
         <TextInput
           style={styles.searchInput}
@@ -228,25 +235,19 @@ export default function Page() {
             ))}
           </View>
         )}
-
-        {loading ? (
-          <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
-        ) : error ? (
-          <Text style={styles.errorText}>{error}</Text>
-        ) : filteredWishes.length === 0 ? (
-          <Text style={styles.noResults}>No matching wishes 💭</Text>
-        ) : (
-          <FlatList
-            data={filteredWishes}
-            keyExtractor={(item) => item.id}
-            renderItem={renderWish}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            contentContainerStyle={{ paddingBottom: 80, flexGrow: 1 }}
-          />
-        )}
-        </ScrollView>
+            </>
+          }
+          ListEmptyComponent={
+            loading ? (
+              <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
+            ) : error ? (
+              <Text style={styles.errorText}>{error}</Text>
+            ) : (
+              <Text style={styles.noResults}>No matching wishes 💭</Text>
+            )
+          }
+          renderItem={renderWish}
+        />
         <ReportDialog
           visible={reportVisible}
           onClose={() => {
