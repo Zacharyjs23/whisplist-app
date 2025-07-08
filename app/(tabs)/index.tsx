@@ -65,6 +65,7 @@ export default function Page() {
   const [wishList, setWishList] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'wish' | 'confession' | 'advice' | 'dream'>('all');
   const [reportVisible, setReportVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -369,8 +370,10 @@ useEffect(() => {
     }
   }, [user]);
 
-  const filteredWishes = wishList.filter((wish) =>
-    wish.text.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredWishes = wishList.filter(
+    (wish) =>
+      wish.text.toLowerCase().includes(searchTerm.toLowerCase()) &&
+      (filterType === 'all' || wish.type === filterType)
   );
 
   return (
@@ -408,6 +411,20 @@ useEffect(() => {
                 value={searchTerm}
                 onChangeText={setSearchTerm}
               />
+
+              <Text style={styles.label}>Filter by Type</Text>
+              <Picker
+                selectedValue={filterType}
+                onValueChange={(val) => setFilterType(val)}
+                style={styles.input}
+                dropdownIconColor="#fff"
+              >
+                <Picker.Item label="All" value="all" />
+                <Picker.Item label="Wish 💭" value="wish" />
+                <Picker.Item label="Confession 😶‍🌫️" value="confession" />
+                <Picker.Item label="Advice Request 🧠" value="advice" />
+                <Picker.Item label="Dream 🌙" value="dream" />
+              </Picker>
 
         <Text style={styles.label}>Wish</Text>
         <TextInput
