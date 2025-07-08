@@ -6,9 +6,8 @@ import {
   setAudioModeAsync,
   RecordingPresets,
   AudioRecorder,
-  InterruptionModeAndroid,
-  InterruptionMode,
 } from 'expo-audio';
+import * as Audio from 'expo-audio';
 import {
   listenWishes,
   addWish,
@@ -105,7 +104,13 @@ useEffect(() => {
 
 useEffect(() => {
   const fetchStatus = async () => {
-    const ids = Array.from(new Set(wishList.map((w) => w.userId).filter(Boolean)));
+    const ids = Array.from(
+      new Set(
+        wishList
+          .map((w) => w.userId)
+          .filter((id): id is string => typeof id === 'string' && id.length > 0)
+      )
+    );
     await Promise.all(
       ids.map(async (id) => {
         if (publicStatus[id] === undefined) {
@@ -171,9 +176,9 @@ useEffect(() => {
       }
       await setAudioModeAsync({
         allowsRecording: true,
-        interruptionMode: InterruptionMode.DoNotMix,
+        interruptionMode: (Audio as any).INTERRUPTION_MODE_IOS_DO_NOT_MIX,
         playsInSilentMode: true,
-        interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+        interruptionModeAndroid: (Audio as any).INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
         shouldPlayInBackground: false,
         shouldRouteThroughEarpiece: false,
       });
