@@ -19,18 +19,15 @@ import {
   increment,
   doc,
   getDoc,
+  getDocs,
+  query,
+  where,
+  collectionGroup,
   updateDoc,
 } from 'firebase/firestore'; // ✅ Keep only if used directly in this file
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Colors } from '../../constants/Colors';
-
-const typeInfo: Record<string, { emoji: string; color: string }> = {
-  wish: { emoji: '💭', color: '#1e1e1e' },
-  confession: { emoji: '😶\u200d🌫️', color: '#374151' },
-  advice: { emoji: '🧠', color: '#064e3b' },
-  dream: { emoji: '🌙', color: '#312e81' },
-};
 import {
   Animated,
   ActivityIndicator,
@@ -56,6 +53,13 @@ import ReportDialog from '../../components/ReportDialog';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
+
+const typeInfo: Record<string, { emoji: string; color: string }> = {
+  wish: { emoji: '💭', color: '#1e1e1e' },
+  confession: { emoji: '😶\u200d🌫️', color: '#374151' },
+  advice: { emoji: '🧠', color: '#064e3b' },
+  dream: { emoji: '🌙', color: '#312e81' },
+};
 
 interface Comment {
   id: string;
@@ -94,6 +98,7 @@ export default function Page() {
   const [postingComment, setPostingComment] = useState(false);
   const [useProfileComment, setUseProfileComment] = useState(true);
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
+  const [verifiedStatus, setVerifiedStatus] = useState<Record<string, boolean>>({});
   const [refreshing, setRefreshing] = useState(false);
   const { user, profile } = useAuth();
 
@@ -184,6 +189,26 @@ try {
     };
     fetchStatus();
   }, [comments, wish]);
+
+  useEffect(() => {
+    const fetchVerified = async () => {
+      const ids = Array.from(new Set(comments.map((c) => c.userId).filter(Boolean)));
+      await Promise.all(
+        ids.map(async (uid) => {
+          if (!uid || verifiedStatus[uid] !== undefined) return;
+          const q = query(collectionGroup(db, 'comments'), where('userId', '==', uid));
+          const snap = await getDocs(q);
+          let total = 0;
+          snap.forEach((d) => {
+            const r = d.data().reactions || {};
+            total += Object.values(r).reduce((s: number, v: any) => s + v, 0);
+          });
+          setVerifiedStatus((prev) => ({ ...prev, [uid]: total >= 10 }));
+        })
+      );
+    };
+    fetchVerified();
+  }, [comments]);
 
   const playAudio = useCallback(async () => {
     if (!wish?.audioUrl) return;
@@ -351,7 +376,10 @@ try {
                   onPress={() => router.push(`/profile/${item.displayName}`)}
                   hitSlop={HIT_SLOP}
                 >
-                  <Text style={styles.nickname}>{item.displayName}</Text>
+                  <Text style={styles.nickname}>
+                    {item.displayName}
+                    {verifiedStatus[item.userId || ''] ? ' \u2705 Verified' : ''}
+                  </Text>
                 </TouchableOpacity>
               )}
             <Text style={styles.comment}>{item.text}</Text>
@@ -437,24 +465,40 @@ try {
 
         {wish.isPoll ? (
           <View style={{ marginTop: 8 }}>
-            <TouchableOpacity
-              style={styles.pollOption}
-              disabled={hasVoted}
-              onPress={() => handleVote('A')}
-            >
-              <Text style={[styles.pollOptionText, { color: Colors[colorScheme].text }]}>
-                {wish.optionA} - {wish.votesA || 0}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.pollOption}
-              disabled={hasVoted}
-              onPress={() => handleVote('B')}
-            >
-              <Text style={[styles.pollOptionText, { color: Colors[colorScheme].text }]}>
-                {wish.optionB} - {wish.votesB || 0}
-              </Text>
-            </TouchableOpacity>
+            {(() => {
+              const totalVotes = (wish.votesA || 0) + (wish.votesB || 0);
+              const percentA = totalVotes
+                ? Math.round(((wish.votesA || 0) / totalVotes) * 100)
+                : 0;
+              const percentB = totalVotes
+                ? Math.round(((wish.votesB || 0) / totalVotes) * 100)
+                : 0;
+              return (
+                <>
+                  <TouchableOpacity
+                    style={styles.pollOption}
+                    disabled={hasVoted}
+                    onPress={() => handleVote('A')}
+                  >
+                    <Text style={[styles.pollOptionText, { color: Colors[colorScheme].text }]}> 
+                      {wish.optionA} - {wish.votesA || 0} ({percentA}%)
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.pollOption}
+                    disabled={hasVoted}
+                    onPress={() => handleVote('B')}
+                  >
+                    <Text style={[styles.pollOptionText, { color: Colors[colorScheme].text }]}> 
+                      {wish.optionB} - {wish.votesB || 0} ({percentB}%)
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={{ color: Colors[colorScheme].text, marginTop: 4 }}>
+                    Total votes: {totalVotes}
+                  </Text>
+                </>
+              );
+            })()}
             <BarChart
               data={{
                 labels: [wish.optionA || 'A', wish.optionB || 'B'],
