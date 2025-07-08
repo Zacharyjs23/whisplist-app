@@ -46,9 +46,9 @@ const typeInfo: Record<string, { emoji: string; color: string }> = {
 };
 
 const prompts = [
-  "What’s your biggest wish this week?",
-  'Describe a dream you had recently',
-  'What advice do you wish you had today?',
+  '💭 What\u2019s your biggest wish this week?',
+  '🌙 Describe a dream you had recently',
+  '🧠 What advice do you wish you had today?',
 ];
 
 export default function Page() {
@@ -74,6 +74,7 @@ export default function Page() {
   const [useProfilePost, setUseProfilePost] = useState(true);
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
   const [streakCount, setStreakCount] = useState(0);
+  const [dailyPrompt, setDailyPrompt] = useState('');
   const { user, profile } = useAuth();
 
   const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
@@ -131,19 +132,25 @@ useEffect(() => {
 }, []);
 
 useEffect(() => {
-  const checkPromptAndStreak = async () => {
+  const loadPromptAndStreak = async () => {
     const today = new Date().toISOString().split('T')[0];
-    const lastPrompt = await AsyncStorage.getItem('lastPromptDate');
-    const lastPosted = await AsyncStorage.getItem('lastPostedDate');
-    if (lastPrompt !== today && lastPosted !== today) {
+    const savedDate = await AsyncStorage.getItem('dailyPromptDate');
+    const savedPrompt = await AsyncStorage.getItem('dailyPromptText');
+
+    if (savedDate === today && savedPrompt) {
+      setDailyPrompt(savedPrompt);
+    } else {
       const prompt = prompts[Math.floor(Math.random() * prompts.length)];
-      Alert.alert('Daily Prompt', prompt);
-      await AsyncStorage.setItem('lastPromptDate', today);
+      setDailyPrompt(prompt);
+      await AsyncStorage.setItem('dailyPromptDate', today);
+      await AsyncStorage.setItem('dailyPromptText', prompt);
     }
+
     const streak = await AsyncStorage.getItem('streakCount');
     if (streak) setStreakCount(parseInt(streak, 10));
   };
-  checkPromptAndStreak();
+
+  loadPromptAndStreak();
 }, []);
 
   const startRecording = async () => {
@@ -347,6 +354,12 @@ useEffect(() => {
           value={searchTerm}
           onChangeText={setSearchTerm}
         />
+
+        {dailyPrompt !== '' && (
+          <View style={styles.promptCard}>
+            <Text style={styles.promptText}>{dailyPrompt}</Text>
+          </View>
+        )}
 
         <Text style={styles.label}>Wish</Text>
         <TextInput
@@ -602,6 +615,16 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     marginBottom: 10,
+  },
+  promptCard: {
+    backgroundColor: '#27272a',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  promptText: {
+    color: '#fff',
+    fontSize: 16,
   },
   preview: {
     width: '100%',
