@@ -48,14 +48,22 @@ export default function Page() {
 
   useEffect(() => {
     const fetchStatus = async () => {
-      const ids = Array.from(new Set(wishes.map((w) => w.userId).filter(Boolean)));
+      const ids = Array.from(
+        new Set(
+          wishes
+            .map((w) => w.userId)
+            .filter((id): id is string => typeof id === 'string')
+        )
+      );
       await Promise.all(
         ids.map(async (id) => {
           if (publicStatus[id] === undefined) {
             const snap = await getDoc(doc(db, 'users', id));
             setPublicStatus((prev) => ({
               ...prev,
-              [id]: snap.exists() ? snap.data().publicProfileEnabled !== false : false,
+              [id]: snap.exists()
+                ? snap.data().publicProfileEnabled !== false
+                : false,
             }));
           }
         })
