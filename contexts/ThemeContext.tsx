@@ -3,44 +3,48 @@ import { useColorScheme as useRNColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '@/constants/Colors';
 
-export type Theme = keyof typeof Colors;
+export type ThemeName = keyof typeof Colors;
+export type Theme = { name: ThemeName } & (typeof Colors)['light'];
 
 interface ThemeContextValue {
   theme: Theme;
-  setTheme: (theme: Theme) => void;
+  setTheme: (themeName: ThemeName) => void;
   toggleTheme: () => void;
 }
 
+const defaultTheme: Theme = { name: 'light', ...Colors.light };
 const ThemeContext = createContext<ThemeContextValue>({
-  theme: 'light',
+  theme: defaultTheme,
   setTheme: () => {},
   toggleTheme: () => {},
 });
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const systemTheme = useRNColorScheme() as Theme;
-  const [theme, setThemeState] = useState<Theme>('light');
+  const systemTheme = useRNColorScheme() as ThemeName;
+  const [themeName, setThemeName] = useState<ThemeName>('light');
 
   useEffect(() => {
     const load = async () => {
       const stored = await AsyncStorage.getItem('appTheme');
       if (stored && (stored in Colors)) {
-        setThemeState(stored as Theme);
+        setThemeName(stored as ThemeName);
       } else if (systemTheme) {
-        setThemeState(systemTheme);
+        setThemeName(systemTheme);
       }
     };
     load();
   }, [systemTheme]);
 
-  const setTheme = async (val: Theme) => {
-    setThemeState(val);
+  const setTheme = async (val: ThemeName) => {
+    setThemeName(val);
     await AsyncStorage.setItem('appTheme', val);
   };
 
   const toggleTheme = () => {
-    setTheme(theme === 'light' ? 'dark' : 'light');
+    setTheme(themeName === 'light' ? 'dark' : 'light');
   };
+
+  const theme: Theme = { name: themeName, ...Colors[themeName] };
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>

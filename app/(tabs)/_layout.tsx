@@ -1,10 +1,10 @@
 // app/(tabs)/_layout.tsx — Enhanced Tab Navigation Layout with Daily Wish Streak
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function Layout() {
-  const colorScheme = useColorScheme();
+  const { theme } = useTheme();
 
   return (
     <Tabs
@@ -12,7 +12,7 @@ export default function Layout() {
         tabBarActiveTintColor: '#a78bfa',
         tabBarInactiveTintColor: '#999',
         tabBarStyle: {
-          backgroundColor: colorScheme === 'dark' ? '#0e0e0e' : '#fff',
+          backgroundColor: theme.name === 'dark' ? '#0e0e0e' : '#fff',
           borderTopWidth: 0,
           paddingBottom: 6,
           paddingTop: 6,

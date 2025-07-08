@@ -2,8 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { collection, getDocs, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useColorScheme } from '@/hooks/useColorScheme';
-import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/contexts/ThemeContext';
 import { db } from '../../firebase';
 import { followUser, unfollowUser } from '../../helpers/firestore';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,7 +17,7 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [privateProfile, setPrivateProfile] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
-  const theme = useColorScheme();
+  const { theme } = useTheme();
   const { user } = useAuth();
 
   useEffect(() => {
@@ -63,28 +62,28 @@ export default function Page() {
 
   if (loading) {
     return (
-      <View style={[styles.center, { backgroundColor: Colors[theme].background }]}>
-        <ActivityIndicator color={Colors[theme].tint} />
+      <View style={[styles.center, { backgroundColor: theme.background }]}>
+        <ActivityIndicator color={theme.tint} />
       </View>
     );
   }
 
   if (privateProfile || !profile) {
     return (
-      <View style={[styles.center, { backgroundColor: Colors[theme].background }]}>
-        <Text style={[styles.privateText, { color: Colors[theme].text }]}>This user has a private profile.</Text>
+      <View style={[styles.center, { backgroundColor: theme.background }]}>
+        <Text style={[styles.privateText, { color: theme.text }]}>This user has a private profile.</Text>
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: Colors[theme].background }]}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       {profile.photoURL ? (
         <Image source={{ uri: profile.photoURL }} style={styles.avatar} />
       ) : (
         <View style={[styles.avatar, { backgroundColor: '#444' }]} />
       )}
-      <Text style={[styles.displayName, { color: Colors[theme].text }]}>{profile.displayName}</Text>
+      <Text style={[styles.displayName, { color: theme.text }]}>{profile.displayName}</Text>
       {user && profileId && user.uid !== profileId && (
         <TouchableOpacity
           onPress={async () => {
@@ -110,18 +109,18 @@ export default function Page() {
         renderItem={({ item }) => (
           <TouchableOpacity
             onPress={() => router.push(`/wish/${item.id}`)}
-            style={[styles.wishItem, { backgroundColor: Colors[theme].input }]}
+            style={[styles.wishItem, { backgroundColor: theme.input }]}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Text style={[styles.wishText, { color: Colors[theme].text }]}>{item.text}</Text>
+            <Text style={[styles.wishText, { color: theme.text }]}>{item.text}</Text>
             {item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.preview} />}
             {item.isPoll ? (
               <View style={{ marginTop: 6 }}>
-                <Text style={[styles.wishText, { color: Colors[theme].text }]}>{item.optionA}: {item.votesA || 0}</Text>
-                <Text style={[styles.wishText, { color: Colors[theme].text }]}>{item.optionB}: {item.votesB || 0}</Text>
+                <Text style={[styles.wishText, { color: theme.text }]}>{item.optionA}: {item.votesA || 0}</Text>
+                <Text style={[styles.wishText, { color: theme.text }]}>{item.optionB}: {item.votesB || 0}</Text>
               </View>
             ) : (
-              <Text style={[styles.likeText, { color: Colors[theme].tint }]}>❤️ {item.likes}</Text>
+              <Text style={[styles.likeText, { color: theme.tint }]}>❤️ {item.likes}</Text>
             )}
           </TouchableOpacity>
         )}

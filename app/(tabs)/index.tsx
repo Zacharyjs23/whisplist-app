@@ -39,7 +39,7 @@ import {
   Animated,
 } from 'react-native';
 import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Picker } from '@react-native-picker/picker';
 import ReportDialog from '../../components/ReportDialog';
 import { db, storage } from '../../firebase';
@@ -78,8 +78,8 @@ export default function Page() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [giftLink, setGiftLink] = useState('');
   const [posting, setPosting] = useState(false);
-  const colorScheme = useColorScheme();
-  const styles = React.useMemo(() => createStyles(Colors[colorScheme]), [colorScheme]);
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const [useProfilePost, setUseProfilePost] = useState(true);
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
   const [followStatus, setFollowStatus] = useState<Record<string, boolean>>({});
@@ -376,8 +376,8 @@ useEffect(() => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <RNStatusBar
-        barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'}
-        backgroundColor={Colors[colorScheme].background}
+        barStyle={theme.name === 'dark' ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.background}
       />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -632,7 +632,7 @@ useEffect(() => {
   );
 }
 
-const createStyles = (c: (typeof Colors)['light']) =>
+const createStyles = (c: (typeof Colors)['light'] & { name: string }) =>
   StyleSheet.create({
     safeArea: {
       flex: 1,

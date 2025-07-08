@@ -1,5 +1,5 @@
 import { ThemedText } from '@/components/ThemedText';
-import { useTheme, Theme } from '@/contexts/ThemeContext';
+import { useTheme, ThemeName } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -38,7 +38,7 @@ export default function Page() {
   const { theme, setTheme } = useTheme();
   const { profile, updateProfile } = useAuth();
 
-  const themeOptions = Object.keys(Colors) as Theme[];
+  const themeOptions = Object.keys(Colors) as ThemeName[];
 
   interface User {
     id: string;
@@ -187,12 +187,12 @@ export default function Page() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           styles.container,
-          { backgroundColor: Colors[theme].background },
+          { backgroundColor: theme.background },
         ]}
       >
         <ThemedText style={styles.title}>Settings</ThemedText>
       <ThemedText style={styles.section}>Theme</ThemedText>
-      <ThemedText accessibilityRole="text">Current Theme: {theme}</ThemedText>
+      <ThemedText accessibilityRole="text">Current Theme: {theme.name}</ThemedText>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.themeList}>
         {themeOptions.map((t) => (
           <TouchableOpacity
@@ -202,16 +202,16 @@ export default function Page() {
               styles.themeItem,
               {
                 backgroundColor: Colors[t as keyof typeof Colors].background,
-                borderColor: theme === t ? Colors[theme].tint : 'transparent',
+                borderColor: theme.name === t ? theme.tint : 'transparent',
               },
             ]}
           >
             <View
               style={[styles.swatch, { backgroundColor: Colors[t as keyof typeof Colors].tint }]}
             />
-            <ThemedText style={theme === t ? { color: Colors[theme].tint } : undefined}>
+            <ThemedText style={theme.name === t ? { color: theme.tint } : undefined}>
               {t}
-              {theme === t ? ' ✓' : ''}
+              {theme.name === t ? ' ✓' : ''}
             </ThemedText>
           </TouchableOpacity>
         ))}
@@ -249,7 +249,7 @@ export default function Page() {
         }}
         style={[
           styles.picker,
-          { backgroundColor: Colors[theme].input, color: Colors[theme].text },
+          { backgroundColor: theme.input, color: theme.text },
         ]}
       >
         <Picker.Item label="General" value="general" />
@@ -267,7 +267,7 @@ export default function Page() {
         }}
         style={[
           styles.picker,
-          { backgroundColor: Colors[theme].input, color: Colors[theme].text },
+          { backgroundColor: theme.input, color: theme.text },
         ]}
       >
         <Picker.Item label="English" value="en" />
@@ -275,7 +275,7 @@ export default function Page() {
       </Picker>
 
       <TextInput
-        style={[styles.input, { backgroundColor: Colors[theme].input, color: Colors[theme].text }]}
+        style={[styles.input, { backgroundColor: theme.input, color: theme.text }]}
         placeholder="Send feedback"
         placeholderTextColor="#888"
         value={feedback}

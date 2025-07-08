@@ -2,14 +2,13 @@ import React, { useEffect } from 'react';
 import { Alert, SafeAreaView, StatusBar, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import usePushNotifications from '@/hooks/usePushNotifications';
-import { Colors } from '@/constants/Colors';
 
 export const AppContainer: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const theme = useColorScheme();
-  const backgroundColor = Colors[theme].background;
-  const barStyle = theme === 'dark' || theme === 'neon' ? 'light-content' : 'dark-content';
+  const { theme } = useTheme();
+  const backgroundColor = theme.background;
+  const barStyle = theme.name === 'dark' || theme.name === 'neon' ? 'light-content' : 'dark-content';
   usePushNotifications();
 
   useEffect(() => {

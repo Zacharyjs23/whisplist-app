@@ -27,7 +27,6 @@ import {
 } from 'firebase/firestore'; // ✅ Keep only if used directly in this file
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Colors } from '../../constants/Colors';
 import {
   Animated,
   ActivityIndicator,
@@ -48,7 +47,7 @@ import {
   RefreshControl,
   ScrollView,
 } from 'react-native';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { BarChart } from 'react-native-chart-kit';
 import ReportDialog from '../../components/ReportDialog';
 import { db } from '../../firebase';
@@ -84,7 +83,7 @@ const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 export default function Page() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const colorScheme = useColorScheme();
+  const { theme } = useTheme();
   const [wish, setWish] = useState<Wish | null>(null);
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
@@ -428,11 +427,11 @@ try {
 
   return (
     <SafeAreaView
-      style={[styles.safeArea, { backgroundColor: Colors[colorScheme].background }]}
+      style={[styles.safeArea, { backgroundColor: theme.background }]}
     >
       <StatusBar
-        style={colorScheme === 'dark' ? 'light' : 'dark'}
-        backgroundColor={Colors[colorScheme].background}
+        style={theme.name === 'dark' ? 'light' : 'dark'}
+        backgroundColor={theme.background}
       />
       <KeyboardAvoidingView
         style={styles.container}
@@ -441,7 +440,7 @@ try {
       >
         <ScrollView contentContainerStyle={styles.contentContainer}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton} hitSlop={HIT_SLOP}>
-          <Text style={[styles.backButtonText, { color: Colors[colorScheme].tint }]}>← Back</Text>
+          <Text style={[styles.backButtonText, { color: theme.tint }]}>← Back</Text>
         </TouchableOpacity>
 
 {loading ? (
@@ -457,10 +456,10 @@ try {
           { backgroundColor: typeInfo[wish.type || 'wish'].color },
         ]}
       >
-        <Text style={[styles.wishCategory, { color: Colors[colorScheme].tint }]}>
+        <Text style={[styles.wishCategory, { color: theme.tint }]}>
           {typeInfo[wish.type || 'wish'].emoji} #{wish.category}
         </Text>
-        <Text style={[styles.wishText, { color: Colors[colorScheme].text }]}>{wish.text}</Text>
+        <Text style={[styles.wishText, { color: theme.text }]}>{wish.text}</Text>
         {wish.imageUrl && (
           <Image source={{ uri: wish.imageUrl }} style={styles.preview} />
         )}
@@ -482,7 +481,7 @@ try {
                     disabled={hasVoted}
                     onPress={() => handleVote('A')}
                   >
-                    <Text style={[styles.pollOptionText, { color: Colors[colorScheme].text }]}> 
+                    <Text style={[styles.pollOptionText, { color: theme.text }]}>
                       {wish.optionA} - {wish.votesA || 0} ({percentA}%)
                     </Text>
                   </TouchableOpacity>
@@ -491,11 +490,11 @@ try {
                     disabled={hasVoted}
                     onPress={() => handleVote('B')}
                   >
-                    <Text style={[styles.pollOptionText, { color: Colors[colorScheme].text }]}> 
+                    <Text style={[styles.pollOptionText, { color: theme.text }]}>
                       {wish.optionB} - {wish.votesB || 0} ({percentB}%)
                     </Text>
                   </TouchableOpacity>
-                  <Text style={{ color: Colors[colorScheme].text, marginTop: 4 }}>
+                  <Text style={{ color: theme.text, marginTop: 4 }}>
                     Total votes: {totalVotes}
                   </Text>
                 </>
@@ -522,7 +521,7 @@ try {
             />
           </View>
         ) : (
-          <Text style={[styles.likes, { color: Colors[colorScheme].tint }]}>❤️ {wish.likes}</Text>
+          <Text style={[styles.likes, { color: theme.tint }]}>❤️ {wish.likes}</Text>
         )}
 
         {wish.audioUrl && (
