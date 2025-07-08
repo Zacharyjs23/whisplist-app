@@ -60,6 +60,13 @@ Join our community of developers creating universal apps.
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
 
+## Audio support
+
+`expo-av` has been deprecated in favor of the new [`expo-audio`](https://docs.expo.dev/versions/latest/sdk/audio/) library.
+When you upgrade, replace `expo-av` imports with `expo-audio` and adjust any API
+changes (mainly how sound and recording objects are created). The rest of the
+logic in this repo can remain largely the same.
+
 ## Push notifications
 
 The app registers the device for Expo push notifications on first launch.
