@@ -27,6 +27,8 @@ import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, li
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
+import { Colors } from '@/constants/Colors';
 
 const typeInfo: Record<string, { emoji: string; color: string }> = {
   wish: { emoji: '💭', color: '#1a1a1a' },
@@ -41,6 +43,7 @@ const allCategories = ['love', 'health', 'career', 'general', 'money', 'friendsh
 export default function Page() {
   const router = useRouter();
   const { user } = useAuth();
+  const { theme } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [filteredWishes, setFilteredWishes] = useState<Wish[]>([]);
   const [topWishes, setTopWishes] = useState<Wish[]>([]);
@@ -219,11 +222,11 @@ export default function Page() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0e0e0e" />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: Colors[theme].background }]}>
+      <StatusBar barStyle="light-content" backgroundColor={Colors[theme].background} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.container}
+        style={[styles.container, { backgroundColor: Colors[theme].background }]}
       >
         <FlatList
           data={filteredWishes}
@@ -237,7 +240,10 @@ export default function Page() {
               <Text style={styles.title}>Explore Wishes 🧭</Text>
 
         <TextInput
-          style={styles.searchInput}
+          style={[
+            styles.searchInput,
+            { backgroundColor: Colors[theme].input, color: Colors[theme].text },
+          ]}
           placeholder="Search wishes..."
           placeholderTextColor="#aaa"
           value={searchTerm}
@@ -247,14 +253,22 @@ export default function Page() {
         <View style={styles.toggleBar}>
           <TouchableOpacity
             onPress={() => toggleTrending(false)}
-            style={[styles.toggleButton, !trendingMode && styles.activeToggle]}
+            style={[
+              styles.toggleButton,
+              { backgroundColor: Colors[theme].input },
+              !trendingMode && styles.activeToggle,
+            ]}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Text style={[styles.toggleText, !trendingMode && styles.activeToggleText]}>Latest</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => toggleTrending(true)}
-            style={[styles.toggleButton, trendingMode && styles.activeToggle]}
+            style={[
+              styles.toggleButton,
+              { backgroundColor: Colors[theme].input },
+              trendingMode && styles.activeToggle,
+            ]}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Text style={[styles.toggleText, trendingMode && styles.activeToggleText]}>🔥 Trending</Text>
@@ -264,7 +278,7 @@ export default function Page() {
         <Picker
           selectedValue={selectedCategory}
           onValueChange={(value) => setSelectedCategory(value)}
-          style={styles.dropdown}
+          style={[styles.dropdown, { backgroundColor: Colors[theme].input, color: Colors[theme].text }]}
           dropdownIconColor="#fff"
         >
           <Picker.Item label="All Categories" value={null} />
@@ -281,7 +295,10 @@ export default function Page() {
           <View style={styles.topSection}>
             <Text style={styles.sectionTitle}>🔥 <Text style={{ color: '#a78bfa' }}>Top Wishes</Text></Text>
             {topWishes.map((wish) => (
-              <View key={wish.id} style={styles.topWish}>
+              <View
+                key={wish.id}
+                style={[styles.topWish, { backgroundColor: Colors[theme].input }]}
+              >
                 <Text style={styles.topWishText}>{wish.text}</Text>
                 <Text style={styles.likes}>❤️ {wish.likes}</Text>
               </View>
@@ -317,7 +334,6 @@ export default function Page() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#0e0e0e',
   },
   container: {
     flex: 1,
@@ -335,7 +351,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   searchInput: {
-    backgroundColor: '#1e1e1e',
     color: '#fff',
     paddingVertical: 8,
     paddingHorizontal: 12,
@@ -351,7 +366,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 16,
     borderRadius: 20,
-    backgroundColor: '#1e1e1e',
     marginHorizontal: 4,
   },
   activeToggle: {
@@ -365,7 +379,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   dropdown: {
-    backgroundColor: '#1e1e1e',
     color: '#fff',
     borderRadius: 10,
     marginBottom: 16,
@@ -380,7 +393,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   topWish: {
-    backgroundColor: '#1e1e1e',
     padding: 14,
     borderRadius: 12,
     marginBottom: 12,
@@ -395,7 +407,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   wishItem: {
-    backgroundColor: '#1a1a1a',
     padding: 14,
     borderRadius: 12,
     marginBottom: 12,

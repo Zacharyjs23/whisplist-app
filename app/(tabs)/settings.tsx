@@ -178,7 +178,7 @@ export default function Page() {
       <ThemedText style={styles.section}>Theme</ThemedText>
       <ThemedText accessibilityRole="text">Current Theme: {theme}</ThemedText>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.themeList}>
-        {Object.keys(Colors).map((t) => (
+        {['light', 'dark', 'sunset', 'ocean', 'neon'].map((t) => (
           <TouchableOpacity
             key={t}
             onPress={() => setTheme(t as any)}
@@ -193,7 +193,7 @@ export default function Page() {
             <View
               style={[styles.swatch, { backgroundColor: Colors[t as keyof typeof Colors].tint }]}
             />
-            <ThemedText>
+            <ThemedText style={theme === t ? { color: Colors[theme].tint } : undefined}>
               {t}
               {theme === t ? ' ✓' : ''}
             </ThemedText>
