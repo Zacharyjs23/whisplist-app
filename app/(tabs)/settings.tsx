@@ -4,6 +4,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ScrollView, TouchableOpacity } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import * as Audio from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
@@ -175,17 +176,29 @@ export default function Page() {
     <ThemedView style={styles.container}>
       <ThemedText style={styles.title}>Settings</ThemedText>
       <ThemedText style={styles.section}>Theme</ThemedText>
-      <Picker
-        selectedValue={theme}
-        onValueChange={(v) => setTheme(v as any)}
-        style={[styles.picker, { backgroundColor: Colors[theme].input, color: Colors[theme].text }]}
-      >
-        <Picker.Item label="Light" value="light" />
-        <Picker.Item label="Dark" value="dark" />
-        <Picker.Item label="Sunset" value="sunset" />
-        <Picker.Item label="Ocean" value="ocean" />
-        <Picker.Item label="Neon" value="neon" />
-      </Picker>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.themeList}>
+        {Object.keys(Colors).map((t) => (
+          <TouchableOpacity
+            key={t}
+            onPress={() => setTheme(t as any)}
+            style={[
+              styles.themeItem,
+              {
+                backgroundColor: Colors[t as keyof typeof Colors].background,
+                borderColor: theme === t ? Colors[theme].tint : 'transparent',
+              },
+            ]}
+          >
+            <View
+              style={[styles.swatch, { backgroundColor: Colors[t as keyof typeof Colors].tint }]}
+            />
+            <ThemedText>
+              {t}
+              {theme === t ? ' ✓' : ''}
+            </ThemedText>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
       <View style={styles.row}>
         <ThemedText style={styles.label}>Anonymize Username</ThemedText>
@@ -289,6 +302,22 @@ const styles = StyleSheet.create({
   },
   picker: {
     marginBottom: 12,
+  },
+  themeList: {
+    marginBottom: 12,
+  },
+  themeItem: {
+    padding: 10,
+    borderRadius: 8,
+    marginRight: 8,
+    alignItems: 'center',
+    borderWidth: 2,
+  },
+  swatch: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    marginBottom: 4,
   },
   input: {
     padding: 10,

@@ -135,7 +135,7 @@ const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
               onPress={() => router.push(`/profile/${item.displayName}`)}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={styles.author}>by {item.displayName}</Text>
+              <Text style={[styles.author, { color: Colors[colorScheme].text }]}>by {item.displayName}</Text>
             </TouchableOpacity>
           )}
         <Text
@@ -173,7 +173,7 @@ const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
         style={{ marginTop: 4 }}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        <Text style={{ color: '#f87171' }}>Report</Text>
+        <Text style={{ color: Colors[colorScheme].tint }}>Report</Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -196,7 +196,7 @@ const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
         {loading ? (
           <ActivityIndicator
             size="large"
-            color="#a78bfa"
+            color={Colors[colorScheme].tint}
             style={{ marginTop: 20 }}
           />
         ) : (
@@ -253,7 +253,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   author: {
-    color: '#ccc',
     fontSize: 12,
     marginBottom: 2,
   },
@@ -269,7 +268,6 @@ const styles = StyleSheet.create({
   },
   likes: {
     marginTop: 8,
-    color: '#f472b6',
     fontSize: 14,
     fontWeight: '500',
   },

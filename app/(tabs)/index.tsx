@@ -38,6 +38,8 @@ import {
   RefreshControl,
   Animated,
 } from 'react-native';
+import { Colors } from '@/constants/Colors';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import { Picker } from '@react-native-picker/picker';
 import ReportDialog from '../../components/ReportDialog';
 import { db, storage } from '../../firebase';
@@ -76,6 +78,8 @@ export default function Page() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [giftLink, setGiftLink] = useState('');
   const [posting, setPosting] = useState(false);
+  const colorScheme = useColorScheme();
+  const styles = React.useMemo(() => createStyles(Colors[colorScheme]), [colorScheme]);
   const [useProfilePost, setUseProfilePost] = useState(true);
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
   const [followStatus, setFollowStatus] = useState<Record<string, boolean>>({});
@@ -371,7 +375,10 @@ useEffect(() => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <RNStatusBar barStyle="light-content" backgroundColor="#0e0e0e" />
+      <RNStatusBar
+        barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'}
+        backgroundColor={Colors[colorScheme].background}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.container}
@@ -620,135 +627,136 @@ useEffect(() => {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#0e0e0e',
-  },
-  container: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 20,
-    paddingBottom: 100,
-    flexGrow: 1,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#ccc',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  streak: {
-    color: '#facc15',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  label: {
-    color: '#ccc',
-    marginBottom: 4,
-  },
-  input: {
-    backgroundColor: '#1e1e1e',
-    color: '#fff',
-    padding: 14,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-  button: {
-    backgroundColor: '#8b5cf6',
-    padding: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  recButton: {
-    padding: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  promptCard: {
-    backgroundColor: '#27272a',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  promptTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  promptText: {
-    color: '#fff',
-    fontSize: 16,
-  },
-  preview: {
-    width: '100%',
-    height: 200,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  recordingStatus: {
-    color: '#22c55e',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  authButton: {
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  authButtonText: {
-    color: '#a78bfa',
-    fontSize: 14,
-    textDecorationLine: 'underline',
-  },
-  wishItem: {
-    backgroundColor: '#1e1e1e',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  wishText: {
-    color: '#fff',
-    fontSize: 16,
-  },
-  likeText: {
-    color: '#a78bfa',
-    marginTop: 6,
-    fontSize: 14,
-  },
-  boostedLabel: {
-    color: '#facc15',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  pollText: {
-    color: '#fff',
-    fontSize: 14,
-  },
-  author: {
-    color: '#ccc',
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  noResults: {
-    color: '#ccc',
-    textAlign: 'center',
-    marginTop: 20,
-  },
-});
+const createStyles = (c: (typeof Colors)['light']) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: c.background,
+    },
+    container: {
+      flex: 1,
+    },
+    contentContainer: {
+      padding: 20,
+      paddingBottom: 100,
+      flexGrow: 1,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      color: c.text,
+      textAlign: 'center',
+      marginBottom: 4,
+    },
+    subtitle: {
+      fontSize: 14,
+      color: c.text,
+      textAlign: 'center',
+      marginBottom: 20,
+    },
+    streak: {
+      color: c.tint,
+      textAlign: 'center',
+      marginBottom: 10,
+    },
+    label: {
+      color: c.text,
+      marginBottom: 4,
+    },
+    input: {
+      backgroundColor: c.input,
+      color: c.text,
+      padding: 14,
+      borderRadius: 10,
+      marginBottom: 10,
+    },
+    button: {
+      backgroundColor: c.tint,
+      padding: 14,
+      borderRadius: 10,
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    recButton: {
+      padding: 14,
+      borderRadius: 10,
+      alignItems: 'center',
+      marginBottom: 10,
+    },
+    promptCard: {
+      backgroundColor: c.input,
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 10,
+    },
+    promptTitle: {
+      color: c.text,
+      fontSize: 18,
+      fontWeight: '600',
+      marginTop: 10,
+      marginBottom: 4,
+    },
+    promptText: {
+      color: c.text,
+      fontSize: 16,
+    },
+    preview: {
+      width: '100%',
+      height: 200,
+      borderRadius: 10,
+      marginBottom: 10,
+    },
+    buttonText: {
+      color: c.text,
+      fontWeight: '600',
+    },
+    recordingStatus: {
+      color: c.tint,
+      textAlign: 'center',
+      marginBottom: 10,
+    },
+    authButton: {
+      marginBottom: 20,
+      alignItems: 'center',
+    },
+    authButtonText: {
+      color: c.tint,
+      fontSize: 14,
+      textDecorationLine: 'underline',
+    },
+    wishItem: {
+      backgroundColor: c.input,
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 10,
+    },
+    wishText: {
+      color: c.text,
+      fontSize: 16,
+    },
+    likeText: {
+      color: c.tint,
+      marginTop: 6,
+      fontSize: 14,
+    },
+    boostedLabel: {
+      color: c.tint,
+      fontSize: 12,
+      marginTop: 4,
+    },
+    pollText: {
+      color: c.text,
+      fontSize: 14,
+    },
+    author: {
+      color: c.text,
+      fontSize: 12,
+      marginBottom: 2,
+    },
+    noResults: {
+      color: c.text,
+      textAlign: 'center',
+      marginTop: 20,
+    },
+  });
 

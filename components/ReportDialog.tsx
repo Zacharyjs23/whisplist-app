@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, View, TextInput, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 
 interface ReportDialogProps {
   visible: boolean;
@@ -9,6 +11,9 @@ interface ReportDialogProps {
 
 export default function ReportDialog({ visible, onClose, onSubmit }: ReportDialogProps) {
   const [reason, setReason] = useState('');
+  const theme = useColorScheme();
+  const c = Colors[theme];
+  const styles = React.useMemo(() => createStyles(c), [c]);
 
   const handleSubmit = () => {
     onSubmit(reason.trim());
@@ -40,41 +45,42 @@ export default function ReportDialog({ visible, onClose, onSubmit }: ReportDialo
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  box: {
-    width: '80%',
-    backgroundColor: '#1e1e1e',
-    padding: 20,
-    borderRadius: 12,
-  },
-  input: {
-    backgroundColor: '#000',
-    color: '#fff',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  buttons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  button: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#8b5cf6',
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  cancel: {
-    backgroundColor: '#555',
-  },
-  buttonText: {
-    color: '#fff',
-  },
-});
+const createStyles = (c: (typeof Colors)['light']) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    box: {
+      width: '80%',
+      backgroundColor: c.background,
+      padding: 20,
+      borderRadius: 12,
+    },
+    input: {
+      backgroundColor: c.input,
+      color: c.text,
+      padding: 10,
+      borderRadius: 8,
+      marginBottom: 12,
+    },
+    buttons: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+    },
+    button: {
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      backgroundColor: c.tint,
+      borderRadius: 8,
+      marginLeft: 8,
+    },
+    cancel: {
+      backgroundColor: c.input,
+    },
+    buttonText: {
+      color: c.text,
+    },
+  });
