@@ -1,4 +1,5 @@
 import { ThemedText } from '@/components/ThemedText';
+import ThemedButton from '@/components/ThemedButton';
 import { useTheme, ThemeName } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,13 +11,13 @@ import {
   Platform,
   View,
   Alert,
-  Button,
   Image,
   Linking,
   Share,
   StyleSheet,
   Switch,
   TextInput,
+  SafeAreaView,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import * as Audio from 'expo-audio';
@@ -177,17 +178,18 @@ export default function Page() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[
-          styles.container,
-          { backgroundColor: theme.background },
-        ]}
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={[
+            styles.container,
+            { backgroundColor: theme.background },
+          ]}
+        >
         <ThemedText style={styles.title}>Settings</ThemedText>
       <ThemedText style={styles.section}>Theme</ThemedText>
       <ThemedText accessibilityRole="text">Current Theme: {theme.name}</ThemedText>
@@ -235,7 +237,7 @@ export default function Page() {
         <Switch value={publicProfileEnabled} onValueChange={togglePublicProfile} />
       </View>
 
-      <Button title="Pick Avatar" onPress={pickAvatar} />
+      <ThemedButton title="Pick Avatar" onPress={pickAvatar} />
       {avatarUrl && <Image source={{ uri: avatarUrl }} style={styles.avatar} />}
 
       <ThemedText style={styles.section}>Default Category</ThemedText>
@@ -273,25 +275,33 @@ export default function Page() {
       </Picker>
 
       <TextInput
-        style={[styles.input, { backgroundColor: theme.input, color: theme.text }]}
+        style={[
+          styles.input,
+          { backgroundColor: theme.input, color: theme.text, height: 80, textAlignVertical: 'top' },
+        ]}
         placeholder="Send feedback"
         placeholderTextColor="#888"
         value={feedback}
         onChangeText={setFeedback}
+        multiline
       />
-      <Button title="Submit Feedback" onPress={handleSendFeedback} />
+      <ThemedButton title="Submit Feedback" onPress={handleSendFeedback} />
 
-      <Button title="Export History" onPress={handleExport} />
-      <Button title="Rate this App" onPress={() => Linking.openURL('https://example.com')} />
-      <Button title="Permissions" onPress={permissionsInfo} />
-      <Button title="Delete My Content" onPress={handleDeleteContent} />
-      <Button title="Reset App Data" onPress={handleReset} />
-      </ScrollView>
-    </KeyboardAvoidingView>
+      <ThemedButton title="Export History" onPress={handleExport} />
+      <ThemedButton title="Rate this App" onPress={() => Linking.openURL('https://example.com')} />
+      <ThemedButton title="Permissions" onPress={permissionsInfo} />
+      <ThemedButton title="Delete My Content" onPress={handleDeleteContent} />
+      <ThemedButton title="Reset App Data" onPress={handleReset} />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     padding: 20,
