@@ -15,7 +15,7 @@ import {
 } from '../../helpers/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
-import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   ActivityIndicator,
