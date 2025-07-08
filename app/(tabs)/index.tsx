@@ -15,6 +15,7 @@ import {
   followUser,
   unfollowUser,
 } from '../../helpers/firestore';
+import { formatTimeLeft } from '../../helpers/time';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
 import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, doc, getDoc } from 'firebase/firestore';
@@ -564,8 +565,26 @@ useEffect(() => {
               <Text style={styles.noResults}>No matching wishes 💭</Text>
             )
           }
-          renderItem={({ item }) => (
-            <View style={[styles.wishItem, { backgroundColor: typeInfo[item.type || 'wish'].color }]}>
+          renderItem={({ item }) => {
+            const isBoosted =
+              item.boostedUntil &&
+              item.boostedUntil.toDate &&
+              item.boostedUntil.toDate() > new Date();
+            const timeLeft = isBoosted
+              ? formatTimeLeft(item.boostedUntil.toDate())
+              : '';
+
+            return (
+            <View
+              style={[
+                styles.wishItem,
+                {
+                  backgroundColor: typeInfo[item.type || 'wish'].color,
+                  borderColor: isBoosted ? '#facc15' : 'transparent',
+                  borderWidth: isBoosted ? 2 : 0,
+                },
+              ]}
+            >
               <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)} hitSlop={HIT_SLOP}>
                 {!item.isAnonymous &&
                   item.displayName &&
@@ -592,9 +611,10 @@ useEffect(() => {
                 ) : (
                   <Text style={styles.likeText}>❤️ {item.likes}</Text>
                 )}
-                {item.boostedUntil && item.boostedUntil.toDate &&
-                  item.boostedUntil.toDate() > new Date() && (
-                    <Text style={styles.boostedLabel}>🚀 Boosted</Text>
+                {isBoosted && (
+                    <Text style={styles.boostedLabel}>
+                      🚀 Boosted{timeLeft ? ` (${timeLeft})` : ''}
+                    </Text>
                   )}
               </TouchableOpacity>
 
@@ -634,7 +654,8 @@ useEffect(() => {
                 <Text style={{ color: '#f87171' }}>Report</Text>
               </TouchableOpacity>
             </View>
-          )}
+          );
+        }}
         />
         <ReportDialog
           visible={reportVisible}

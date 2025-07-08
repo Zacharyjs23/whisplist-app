@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { listenBoostedWishes } from '../../helpers/firestore';
+import { formatTimeLeft } from '../../helpers/time';
 import ReportDialog from '../../components/ReportDialog';
 import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -109,6 +110,7 @@ export default function Page() {
 
   const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
+    const [timeLeft, setTimeLeft] = useState('');
 
     useEffect(() => {
       Animated.timing(fadeAnim, {
@@ -118,6 +120,19 @@ export default function Page() {
       }).start();
     }, [fadeAnim]);
 
+    useEffect(() => {
+      if (item.boostedUntil && item.boostedUntil.toDate) {
+        const update = () => {
+          setTimeLeft(formatTimeLeft(item.boostedUntil.toDate()));
+        };
+        update();
+        const id = setInterval(update, 60000);
+        return () => clearInterval(id);
+      } else {
+        setTimeLeft('');
+      }
+    }, [item.boostedUntil]);
+
     return (
       <Animated.View
         style={[
@@ -125,6 +140,8 @@ export default function Page() {
           {
             opacity: fadeAnim,
             backgroundColor: typeInfo[item.type || 'wish'].color,
+            borderColor: item.boostedUntil ? '#facc15' : 'transparent',
+            borderWidth: item.boostedUntil ? 2 : 0,
           },
         ]}
       >
@@ -161,7 +178,9 @@ export default function Page() {
             <Text style={[styles.likes, { color: theme.tint }]}>❤️ {item.likes}</Text>
           )}
           {item.boostedUntil && item.boostedUntil.toDate && (
-            <Text style={styles.boostedLabel}>🚀 Boosted</Text>
+            <Text style={styles.boostedLabel}>
+              🚀 Boosted{timeLeft ? ` (${timeLeft})` : ''}
+            </Text>
           )}
         </TouchableOpacity>
         <TouchableOpacity
