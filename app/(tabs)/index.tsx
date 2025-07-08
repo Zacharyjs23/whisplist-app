@@ -587,12 +587,14 @@ useEffect(() => {
                     if (!user?.uid) return;
                     if (!item.userId) return;
 
-                    if (followStatus[item.userId]) {
-                      await unfollowUser(user.uid, item.userId);
-                      setFollowStatus((prev) => ({ ...prev, [item.userId]: false }));
+                    const targetId = item.userId;
+
+                    if (followStatus[targetId]) {
+                      await unfollowUser(user.uid, targetId);
+                      setFollowStatus((prev) => ({ ...prev, [targetId]: false }));
                     } else {
-                      await followUser(user.uid, item.userId);
-                      setFollowStatus((prev) => ({ ...prev, [item.userId]: true }));
+                      await followUser(user.uid, targetId);
+                      setFollowStatus((prev) => ({ ...prev, [targetId]: true }));
                     }
                   }}
                   style={{ marginTop: 4 }}
