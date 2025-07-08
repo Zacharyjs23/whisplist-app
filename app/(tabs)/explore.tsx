@@ -23,7 +23,7 @@ import {
   listenWishes,
   getFollowingIds,
 } from '../../helpers/firestore';
-import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
