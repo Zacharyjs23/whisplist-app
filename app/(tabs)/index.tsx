@@ -45,6 +45,12 @@ const typeInfo: Record<string, { emoji: string; color: string }> = {
   dream: { emoji: '🌙', color: '#312e81' },
 };
 
+const prompts = [
+  "What’s your biggest wish this week?",
+  'Describe a dream you had recently',
+  'What advice do you wish you had today?',
+];
+
 export default function Page() {
   const [wish, setWish] = useState('');
   const [category, setCategory] = useState('general');
@@ -67,6 +73,7 @@ export default function Page() {
   const [posting, setPosting] = useState(false);
   const [useProfilePost, setUseProfilePost] = useState(true);
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
+  const [streakCount, setStreakCount] = useState(0);
   const { user, profile } = useAuth();
 
   const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
@@ -121,6 +128,22 @@ useEffect(() => {
     }
   };
   showWelcome();
+}, []);
+
+useEffect(() => {
+  const checkPromptAndStreak = async () => {
+    const today = new Date().toISOString().split('T')[0];
+    const lastPrompt = await AsyncStorage.getItem('lastPromptDate');
+    const lastPosted = await AsyncStorage.getItem('lastPostedDate');
+    if (lastPrompt !== today && lastPosted !== today) {
+      const prompt = prompts[Math.floor(Math.random() * prompts.length)];
+      Alert.alert('Daily Prompt', prompt);
+      await AsyncStorage.setItem('lastPromptDate', today);
+    }
+    const streak = await AsyncStorage.getItem('streakCount');
+    if (streak) setStreakCount(parseInt(streak, 10));
+  };
+  checkPromptAndStreak();
 }, []);
 
   const startRecording = async () => {
@@ -179,6 +202,23 @@ useEffect(() => {
     }
   };
 
+  const updateStreak = async () => {
+    const today = new Date().toISOString().split('T')[0];
+    const lastDate = await AsyncStorage.getItem('lastPostedDate');
+    let streak = parseInt((await AsyncStorage.getItem('streakCount')) || '0', 10);
+    if (lastDate === today) return;
+    if (lastDate) {
+      const diff =
+        (new Date(today).getTime() - new Date(lastDate).getTime()) / 86400000;
+      streak = diff === 1 ? streak + 1 : 1;
+    } else {
+      streak = 1;
+    }
+    await AsyncStorage.setItem('lastPostedDate', today);
+    await AsyncStorage.setItem('streakCount', streak.toString());
+    setStreakCount(streak);
+  };
+
   const handlePostWish = async () => {
     if (wish.trim() === '') return;
 
@@ -231,6 +271,7 @@ useEffect(() => {
       setGiftLink('');
       setPostType('wish');
       Alert.alert('Wish posted!');
+      await updateStreak();
     } catch (error) {
       console.error('❌ Failed to post wish:', error);
     } finally {
@@ -292,6 +333,11 @@ useEffect(() => {
       >
         <Text style={styles.title}>WhispList ✨</Text>
         <Text style={styles.subtitle}>Post a wish and see what dreams grow 🌱</Text>
+        {streakCount > 0 && (
+          <Text style={styles.streak}>
+            🔥 You’ve posted {streakCount} days in a row!
+          </Text>
+        )}
 
         <Text style={styles.label}>Search</Text>
         <TextInput
@@ -527,6 +573,11 @@ const styles = StyleSheet.create({
     color: '#ccc',
     textAlign: 'center',
     marginBottom: 20,
+  },
+  streak: {
+    color: '#facc15',
+    textAlign: 'center',
+    marginBottom: 10,
   },
   label: {
     color: '#ccc',
