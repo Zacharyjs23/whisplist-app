@@ -32,6 +32,19 @@ export function listenWishes(cb: (wishes: Wish[]) => void) {
   });
 }
 
+export function listenBoostedWishes(cb: (wishes: Wish[]) => void) {
+  const now = new Date();
+  const q = query(
+    collection(db, 'wishes'),
+    where('boostedUntil', '>', now),
+    orderBy('boostedUntil', 'desc')
+  );
+  return onSnapshot(q, snap => {
+    const data = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Wish,'id'>) }));
+    cb(data as Wish[]);
+  });
+}
+
 export async function addWish(data: Omit<Wish, 'id'>) {
   return addDoc(collection(db, 'wishes'), {
     likes: 0,
