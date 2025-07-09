@@ -12,13 +12,13 @@ import {
   View,
   Alert,
   Image,
-  Linking,
   Share,
   StyleSheet,
   Switch,
   TextInput,
   SafeAreaView,
 } from 'react-native';
+import * as Linking from 'expo-linking';
 import { Picker } from '@react-native-picker/picker';
 import * as Audio from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
