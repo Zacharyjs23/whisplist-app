@@ -53,7 +53,13 @@ export default function Page() {
 
   useEffect(() => {
     const fetchStatus = async () => {
-      const ids = Array.from(new Set(wishes.map((w) => w.userId).filter(Boolean)));
+      const ids = Array.from(
+        new Set(
+          wishes
+            .map((w) => w.userId)
+            .filter((id): id is string => typeof id === 'string' && id.length > 0)
+        )
+      );
       await Promise.all(
         ids.map(async (id) => {
           if (publicStatus[id] === undefined) {
@@ -118,7 +124,7 @@ const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
         {
           opacity: fadeAnim,
           backgroundColor:
-            typeInfo[item.type || 'wish'].color,
+            typeInfo[(item.type ?? 'wish') as string].color,
         },
       ]}
     >
@@ -140,7 +146,7 @@ const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
         <Text
           style={[styles.wishCategory, { color: theme.tint }]}
         >
-          {typeInfo[item.type || 'wish'].emoji} #{item.category}
+          {typeInfo[(item.type ?? 'wish') as string].emoji} #{item.category}
         </Text>
         <Text style={[styles.wishText, { color: theme.text }]}>
           {item.text}
