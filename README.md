@@ -83,3 +83,17 @@ If your editor reports missing modules such as `react-native` or `expo-router`, 
 2. Open the project root (`whisplist-app`) in your IDE so it picks up `tsconfig.json`.
 3. The alias `@/` points to the repository root. Your editor should respect this alias after reading `tsconfig.json`.
 
+## Troubleshooting iOS build errors
+
+If `expo run:ios` fails with errors like `Redefinition of module 'ReactCommon'` or
+`Could not build module 'DarwinFoundation'`, clean the pods and reinstall them
+before trying again:
+
+```bash
+./scripts/clean-ios-pods.sh
+npx expo run:ios
+```
+
+The script removes the `Pods` directory, clears Xcode's derived data, and runs
+`pod install --repo-update` so the iOS project builds from a clean state.
+
