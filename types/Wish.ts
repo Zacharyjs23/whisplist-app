@@ -15,6 +15,10 @@ export interface Wish {
   audioUrl?: string;
   imageUrl?: string;
   giftLink?: string;
+  /**
+   * Link provided by a user after fulfilling the wish
+   */
+  fulfillmentLink?: string;
   isPoll?: boolean;
   optionA?: string;
   optionB?: string;

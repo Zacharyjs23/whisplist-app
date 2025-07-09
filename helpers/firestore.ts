@@ -143,6 +143,11 @@ export async function boostWish(id: string, hours: number) {
   return updateDoc(ref, { boostedUntil });
 }
 
+export async function setFulfillmentLink(id: string, link: string) {
+  const ref = doc(db, 'wishes', id);
+  return updateDoc(ref, { fulfillmentLink: link });
+}
+
 export async function getWish(id: string): Promise<Wish | null> {
   const snap = await getDoc(doc(db, 'wishes', id));
   return snap.exists() ? ({ id: snap.id, ...(snap.data() as Omit<Wish,'id'>) } as Wish) : null;
@@ -206,6 +211,7 @@ export async function getWishesByNickname(nickname: string): Promise<Wish[]> {
       audioUrl: data.audioUrl,
       imageUrl: data.imageUrl,
       giftLink: data.giftLink,
+      fulfillmentLink: data.fulfillmentLink,
       isPoll: data.isPoll,
       optionA: data.optionA,
       optionB: data.optionB,
@@ -241,6 +247,7 @@ export async function getAllWishes(): Promise<Wish[]> {
       audioUrl: data.audioUrl,
       imageUrl: data.imageUrl,
       giftLink: data.giftLink,
+      fulfillmentLink: data.fulfillmentLink,
       isPoll: data.isPoll,
       optionA: data.optionA,
       optionB: data.optionB,
