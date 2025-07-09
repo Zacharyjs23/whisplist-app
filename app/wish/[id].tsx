@@ -44,10 +44,10 @@ import {
   View,
   Dimensions,
   Alert,
-  Linking,
   RefreshControl,
   ScrollView,
 } from 'react-native';
+import * as Linking from 'expo-linking';
 import { useTheme } from '@/contexts/ThemeContext';
 import { BarChart } from 'react-native-chart-kit';
 import ReportDialog from '../../components/ReportDialog';

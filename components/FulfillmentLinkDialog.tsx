@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Modal, View, TextInput, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
-import { isValidHttpsUrl, normalizeLink } from '@/helpers/url';
+import { normalizeAndValidateUrl } from '@/helpers/url';
 import { trackEvent } from '@/helpers/analytics';
 
 interface FulfillmentLinkDialogProps {
@@ -25,8 +25,8 @@ export default function FulfillmentLinkDialog({ visible, onClose, onSubmit, exis
   }, [visible, existingLink]);
 
   const handleSubmit = () => {
-    const cleaned = normalizeLink(link);
-    if (!isValidHttpsUrl(cleaned)) {
+    const cleaned = normalizeAndValidateUrl(link);
+    if (!cleaned) {
       setError('Please enter a valid HTTPS link');
       return;
     }
