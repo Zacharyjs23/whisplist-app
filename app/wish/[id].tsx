@@ -55,6 +55,7 @@ import FulfillmentLinkDialog from '../../components/FulfillmentLinkDialog';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
+import { trackEvent } from '@/helpers/analytics';
 
 const typeInfo: Record<string, { emoji: string; color: string }> = {
   wish: { emoji: '💭', color: '#1e1e1e' },
@@ -461,6 +462,11 @@ try {
           {typeInfo[wish.type || 'wish'].emoji} #{wish.category}
         </Text>
         <Text style={[styles.wishText, { color: theme.text }]}>{wish.text}</Text>
+        {wish.fulfillmentLink && (
+          <Text style={{ color: '#34d399', marginTop: 4 }}>
+            💝 Fulfilled
+          </Text>
+        )}
         {wish.imageUrl && (
           <Image source={{ uri: wish.imageUrl }} style={styles.preview} />
         )}
@@ -633,7 +639,10 @@ try {
 
         {wish?.fulfillmentLink ? (
           <TouchableOpacity
-            onPress={() => Linking.openURL(wish.fulfillmentLink!)}
+            onPress={() => {
+              trackEvent('open_fulfillment_link');
+              Linking.openURL(wish.fulfillmentLink!);
+            }}
             style={{ marginTop: 8 }}
           >
             <Text style={{ color: '#34d399' }}>View Fulfillment Link</Text>
