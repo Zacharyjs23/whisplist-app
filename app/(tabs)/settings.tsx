@@ -197,7 +197,9 @@ export default function Page() {
         {themeOptions.map((t) => (
           <TouchableOpacity
             key={t}
-            onPress={() => setTheme(t)}
+            onPress={() => {
+              setTheme(t);
+            }}
             style={[
               styles.themeItem,
               {
