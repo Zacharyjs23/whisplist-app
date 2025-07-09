@@ -39,6 +39,29 @@ export default function Page() {
 
   const themeOptions = Object.keys(Colors) as ThemeName[];
 
+  const ThemeSwatch = ({ name }: { name: ThemeName }) => {
+    const active = theme.name === name;
+    return (
+      <TouchableOpacity
+        key={name}
+        onPress={() => setTheme(name)}
+        style={[
+          styles.themeItem,
+          {
+            backgroundColor: Colors[name].background,
+            borderColor: active ? theme.tint : 'transparent',
+          },
+        ]}
+      >
+        <View style={[styles.swatch, { backgroundColor: Colors[name].tint }]} />
+        <ThemedText style={active ? { color: theme.tint } : undefined}>
+          {name}
+          {active ? ' ✓' : ''}
+        </ThemedText>
+      </TouchableOpacity>
+    );
+  };
+
   interface User {
     id: string;
     nickname: string;
@@ -192,30 +215,9 @@ export default function Page() {
         >
         <ThemedText style={styles.title}>Settings</ThemedText>
       <ThemedText style={styles.section}>Theme</ThemedText>
-      <ThemedText accessibilityRole="text">Current Theme: {theme.name}</ThemedText>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.themeList}>
         {themeOptions.map((t) => (
-          <TouchableOpacity
-            key={t}
-            onPress={() => {
-              setTheme(t);
-            }}
-            style={[
-              styles.themeItem,
-              {
-                backgroundColor: Colors[t as keyof typeof Colors].background,
-                borderColor: theme.name === t ? theme.tint : 'transparent',
-              },
-            ]}
-          >
-            <View
-              style={[styles.swatch, { backgroundColor: Colors[t as keyof typeof Colors].tint }]}
-            />
-            <ThemedText style={theme.name === t ? { color: theme.tint } : undefined}>
-              {t}
-              {theme.name === t ? ' ✓' : ''}
-            </ThemedText>
-          </TouchableOpacity>
+          <ThemeSwatch key={t} name={t} />
         ))}
       </ScrollView>
 
