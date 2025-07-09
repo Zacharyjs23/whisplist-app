@@ -220,6 +220,15 @@ export default function Page() {
           <ThemeSwatch key={t} name={t} />
         ))}
       </ScrollView>
+      <Picker
+        selectedValue={theme.name}
+        onValueChange={(value) => setTheme(value as ThemeName)}
+        style={[styles.picker, { backgroundColor: theme.input, color: theme.text }]}
+      >
+        {themeOptions.map((t) => (
+          <Picker.Item key={t} label={t} value={t} />
+        ))}
+      </Picker>
 
       <View style={styles.row}>
         <ThemedText style={styles.label}>Anonymize Username</ThemedText>
