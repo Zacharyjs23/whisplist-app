@@ -10,6 +10,7 @@ import {
   addComment,
   updateCommentReaction,
   boostWish,
+  setFulfillmentLink,
 } from '../../helpers/firestore';
 
 import {
@@ -50,6 +51,7 @@ import {
 import { useTheme } from '@/contexts/ThemeContext';
 import { BarChart } from 'react-native-chart-kit';
 import ReportDialog from '../../components/ReportDialog';
+import FulfillmentLinkDialog from '../../components/FulfillmentLinkDialog';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
@@ -91,7 +93,7 @@ export default function Page() {
   const [reportTarget, setReportTarget] = useState<{ type: 'wish' | 'comment'; id: string } | null>(null);
   const [reportVisible, setReportVisible] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
-  const [fulfillment, setFulfillment] = useState('');
+  const [fulfillmentVisible, setFulfillmentVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sound, setSound] = useState<AudioPlayer | null>(null);
@@ -308,19 +310,18 @@ try {
     [fetchWish, hasVoted, wish]
   );
 
-  const handleFulfillWish = useCallback(async () => {
-    if (!fulfillment.trim()) return;
-    try {
-      const fulfillRef = collection(db, 'wishes', id as string, 'fulfillments');
-      await addDoc(fulfillRef, {
-        text: fulfillment.trim(),
-        timestamp: serverTimestamp(),
-      });
-      setFulfillment('');
-    } catch (err) {
-      console.error('❌ Failed to fulfill wish:', err);
-    }
-  }, [fulfillment, id]);
+  const handleFulfillWish = useCallback(
+    async (link: string) => {
+      if (!link.trim()) return;
+      try {
+        await setFulfillmentLink(id as string, link.trim());
+        await fetchWish();
+      } catch (err) {
+        console.error('❌ Failed to fulfill wish:', err);
+      }
+    },
+    [fetchWish, id]
+  );
 
   const handleBoostWish = useCallback(async () => {
     if (!wish) return;
@@ -630,18 +631,31 @@ try {
           onSubmit={handleReport}
         />
 
-<Text style={styles.label}>Fulfillment</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Fulfillment text or link"
-          placeholderTextColor="#aaa"
-          value={fulfillment}
-          onChangeText={setFulfillment}
-        />
+        {wish?.fulfillmentLink ? (
+          <TouchableOpacity
+            onPress={() => Linking.openURL(wish.fulfillmentLink!)}
+            style={{ marginTop: 8 }}
+          >
+            <Text style={{ color: '#34d399' }}>View Fulfillment Link</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => setFulfillmentVisible(true)}
+            hitSlop={HIT_SLOP}
+          >
+            <Text style={styles.buttonText}>Fulfill this Wish</Text>
+          </TouchableOpacity>
+        )}
 
-        <TouchableOpacity style={styles.button} onPress={handleFulfillWish} hitSlop={HIT_SLOP}>
-          <Text style={styles.buttonText}>Fulfill Wish</Text>
-        </TouchableOpacity>
+        <FulfillmentLinkDialog
+          visible={fulfillmentVisible}
+          onClose={() => setFulfillmentVisible(false)}
+          onSubmit={(link) => {
+            setFulfillmentVisible(false);
+            handleFulfillWish(link);
+          }}
+        />
         </ScrollView>
 
       </KeyboardAvoidingView>
