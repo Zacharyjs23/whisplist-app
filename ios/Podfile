@@ -11,6 +11,11 @@ platform :ios, podfile_properties['ios.deploymentTarget'] || '15.1'
 install! 'cocoapods',
   :deterministic_uuids => false
 
+# Allow Swift pods without module maps to generate modular headers. This avoids
+# the "redefinition of module" build errors seen when integrating Firebase
+# dependencies.
+use_modular_headers!
+
 prepare_react_native_project!
 
 target 'WhispList' do
