@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Modal, View, TextInput, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
+import { isValidHttpsUrl, normalizeLink } from '@/helpers/url';
+import { trackEvent } from '@/helpers/analytics';
 
 interface FulfillmentLinkDialogProps {
   visible: boolean;
@@ -12,6 +14,7 @@ interface FulfillmentLinkDialogProps {
 
 export default function FulfillmentLinkDialog({ visible, onClose, onSubmit, existingLink }: FulfillmentLinkDialogProps) {
   const [link, setLink] = useState('');
+  const [error, setError] = useState('');
   const { theme } = useTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
 
@@ -22,7 +25,14 @@ export default function FulfillmentLinkDialog({ visible, onClose, onSubmit, exis
   }, [visible, existingLink]);
 
   const handleSubmit = () => {
-    onSubmit(link.trim());
+    const cleaned = normalizeLink(link);
+    if (!isValidHttpsUrl(cleaned)) {
+      setError('Please enter a valid HTTPS link');
+      return;
+    }
+    setError('');
+    trackEvent('set_fulfillment_link');
+    onSubmit(cleaned);
     setLink('');
   };
 
@@ -34,10 +44,11 @@ export default function FulfillmentLinkDialog({ visible, onClose, onSubmit, exis
             style={styles.input}
             placeholder="Paste fulfillment link"
             placeholderTextColor="#888"
-            value={link}
-            onChangeText={setLink}
-          />
-          <View style={styles.buttons}>
+          value={link}
+          onChangeText={setLink}
+        />
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <View style={styles.buttons}>
             <TouchableOpacity onPress={onClose} style={[styles.button, styles.cancel]} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Text style={styles.buttonText}>Cancel</Text>
             </TouchableOpacity>
@@ -88,5 +99,9 @@ const createStyles = (c: (typeof Colors)['light']) =>
     },
     buttonText: {
       color: c.text,
+    },
+    error: {
+      color: '#f87171',
+      marginBottom: 8,
     },
   });
