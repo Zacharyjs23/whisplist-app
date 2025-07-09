@@ -74,3 +74,12 @@ A Firebase Cloud Function in `functions/index.js` listens for Firestore
 updates and sends a notification whenever a wish gets a new like, comment,
 or a reply to a comment. Each user's Expo push token is stored in their
 profile document so the appropriate user receives the message automatically.
+
+## Troubleshooting TypeScript errors
+
+If your editor reports missing modules such as `react-native` or `expo-router`, ensure you:
+
+1. Run `npm install` to install all dependencies.
+2. Open the project root (`whisplist-app`) in your IDE so it picks up `tsconfig.json`.
+3. The alias `@/` points to the repository root. Your editor should respect this alias after reading `tsconfig.json`.
+
