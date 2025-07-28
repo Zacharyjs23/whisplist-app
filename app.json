@@ -47,9 +47,6 @@
       "typedRoutes": true
     },
     "extra": {
-      "eas": {
-        "projectId": "whisplist-f6b0d"
-      },
       "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyDVBdi1qJOtOPX6-jGOZgj8uwh9tM7uomc",
       "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "whisplist-f6b0d.firebaseapp.com",
       "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "whisplist-f6b0d",
