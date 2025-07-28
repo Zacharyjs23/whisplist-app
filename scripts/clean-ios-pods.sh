@@ -11,7 +11,9 @@ rm -rf ios/Pods ios/Podfile.lock ios/build
 rm -rf ~/Library/Developer/Xcode/DerivedData
 
 # 3. Delete duplicate React-jsitooling.modulemap files that can cause build failures
-find ios/Pods -name "React-jsitooling.modulemap" -type f -delete
+if [ -d ios/Pods ]; then
+  find ios/Pods -name "React-jsitooling.modulemap" -type f -delete
+fi
 
 # 4. Reinstall pods with repository update to ensure dependencies are fresh
 cd ios
