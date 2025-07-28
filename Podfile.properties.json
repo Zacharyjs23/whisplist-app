@@ -1,5 +1,5 @@
 {
-  "jsEngine": "jsc",
+  "expo.jsEngine": "jsc",
   "EX_DEV_CLIENT_NETWORK_INSPECTOR": "true",
   "newArchEnabled": "false"
 }
