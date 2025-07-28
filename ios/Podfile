@@ -55,6 +55,16 @@ target 'WhispList' do
       :ccache_enabled => podfile_properties['apple.ccacheEnabled'] == 'true',
     )
 
+    # Disable module generation for pods that conflict with React runtime
+    %w[React-RuntimeApple React-RCTRuntime React-jsc Fabric].each do |pod_name|
+      target = installer.pods_project.targets.find { |t| t.name == pod_name }
+      next unless target
+
+      target.build_configurations.each do |config|
+        config.build_settings['DEFINES_MODULE'] = 'NO'
+      end
+    end
+
     # This is necessary for Xcode 14, because it signs resource bundles by default
     # when building for devices.
     installer.target_installation_results.pod_target_installation_results
