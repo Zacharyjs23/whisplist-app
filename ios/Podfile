@@ -1,5 +1,5 @@
 require 'json'
-podfile_properties = JSON.parse(File.read(File.join(__dir__, 'Podfile.properties.json'))) rescue {}
+podfile_properties = JSON.parse(File.read(File.join(__dir__, '..', 'Podfile.properties.json'))) rescue {}
 
 # Ensure the New Architecture is completely disabled
 ENV['RCT_NEW_ARCH_ENABLED'] = '0' if podfile_properties['newArchEnabled'] == 'false'
