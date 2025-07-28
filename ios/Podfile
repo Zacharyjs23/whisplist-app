@@ -65,6 +65,18 @@ target 'WhispList' do
       end
     end
 
+    # Ensure no pod targets still define modules which can cause
+    # "redefinition of module" errors. Any target that still has
+    # DEFINES_MODULE = YES will be logged and set to NO.
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        next unless config.build_settings['DEFINES_MODULE'] == 'YES'
+
+        Pod::UI.puts "[debug] Disabling DEFINES_MODULE for #{target.name}"
+        config.build_settings['DEFINES_MODULE'] = 'NO'
+      end
+    end
+
     # This is necessary for Xcode 14, because it signs resource bundles by default
     # when building for devices.
     installer.target_installation_results.pod_target_installation_results
