@@ -1,6 +1,10 @@
 import { Platform } from 'react-native';
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import {
+  getAuth,
+  initializeAuth,
+  getReactNativePersistence,
+} from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
@@ -32,7 +36,6 @@ if (Platform.OS === 'web') {
 } else {
   // ✅ Use AsyncStorage for persistent login on native
   const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-  const { getReactNativePersistence, initializeAuth } = require('firebase/auth/react-native');
   auth = initializeAuth(app, {
     persistence: getReactNativePersistence(AsyncStorage),
   });
