@@ -1,8 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { initializeApp } from 'firebase/app';
 import {
+  getAuth,
   getReactNativePersistence,
-  initializeAuth
+  initializeAuth,
 } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
@@ -19,10 +21,15 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// ✅ Use AsyncStorage for persistent login
-const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage),
-});
+let auth;
+if (Platform.OS === 'web') {
+  auth = getAuth(app);
+} else {
+  // ✅ Use AsyncStorage for persistent login on native
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage),
+  });
+}
 
 const db = getFirestore(app);
 const storage = getStorage(app);
