@@ -10,6 +10,10 @@ function LayoutInner() {
   const router = useRouter();
   const pathname = usePathname();
 
+  if (loading === undefined) {
+    console.error('AuthContext loading value undefined');
+  }
+
   useEffect(() => {
     const check = async () => {
       const seen = await AsyncStorage.getItem('hasSeenOnboarding');
@@ -25,13 +29,18 @@ function LayoutInner() {
 }
 
 export default function Layout() {
-  return (
-    <AuthProvider>
-      <ThemeProvider>
-        <AppContainer>
-          <LayoutInner />
-        </AppContainer>
-      </ThemeProvider>
-    </AuthProvider>
-  );
+  try {
+    return (
+      <AuthProvider>
+        <ThemeProvider>
+          <AppContainer>
+            <LayoutInner />
+          </AppContainer>
+        </ThemeProvider>
+      </AuthProvider>
+    );
+  } catch (err) {
+    console.error('Error rendering root layout', err);
+    return null;
+  }
 }

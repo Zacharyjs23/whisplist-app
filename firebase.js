@@ -19,7 +19,16 @@ const firebaseConfig = {
   measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-const app = initializeApp(firebaseConfig);
+if (!firebaseConfig.apiKey) {
+  console.error('Firebase config appears to be missing. Check environment variables.');
+}
+
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+} catch (err) {
+  console.error('Failed to initialize Firebase app', err);
+}
 
 let auth;
 if (Platform.OS === 'web') {
@@ -29,6 +38,10 @@ if (Platform.OS === 'web') {
   auth = initializeAuth(app, {
     persistence: getReactNativePersistence(AsyncStorage),
   });
+}
+
+if (!auth) {
+  console.error('Firebase auth not initialized');
 }
 
 const db = getFirestore(app);

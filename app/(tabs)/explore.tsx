@@ -42,6 +42,13 @@ export default function Page() {
   const router = useRouter();
   const { user } = useAuth();
   const { theme } = useTheme();
+
+  if (!db) {
+    console.error('Firebase database undefined in explore page');
+  }
+  if (user === undefined) {
+    console.error('AuthContext returned undefined user');
+  }
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [filteredWishes, setFilteredWishes] = useState<Wish[]>([]);
   const [topWishes, setTopWishes] = useState<Wish[]>([]);
@@ -54,10 +61,15 @@ export default function Page() {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = listenTrendingWishes((data) => {
-      setTopWishes(data.slice(0, 3));
-    });
-    return unsubscribe;
+    try {
+      const unsubscribe = listenTrendingWishes((data) => {
+        setTopWishes(data.slice(0, 3));
+      });
+      return unsubscribe;
+    } catch (err) {
+      console.error('Failed to listen for trending wishes', err);
+      return () => {};
+    }
   }, []);
 
   const fetchWishes = useCallback(() => {
@@ -230,8 +242,9 @@ export default function Page() {
     </View>
   );
 
-  return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+  try {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar barStyle="light-content" backgroundColor={theme.background} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -336,8 +349,12 @@ export default function Page() {
           onSubmit={handleReport}
         />
       </KeyboardAvoidingView>
-    </SafeAreaView>
-  );
+      </SafeAreaView>
+    );
+  } catch (err) {
+    console.error('Error rendering explore page', err);
+    return null;
+  }
 }
 
 const styles = StyleSheet.create({

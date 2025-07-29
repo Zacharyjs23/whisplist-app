@@ -26,6 +26,10 @@ import * as ImagePicker from 'expo-image-picker';
 
 WebBrowser.maybeCompleteAuthSession();
 
+if (!auth || !db || !storage) {
+  console.error('Firebase modules are undefined in AuthContext');
+}
+
 interface Profile {
   displayName: string | null;
   email: string | null;
@@ -133,61 +137,92 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
   }, [user, loading]);
 
   const signUp = async (email: string, password: string) => {
-    await createUserWithEmailAndPassword(auth, email, password);
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      console.error('Failed to sign up', err);
+      throw err;
+    }
   };
 
   const signIn = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      console.error('Failed to sign in', err);
+      throw err;
+    }
   };
 
   const signInAnonymouslyFn = async () => {
-    await signInAnonymously(auth);
+    try {
+      await signInAnonymously(auth);
+    } catch (err) {
+      console.error('Failed to sign in anonymously', err);
+    }
   };
 
   const signInWithGoogle = async () => {
-    const res = await promptAsync();
-    if (res?.type === 'success' && res.authentication?.idToken) {
-      const credential = GoogleAuthProvider.credential(res.authentication.idToken);
-      await signInWithCredential(auth, credential);
+    try {
+      const res = await promptAsync();
+      if (res?.type === 'success' && res.authentication?.idToken) {
+        const credential = GoogleAuthProvider.credential(res.authentication.idToken);
+        await signInWithCredential(auth, credential);
+      }
+    } catch (err) {
+      console.error('Failed to sign in with Google', err);
     }
   };
 
   const signOut = async () => {
-    await fbSignOut(auth);
+    try {
+      await fbSignOut(auth);
+    } catch (err) {
+      console.error('Failed to sign out', err);
+    }
   };
 
   const updateProfileInfo = async (data: Partial<Profile>) => {
-    if (!user) return;
-    const ref = doc(db, 'users', user.uid);
-    await updateDoc(ref, data);
-    if (data.displayName || data.photoURL) {
-      await fbUpdateProfile(user, {
-        displayName: data.displayName ?? user.displayName ?? undefined,
-        photoURL: data.photoURL ?? user.photoURL ?? undefined,
-      });
+    try {
+      if (!user) return;
+      const ref = doc(db, 'users', user.uid);
+      await updateDoc(ref, data);
+      if (data.displayName || data.photoURL) {
+        await fbUpdateProfile(user, {
+          displayName: data.displayName ?? user.displayName ?? undefined,
+          photoURL: data.photoURL ?? user.photoURL ?? undefined,
+        });
+      }
+      const snap = await getDoc(ref);
+      const newData = snap.data() as Profile;
+      if (newData.publicProfileEnabled === undefined) newData.publicProfileEnabled = true;
+      setProfile(newData);
+    } catch (err) {
+      console.error('Failed to update profile', err);
     }
-    const snap = await getDoc(ref);
-    const newData = snap.data() as Profile;
-    if (newData.publicProfileEnabled === undefined) newData.publicProfileEnabled = true;
-    setProfile(newData);
   };
 
   const pickImage = async () => {
-    const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!granted) return;
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7 });
-    if (!result.canceled && result.assets.length > 0) {
-      const asset = result.assets[0];
-      if (!user) return;
-      const storageRef = ref(storage, `profiles/${user.uid}`);
-      const resp = await fetch(asset.uri);
-      const blob = await resp.blob();
-      await uploadBytes(storageRef, blob);
-      const url = await getDownloadURL(storageRef);
-      await updateProfileInfo({ photoURL: url });
-      return url;
+    try {
+      const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!granted) return;
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7 });
+      if (!result.canceled && result.assets.length > 0) {
+        const asset = result.assets[0];
+        if (!user) return;
+        const storageRef = ref(storage, `profiles/${user.uid}`);
+        const resp = await fetch(asset.uri);
+        const blob = await resp.blob();
+        await uploadBytes(storageRef, blob);
+        const url = await getDownloadURL(storageRef);
+        await updateProfileInfo({ photoURL: url });
+        return url;
+      }
+      return undefined;
+    } catch (err) {
+      console.error('Failed to pick image', err);
+      return undefined;
     }
-    return undefined;
   };
 
   return (
