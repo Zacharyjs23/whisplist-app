@@ -90,6 +90,13 @@ export default function Page() {
   const promptOpacity = useRef(new Animated.Value(0)).current;
   const { user, profile } = useAuth();
 
+  if (!db || !storage) {
+    console.error('Firebase modules undefined in index page', { db, storage });
+  }
+  if (user === undefined) {
+    console.error('AuthContext returned undefined user');
+  }
+
   const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 
 
@@ -111,17 +118,21 @@ useEffect(() => {
           .filter((id): id is string => typeof id === 'string' && id.length > 0)
       )
     );
-    await Promise.all(
-      ids.map(async (id) => {
-        if (publicStatus[id] === undefined) {
-          const snap = await getDoc(doc(db, 'users', id));
-          setPublicStatus((prev) => ({
-            ...prev,
-            [id]: snap.exists() ? snap.data().publicProfileEnabled !== false : false,
-          }));
-        }
-      })
-    );
+    try {
+      await Promise.all(
+        ids.map(async (id) => {
+          if (publicStatus[id] === undefined) {
+            const snap = await getDoc(doc(db, 'users', id));
+            setPublicStatus((prev) => ({
+              ...prev,
+              [id]: snap.exists() ? snap.data().publicProfileEnabled !== false : false,
+            }));
+          }
+        })
+      );
+    } catch (err) {
+      console.error('Failed to fetch public status', err);
+    }
   };
   fetchStatus();
 }, [wishList]);
@@ -136,27 +147,35 @@ useEffect(() => {
           .filter((id): id is string => typeof id === 'string' && id !== user.uid)
       )
     );
-    await Promise.all(
-      ids.map(async (id) => {
-        if (followStatus[id] === undefined) {
-          const snap = await getDoc(doc(db, 'users', user.uid, 'following', id));
-          setFollowStatus((prev) => ({ ...prev, [id]: snap.exists() }));
-        }
-      })
-    );
+    try {
+      await Promise.all(
+        ids.map(async (id) => {
+          if (followStatus[id] === undefined) {
+            const snap = await getDoc(doc(db, 'users', user.uid, 'following', id));
+            setFollowStatus((prev) => ({ ...prev, [id]: snap.exists() }));
+          }
+        })
+      );
+    } catch (err) {
+      console.error('Failed to fetch follow status', err);
+    }
   };
   fetchFollow();
 }, [wishList, user]);
 
 useEffect(() => {
   const showWelcome = async () => {
-    const seen = await AsyncStorage.getItem('seenWelcome');
-    if (!seen) {
-      Alert.alert(
-        'Welcome to WhispList',
-        'Share your wishes anonymously and tap a wish to read or comment.'
-      );
-      await AsyncStorage.setItem('seenWelcome', 'true');
+    try {
+      const seen = await AsyncStorage.getItem('seenWelcome');
+      if (!seen) {
+        Alert.alert(
+          'Welcome to WhispList',
+          'Share your wishes anonymously and tap a wish to read or comment.'
+        );
+        await AsyncStorage.setItem('seenWelcome', 'true');
+      }
+    } catch (err) {
+      console.error('Failed in showWelcome', err);
     }
   };
   showWelcome();
@@ -164,26 +183,30 @@ useEffect(() => {
 
 useEffect(() => {
   const loadPromptAndStreak = async () => {
-    const today = new Date().toISOString().split('T')[0];
-    const savedDate = await AsyncStorage.getItem('dailyPromptDate');
-    const savedPrompt = await AsyncStorage.getItem('dailyPromptText');
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const savedDate = await AsyncStorage.getItem('dailyPromptDate');
+      const savedPrompt = await AsyncStorage.getItem('dailyPromptText');
 
-    if (savedDate === today && savedPrompt) {
-      setDailyPrompt(savedPrompt);
-    } else {
-      const prompt = prompts[Math.floor(Math.random() * prompts.length)];
-      setDailyPrompt(prompt);
-      await AsyncStorage.setItem('dailyPromptDate', today);
-      await AsyncStorage.setItem('dailyPromptText', prompt);
+      if (savedDate === today && savedPrompt) {
+        setDailyPrompt(savedPrompt);
+      } else {
+        const prompt = prompts[Math.floor(Math.random() * prompts.length)];
+        setDailyPrompt(prompt);
+        await AsyncStorage.setItem('dailyPromptDate', today);
+        await AsyncStorage.setItem('dailyPromptText', prompt);
+      }
+      Animated.timing(promptOpacity, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
+
+      const streak = await AsyncStorage.getItem('streakCount');
+      if (streak) setStreakCount(parseInt(streak, 10));
+    } catch (err) {
+      console.error('Failed to load prompt or streak', err);
     }
-    Animated.timing(promptOpacity, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
-
-    const streak = await AsyncStorage.getItem('streakCount');
-    if (streak) setStreakCount(parseInt(streak, 10));
   };
 
   loadPromptAndStreak();
@@ -377,8 +400,9 @@ useEffect(() => {
       (filterType === 'all' || wish.type === filterType)
   );
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
+  try {
+    return (
+      <SafeAreaView style={styles.safeArea}>
       <RNStatusBar
         barStyle={theme.name === 'dark' ? 'light-content' : 'dark-content'}
         backgroundColor={theme.background}
@@ -666,8 +690,12 @@ useEffect(() => {
           onSubmit={handleReport}
         />
       </KeyboardAvoidingView>
-    </SafeAreaView>
-  );
+      </SafeAreaView>
+    );
+  } catch (err) {
+    console.error('Error rendering index page', err);
+    return null;
+  }
 }
 
 const createStyles = (c: (typeof Colors)['light'] & { name: string }) =>
