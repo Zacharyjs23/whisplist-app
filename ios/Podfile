@@ -13,10 +13,6 @@ platform :ios, podfile_properties['ios.deploymentTarget'] || '15.1'
 install! 'cocoapods',
   :deterministic_uuids => false
 
-# Allow Swift pods without module maps to generate modular headers. This avoids
-# the "redefinition of module" build errors seen when integrating Firebase
-# dependencies.
-use_modular_headers!
 
 prepare_react_native_project!
 
@@ -38,6 +34,12 @@ target 'WhispList' do
 
   config = use_native_modules!(config_command)
 
+  # FirebaseCoreInternal requires GoogleUtilities to expose a module map when
+  # built as a static library. Declaring it with :modular_headers prevents the
+  # "Could not build module 'DarwinFoundation'" error without enabling
+  # use_modular_headers! globally.
+  pod 'GoogleUtilities', :modular_headers => true
+
   use_frameworks! :linkage => podfile_properties['ios.useFrameworks'].to_sym if podfile_properties['ios.useFrameworks']
   use_frameworks! :linkage => ENV['USE_FRAMEWORKS'].to_sym if ENV['USE_FRAMEWORKS']
 
@@ -57,27 +59,6 @@ target 'WhispList' do
       :ccache_enabled => podfile_properties['apple.ccacheEnabled'] == 'true',
     )
 
-    # Disable module generation for pods that conflict with React runtime
-    %w[React-RuntimeApple React-RCTRuntime React-jsc Fabric].each do |pod_name|
-      target = installer.pods_project.targets.find { |t| t.name == pod_name }
-      next unless target
-
-      target.build_configurations.each do |config|
-        config.build_settings['DEFINES_MODULE'] = 'NO'
-      end
-    end
-
-    # Ensure no pod targets still define modules which can cause
-    # "redefinition of module" errors. Any target that still has
-    # DEFINES_MODULE = YES will be logged and set to NO.
-    installer.pods_project.targets.each do |target|
-      target.build_configurations.each do |config|
-        next unless config.build_settings['DEFINES_MODULE'] == 'YES'
-
-        Pod::UI.puts "[debug] Disabling DEFINES_MODULE for #{target.name}"
-        config.build_settings['DEFINES_MODULE'] = 'NO'
-      end
-    end
 
     # This is necessary for Xcode 14, because it signs resource bundles by default
     # when building for devices.
