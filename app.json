@@ -22,6 +22,7 @@
         "backgroundColor": "#0e0e0e"
       },
       "edgeToEdgeEnabled": true,
+      "compileSdkVersion": 34,
       "package": "com.anonymous.WhispList"
     },
     "web": {

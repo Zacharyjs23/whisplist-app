@@ -37,7 +37,7 @@ import {
 
 export default function Page() {
   const { theme, setTheme } = useTheme();
-  const { profile, updateProfile } = useAuth();
+  const { user, profile, updateProfile } = useAuth();
 
   const themeOptions = Object.keys(Colors) as ThemeName[];
 
@@ -64,12 +64,12 @@ export default function Page() {
     );
   };
 
-  interface User {
+  interface LocalUser {
     id: string;
     nickname: string;
   }
 
-  const [user, setUser] = useState<User | null>(null);
+  const [localUser, setLocalUser] = useState<LocalUser | null>(null);
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [defaultCategory, setDefaultCategory] = useState('general');
@@ -104,7 +104,8 @@ export default function Page() {
       setAnonymize(anon === 'true');
       setDevMode(dev === 'true');
       setDailyQuote(quote === 'true');
-      if (storedNickname) setUser({ id: 'local', nickname: storedNickname });
+        if (storedNickname)
+          setLocalUser({ id: 'local', nickname: storedNickname });
       setPublicProfileEnabled(profile?.publicProfileEnabled !== false);
       const prefs = await AsyncStorage.getItem('pushPrefs');
       if (prefs) setPushPrefs(JSON.parse(prefs));
@@ -137,13 +138,13 @@ export default function Page() {
   };
 
   const handleExport = async () => {
-    if (!user?.nickname) return Alert.alert('No nickname set');
-    const wishes = await getWishesByNickname(user.nickname);
+    if (!localUser?.nickname) return Alert.alert('No nickname set');
+    const wishes = await getWishesByNickname(localUser?.nickname);
     const comments: any[] = [];
     for (const w of wishes) {
       const list = await getWishComments(w.id);
       list.forEach((c) => {
-        if (c.nickname === user.nickname) comments.push(c);
+        if (c.nickname === localUser?.nickname) comments.push(c);
       });
     }
     const data = JSON.stringify({ wishes, comments }, null, 2);
@@ -161,7 +162,7 @@ export default function Page() {
   };
 
   const handleDeleteContent = async () => {
-    if (!user?.nickname) return Alert.alert('No nickname set');
+    if (!localUser?.nickname) return Alert.alert('No nickname set');
     const confirm = await new Promise<boolean>((resolve) => {
       Alert.alert('Delete All', 'Are you sure?', [
         { text: 'Cancel', onPress: () => resolve(false) },
@@ -169,7 +170,7 @@ export default function Page() {
       ]);
     });
     if (!confirm) return;
-    const wishes = await getWishesByNickname(user.nickname);
+    const wishes = await getWishesByNickname(localUser?.nickname);
     for (const w of wishes) {
       await deleteDoc(doc(db, 'wishes', w.id));
     }
@@ -177,7 +178,7 @@ export default function Page() {
     for (const wish of all) {
       const list = await getWishComments(wish.id);
       for (const c of list) {
-        if (c.nickname === user.nickname) {
+        if (c.nickname === localUser?.nickname) {
           await deleteDoc(doc(db, 'wishes', wish.id, 'comments', c.id));
         }
       }
