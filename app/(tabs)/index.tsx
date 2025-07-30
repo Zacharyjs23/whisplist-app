@@ -49,6 +49,7 @@ import ReportDialog from '../../components/ReportDialog';
 import { db, storage } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
+import { cleanupExpiredWishes } from '../../helpers/firestore';
 
 const typeInfo: Record<string, { emoji: string; color: string }> = {
   wish: { emoji: '💭', color: '#1e1e1e' },
@@ -86,6 +87,8 @@ export default function Page() {
   const [giftLabel, setGiftLabel] = useState('');
   const [posting, setPosting] = useState(false);
   const [showGiftOptions, setShowGiftOptions] = useState(false);
+  const [autoDelete, setAutoDelete] = useState(false);
+  const [rephrasing, setRephrasing] = useState(false);
   const [confirmGift, setConfirmGift] = useState<{link?: string; amount?: number; wishId?: string; recipientId?: string} | null>(null);
   const [showThanks, setShowThanks] = useState(false);
   const [thanksMessage, setThanksMessage] = useState('');
@@ -110,6 +113,10 @@ export default function Page() {
 
   const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 
+
+useEffect(() => {
+  cleanupExpiredWishes();
+}, []);
 
 useEffect(() => {
   const unsubscribe = listenWishes(user?.uid ?? null, (w) => {
@@ -340,6 +347,34 @@ useEffect(() => {
     setStreakCount(streak);
   };
 
+  const handleRephrase = async () => {
+    if (wish.trim() === '') return;
+    setRephrasing(true);
+    try {
+      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.EXPO_PUBLIC_OPENAI_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: [
+            { role: 'user', content: `Rephrase this wish in an emotionally clear and honest way: ${wish}` },
+          ],
+          max_tokens: 60,
+        }),
+      });
+      const data = await resp.json();
+      const suggestion = data.choices?.[0]?.message?.content?.trim();
+      if (suggestion) setWish(suggestion);
+    } catch (err) {
+      console.error('AI rephrase failed', err);
+    } finally {
+      setRephrasing(false);
+    }
+  };
+
   const handlePostWish = async () => {
     if (wish.trim() === '') return;
 
@@ -388,6 +423,7 @@ useEffect(() => {
         }),
         ...(audioUrl && { audioUrl }),
         ...(imageUrl && { imageUrl }),
+        ...(autoDelete && { expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) }),
       });
 
       try {
@@ -475,7 +511,8 @@ useEffect(() => {
   const filteredWishes = wishList.filter(
     (wish) =>
       wish.text.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      (filterType === 'all' || wish.type === filterType)
+      (filterType === 'all' || wish.type === filterType) &&
+      (!wish.expiresAt || (wish.expiresAt.toDate ? wish.expiresAt.toDate() : wish.expiresAt) > new Date())
   );
 
   const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
@@ -713,6 +750,15 @@ useEffect(() => {
                   value={wish}
                   onChangeText={setWish}
                 />
+                <TouchableOpacity
+                  onPress={handleRephrase}
+                  style={[styles.button, { marginBottom: 10 }]}
+                  disabled={rephrasing || wish.trim() === ''}
+                >
+                  <Text style={styles.buttonText}>
+                    {rephrasing ? 'Thinking...' : '✨ Help me rephrase this'}
+                  </Text>
+                </TouchableOpacity>
 
                 {dailyPrompt !== '' && (
                   <>
@@ -796,6 +842,11 @@ useEffect(() => {
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
           <Text style={{ color: '#fff', marginRight: 8 }}>Post with profile</Text>
           <Switch value={useProfilePost} onValueChange={setUseProfilePost} />
+        </View>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+          <Text style={{ color: '#fff', marginRight: 8 }}>Auto-delete after 24h</Text>
+          <Switch value={autoDelete} onValueChange={setAutoDelete} />
         </View>
 
         {isPoll && (
@@ -940,7 +991,7 @@ useEffect(() => {
                       try {
                         await addDoc(collection(db, 'wishes', confirmGift!.wishId!, 'gifts'), {
                           message: thanksMessage,
-                          sender: user?.uid || 'anon',
+                          from: user?.displayName || 'anonymous',
                           timestamp: serverTimestamp(),
                         });
                       } catch (err) {

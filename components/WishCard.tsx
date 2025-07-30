@@ -2,6 +2,8 @@ import React, { useCallback } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
+import { Ionicons } from '@expo/vector-icons';
+import { useSavedWishes } from '@/contexts/SavedWishesContext';
 import type { Wish } from '../types/Wish';
 import { updateWishReaction } from '../helpers/firestore';
 
@@ -30,6 +32,7 @@ type ReactionKey = keyof typeof reactionMap;
 export const WishCard: React.FC<{ wish: Wish; onReport?: () => void }> = ({ wish, onReport }) => {
   const { theme } = useTheme();
   const router = useRouter();
+  const { saved, toggleSave } = useSavedWishes();
 
   const borderColor = moodColors[wish.mood || ''] || typeColors[wish.type || ''] || theme.tint;
   const bgTint = `${borderColor}33`;
@@ -61,7 +64,28 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void }> = ({ wish
             </Text>
           </TouchableOpacity>
         ))}
+        <TouchableOpacity
+          onPress={() => wish.id && toggleSave(wish.id)}
+          style={styles.reactionButton}
+        >
+          <Ionicons
+            name={saved[wish.id] ? 'bookmark' : 'bookmark-outline'}
+            size={20}
+            color={theme.tint}
+          />
+        </TouchableOpacity>
       </View>
+      {wish.expiresAt && (
+        <Text style={{ color: theme.tint, marginTop: 4 }}>
+          ⏳{' '}
+          {(() => {
+            const ts = wish.expiresAt.toDate ? wish.expiresAt.toDate() : new Date(wish.expiresAt);
+            const diff = ts.getTime() - Date.now();
+            const hrs = Math.max(0, Math.ceil(diff / 3600000));
+            return `${hrs}h left`;
+          })()}
+        </Text>
+      )}
       {onReport && (
         <TouchableOpacity onPress={onReport} style={styles.reportButton}>
           <Text style={[styles.reactionText, { color: '#f87171' }]}>Report</Text>

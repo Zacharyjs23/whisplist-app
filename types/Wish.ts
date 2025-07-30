@@ -47,5 +47,9 @@ export interface Wish {
     pray?: number;
     [key: string]: number | undefined;
   };
+  /**
+   * Timestamp when this wish should disappear
+   */
+  expiresAt?: any;
   [key: string]: any;
 }

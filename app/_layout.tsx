@@ -1,6 +1,7 @@
 import { AppContainer } from '@/components/AppContainer';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { SavedWishesProvider } from '@/contexts/SavedWishesContext';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import React, { useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -34,9 +35,11 @@ export default function Layout() {
     return (
       <AuthProvider>
         <ThemeProvider>
-          <AppContainer>
-            <LayoutInner />
-          </AppContainer>
+          <SavedWishesProvider>
+            <AppContainer>
+              <LayoutInner />
+            </AppContainer>
+          </SavedWishesProvider>
         </ThemeProvider>
       </AuthProvider>
     );

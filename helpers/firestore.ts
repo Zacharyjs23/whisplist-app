@@ -317,3 +317,10 @@ export async function getWishComments(wishId: string): Promise<Comment[]> {
     return comment;
   });
 }
+
+export async function cleanupExpiredWishes() {
+  const now = new Date();
+  const q = query(collection(db, 'wishes'), where('expiresAt', '<=', now));
+  const snap = await getDocs(q);
+  await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
+}

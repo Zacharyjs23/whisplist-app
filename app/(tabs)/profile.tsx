@@ -22,6 +22,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { collection, getDocs, query, where, orderBy, collectionGroup } from 'firebase/firestore';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
+import { useSavedWishes } from '@/contexts/SavedWishesContext';
 
 export default function Page() {
   const { user, profile, updateProfile, pickImage, signOut } = useAuth();
@@ -39,6 +40,8 @@ export default function Page() {
   >([]);
   const [boostImpact, setBoostImpact] = useState({ likes: 0, comments: 0 });
   const [giftStats, setGiftStats] = useState({ count: 0, total: 0 });
+  const [giftMessages, setGiftMessages] = useState<{ text: string; ts: any }[]>([]);
+  const [savedList, setSavedList] = useState<Wish[]>([]);
   const [dailyReminder, setDailyReminder] = useState(false);
   const [showSparkle, setShowSparkle] = useState(false);
   const [referralCount, setReferralCount] = useState(0);
@@ -86,7 +89,9 @@ export default function Page() {
       const snap = await getDocs(
         query(collection(db, 'wishes'), where('userId', '==', user.uid), orderBy('timestamp', 'desc'))
       );
-      const list = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
+      const list = snap.docs
+        .map(d => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) }))
+        .filter(w => !w.expiresAt || (w.expiresAt.toDate ? w.expiresAt.toDate() : w.expiresAt) > new Date()) as Wish[];
       const active = list.filter(
         w => w.boostedUntil && w.boostedUntil.toDate && w.boostedUntil.toDate() > new Date()
       );
@@ -166,14 +171,38 @@ export default function Page() {
       const snap = await getDocs(query(collectionGroup(db, 'gifts'), where('recipientId', '==', user.uid)));
       let count = 0;
       let total = 0;
+      const msgs: { text: string; ts: any }[] = [];
       snap.forEach(d => {
         count += 1;
         total += d.data().amount || 0;
+        if (d.data().message) {
+          msgs.push({ text: d.data().message, ts: d.data().timestamp });
+        }
       });
       setGiftStats({ count, total });
+      msgs.sort((a, b) => (b.ts?.seconds || 0) - (a.ts?.seconds || 0));
+      setGiftMessages(msgs);
     };
     loadGifts();
   }, [user]);
+
+  const { saved } = useSavedWishes();
+
+  useEffect(() => {
+    const load = async () => {
+      if (!user?.uid) return;
+      const list: Wish[] = [];
+      for (const id of Object.keys(saved)) {
+        const docSnap = await getDocs(query(collection(db, 'wishes'), where('__name__', '==', id)));
+        docSnap.forEach(d => {
+          list.push({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) });
+        });
+      }
+      list.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+      setSavedList(list);
+    };
+    load();
+  }, [saved, user]);
 
   useEffect(() => {
     if (profile?.boostCredits != null && prevCredits.current != null && profile.boostCredits > prevCredits.current) {
@@ -260,6 +289,17 @@ export default function Page() {
         </View>
       )}
 
+      {giftMessages.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>💌 Messages from Supporters</Text>
+          {giftMessages.map((m, i) => (
+            <Text key={i} style={styles.info}>
+              {m.text}
+            </Text>
+          ))}
+        </View>
+      )}
+
       {referralCount > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🎁 Referrals</Text>
@@ -309,6 +349,21 @@ export default function Page() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🧠 Reflection</Text>
             <Text style={styles.info}>Yesterday, you said: &apos;{dailyPrompt}&apos;</Text>
+        </View>
+      )}
+
+      {savedList.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🔖 Saved</Text>
+          {savedList.map((w) => (
+            <TouchableOpacity
+              key={w.id}
+              onPress={() => router.push(`/wish/${w.id}`)}
+              style={{ marginBottom: 6 }}
+            >
+              <Text style={styles.info}>{w.text}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
       )}
 

@@ -2,9 +2,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
+import useNotifications from '@/hooks/useNotifications';
 
 export default function Layout() {
   const { theme } = useTheme();
+  const { unread } = useNotifications();
 
   return (
     <Tabs
@@ -58,6 +60,16 @@ export default function Layout() {
           title: 'Profile',
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="person-circle-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="inbox"
+        options={{
+          title: 'Inbox',
+          tabBarBadge: unread > 0 ? unread : undefined,
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
+            <Ionicons name="notifications-outline" color={color} size={size} />
           ),
         }}
       />
