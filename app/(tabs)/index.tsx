@@ -324,6 +324,16 @@ useEffect(() => {
         ...(imageUrl && { imageUrl }),
       });
 
+      try {
+        const raw = await AsyncStorage.getItem('reflectionHistory');
+        const history = raw ? JSON.parse(raw) : [];
+        history.unshift({ text: wish.trim(), timestamp: Date.now() });
+        if (history.length > 7) history.splice(7);
+        await AsyncStorage.setItem('reflectionHistory', JSON.stringify(history));
+      } catch (err) {
+        console.error('Failed to save reflection history', err);
+      }
+
       setWish('');
       setOptionA('');
       setOptionB('');
