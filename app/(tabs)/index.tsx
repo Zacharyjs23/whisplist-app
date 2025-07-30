@@ -41,6 +41,7 @@ import {
   RefreshControl,
   Modal,
   Animated,
+  ToastAndroid,
 } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -349,27 +350,43 @@ useEffect(() => {
 
   const handleRephrase = async () => {
     if (wish.trim() === '') return;
+    const originalWishText = wish;
     setRephrasing(true);
     try {
-      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      const apiKey = process.env.EXPO_PUBLIC_OPENAI_KEY;
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${process.env.EXPO_PUBLIC_OPENAI_KEY}`,
+          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           model: 'gpt-3.5-turbo',
           messages: [
-            { role: 'user', content: `Rephrase this wish in an emotionally clear and honest way: ${wish}` },
+            {
+              role: 'system',
+              content:
+                'You are a wish clarity assistant. Rephrase this wish to make it more emotionally honest, concise, and human.',
+            },
+            { role: 'user', content: originalWishText },
           ],
-          max_tokens: 60,
+          temperature: 0.7,
         }),
       });
-      const data = await resp.json();
+      const data = await response.json();
       const suggestion = data.choices?.[0]?.message?.content?.trim();
-      if (suggestion) setWish(suggestion);
+      if (suggestion) {
+        setWish(suggestion);
+        const msg = '✨ Wish rephrased';
+        if (Platform.OS === 'android') {
+          ToastAndroid.show(msg, ToastAndroid.SHORT);
+        } else {
+          Alert.alert(msg);
+        }
+      }
     } catch (err) {
       console.error('AI rephrase failed', err);
+      Alert.alert('Failed to rephrase wish', 'Please try again later.');
     } finally {
       setRephrasing(false);
     }
