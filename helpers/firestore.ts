@@ -124,6 +124,86 @@ export async function getFollowingIds(userId: string): Promise<string[]> {
   return snap.docs.map(d => d.id);
 }
 
+export function listenFollowingWishes(
+  userId: string,
+  cb: (wishes: Wish[]) => void
+) {
+  let unsub = () => {};
+  getFollowingIds(userId).then(ids => {
+    if (ids.length === 0) {
+      cb([]);
+      return;
+    }
+    const q = query(
+      collection(db, 'wishes'),
+      where('userId', 'in', ids),
+      orderBy('timestamp', 'desc')
+    );
+    unsub = onSnapshot(q, snap => {
+      const data = snap.docs.map(d => ({
+        id: d.id,
+        ...(d.data() as Omit<Wish, 'id'>),
+      }));
+      cb(data as Wish[]);
+    });
+  });
+  return () => unsub();
+}
+
+export async function getFollowingWishes(userId: string): Promise<Wish[]> {
+  const ids = await getFollowingIds(userId);
+  if (ids.length === 0) return [];
+  const q = query(
+    collection(db, 'wishes'),
+    where('userId', 'in', ids),
+    orderBy('timestamp', 'desc')
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
+}
+
+export async function getTopBoostedCreators(limitCount = 5): Promise<{
+  userId: string;
+  displayName: string;
+  count: number;
+}[]> {
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const q = query(collection(db, 'wishes'), where('boostedUntil', '>=', since));
+  const snap = await getDocs(q);
+  const map: Record<string, { name: string; count: number }> = {};
+  snap.forEach(d => {
+    const data = d.data() as any;
+    if (!data.userId) return;
+    if (!map[data.userId]) {
+      map[data.userId] = { name: data.displayName || 'Anon', count: 0 };
+    }
+    map[data.userId].count += 1;
+  });
+  return Object.entries(map)
+    .map(([userId, v]) => ({ userId, displayName: v.name, count: v.count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limitCount);
+}
+
+export async function getWhispOfTheDay(): Promise<Wish | null> {
+  const since = new Date(Date.now() - 48 * 60 * 60 * 1000);
+  const q = query(
+    collection(db, 'wishes'),
+    where('timestamp', '>', since),
+    orderBy('timestamp', 'desc'),
+    limit(50)
+  );
+  const snap = await getDocs(q);
+  const list = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
+  const filtered = list.filter(w => {
+    const boost = w.boostedUntil && w.boostedUntil.toDate && w.boostedUntil.toDate() > new Date();
+    const reacts = w.reactions && Object.values(w.reactions).reduce((s, v) => s + (v || 0), 0) > 0;
+    return boost || reacts;
+  });
+  if (filtered.length === 0) return null;
+  return filtered[Math.floor(Math.random() * filtered.length)];
+}
+
 export async function addWish(data: Omit<Wish, 'id'>) {
   return addDoc(collection(db, 'wishes'), {
     likes: 0,

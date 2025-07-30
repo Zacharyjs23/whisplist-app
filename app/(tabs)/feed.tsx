@@ -1,5 +1,6 @@
 // app/(tabs)/feed.tsx — Combined Feed Screen with segmented tabs
 import React, { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'expo-router';
 import {
   FlatList,
   SafeAreaView,
@@ -22,6 +23,10 @@ import {
   listenWishes,
   getFollowingIds,
   listenBoostedWishes,
+  listenFollowingWishes,
+  getFollowingWishes,
+  getTopBoostedCreators,
+  getWhispOfTheDay,
 } from '../../helpers/firestore';
 import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -36,6 +41,7 @@ const allCategories = ['love', 'health', 'career', 'general', 'money', 'friendsh
 export default function Page() {
   const { user } = useAuth();
   const { theme } = useTheme();
+  const router = useRouter();
 
   if (!db) {
     console.error('Firebase database undefined in feed page');
@@ -46,9 +52,11 @@ export default function Page() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [filteredWishes, setFilteredWishes] = useState<Wish[]>([]);
   const [topWishes, setTopWishes] = useState<Wish[]>([]);
+  const [leaderboard, setLeaderboard] = useState<{ userId: string; displayName: string; count: number }[]>([]);
+  const [whispOfDay, setWhispOfDay] = useState<Wish | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'latest' | 'boosted' | 'trending' | 'forYou'>('latest');
+  const [activeTab, setActiveTab] = useState<'latest' | 'boosted' | 'trending' | 'forYou' | 'following'>('latest');
   const [searchTerm, setSearchTerm] = useState('');
   const [reportVisible, setReportVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
@@ -80,7 +88,7 @@ export default function Page() {
   useEffect(() => {
     (async () => {
       const stored = await AsyncStorage.getItem('feedTab');
-      if (stored === 'latest' || stored === 'boosted' || stored === 'trending' || stored === 'forYou') {
+      if (stored === 'latest' || stored === 'boosted' || stored === 'trending' || stored === 'forYou' || stored === 'following') {
         setActiveTab(stored as any);
       }
     })();
@@ -95,6 +103,18 @@ export default function Page() {
       const unsubscribe = listenTrendingWishes((data) => {
         setTopWishes(data.slice(0, 3));
       });
+      (async () => {
+        try {
+          const [topCreators, spotlight] = await Promise.all([
+            getTopBoostedCreators(),
+            getWhispOfTheDay(),
+          ]);
+          setLeaderboard(topCreators);
+          setWhispOfDay(spotlight);
+        } catch (err) {
+          console.warn('Failed to load highlights', err);
+        }
+      })();
       return unsubscribe;
     } catch (err) {
       console.error('Failed to listen for trending wishes', err);
@@ -151,6 +171,22 @@ export default function Page() {
               const filtered = all.filter((wish) => {
                 const inCategory =
                   activeTab === 'trending' || !selectedCategory || wish.category === selectedCategory;
+                const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+                return inCategory && inSearch;
+              });
+              setFilteredWishes(filtered);
+            } catch (err) {
+              console.error('❌ Failed to filter wishes:', err);
+              setError('Failed to load wishes');
+            } finally {
+              setLoading(false);
+            }
+          })
+        : activeTab === 'following'
+        ? listenFollowingWishes(user?.uid ?? '', (all: Wish[]) => {
+            try {
+              const filtered = all.filter((wish) => {
+                const inCategory = !selectedCategory || wish.category === selectedCategory;
                 const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
                 return inCategory && inSearch;
               });
@@ -230,6 +266,18 @@ export default function Page() {
           return inCategory && inSearch;
         });
         setFilteredWishes(filtered);
+      } else if (activeTab === 'following') {
+        if (user) {
+          const list = await getFollowingWishes(user.uid);
+          const filtered = list.filter((wish) => {
+            const inCategory = !selectedCategory || wish.category === selectedCategory;
+            const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+            return inCategory && inSearch;
+          });
+          setFilteredWishes(filtered);
+        } else {
+          setFilteredWishes([]);
+        }
       } else {
         const followingIds = user ? await getFollowingIds(user.uid) : [];
 
@@ -326,6 +374,36 @@ export default function Page() {
           ListHeaderComponent={
             <>
               <Text style={styles.title}>Feed</Text>
+              {whispOfDay && (
+                <TouchableOpacity
+                  onPress={() => router.push(`/wish/${whispOfDay.id}`)}
+                  style={[styles.spotlight, { backgroundColor: theme.input }]}
+                >
+                  <Text style={styles.sectionTitle}>🌙 Whisp of the Day</Text>
+                  <Text style={[styles.spotlightText, { color: theme.text }]}
+                    numberOfLines={3}
+                  >
+                    {whispOfDay.text}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {leaderboard.length > 0 && (
+                <View style={styles.leaderboard}>
+                  <Text style={styles.sectionTitle}>🌟 Top Boosted Creators This Week</Text>
+                  <FlatList
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    data={leaderboard}
+                    keyExtractor={(i) => i.userId}
+                    renderItem={({ item }) => (
+                      <View style={[styles.leaderItem, { backgroundColor: theme.input }]}>
+                        <Text style={{ color: theme.text }}>{item.displayName}</Text>
+                        <Text style={{ color: theme.tint }}>🔥 {item.count}x</Text>
+                      </View>
+                    )}
+                  />
+                </View>
+              )}
 
         <TextInput
           style={[
@@ -339,7 +417,7 @@ export default function Page() {
         />
 
         <View style={styles.toggleBar}>
-          {(['boosted', 'latest', 'trending', 'forYou'] as const).map((tab) => (
+          {(['boosted', 'latest', 'trending', 'forYou', 'following'] as const).map((tab) => (
             <TouchableOpacity
               key={tab}
               onPress={() => setActiveTab(tab)}
@@ -357,6 +435,8 @@ export default function Page() {
                   ? '💬 Latest'
                   : tab === 'trending'
                   ? '📈 Trending'
+                  : tab === 'following'
+                  ? '👥 Following'
                   : '🧠 For You'}
               </Text>
             </TouchableOpacity>
@@ -556,4 +636,25 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 12,
     marginBottom: 12,
-  },});
+  },
+  spotlight: {
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  spotlightText: {
+    marginTop: 6,
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  leaderboard: {
+    marginBottom: 16,
+  },
+  leaderItem: {
+    padding: 10,
+    borderRadius: 8,
+    marginRight: 10,
+    alignItems: 'center',
+  },
+});
