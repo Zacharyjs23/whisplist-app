@@ -8,40 +8,32 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  Image,
   View,
   RefreshControl,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
-import { useRouter } from 'expo-router';
 import ReportDialog from '../../components/ReportDialog';
+import WishCard from '../../components/WishCard';
 import {
   listenTrendingWishes,
   listenWishes,
   getFollowingIds,
   listenBoostedWishes,
 } from '../../helpers/firestore';
-import { formatTimeLeft } from '../../helpers/time';
 import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 
-const typeInfo: Record<string, { emoji: string; color: string }> = {
-  wish: { emoji: '💭', color: '#1a1a1a' },
-  confession: { emoji: '😶\u200d🌫️', color: '#374151' },
-  advice: { emoji: '🧠', color: '#064e3b' },
-  dream: { emoji: '🌙', color: '#312e81' },
-};
 
 
 const allCategories = ['love', 'health', 'career', 'general', 'money', 'friendship', 'fitness'];
 
 export default function Page() {
-  const router = useRouter();
   const { user } = useAuth();
   const { theme } = useTheme();
 
@@ -56,11 +48,47 @@ export default function Page() {
   const [topWishes, setTopWishes] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'latest' | 'boosted' | 'trending'>('latest');
+  const [activeTab, setActiveTab] = useState<'latest' | 'boosted' | 'trending' | 'forYou'>('latest');
   const [searchTerm, setSearchTerm] = useState('');
   const [reportVisible, setReportVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  const loadPersonalPrefs = useCallback(async () => {
+    if (!user) return { categories: [], type: undefined as string | undefined };
+    const snap = await getDocs(
+      query(
+        collection(db, 'wishes'),
+        where('userId', '==', user.uid),
+        orderBy('timestamp', 'desc'),
+        limit(10)
+      )
+    );
+    const cats = new Set<string>();
+    const typeCounts: Record<string, number> = {};
+    snap.docs.forEach((d) => {
+      const data = d.data() as Wish;
+      if (data.category) cats.add(data.category);
+      if (data.type) typeCounts[data.type] = (typeCounts[data.type] || 0) + 1;
+    });
+    const favType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+    const pref = { categories: Array.from(cats), type: favType };
+    await AsyncStorage.setItem('forYouPref', JSON.stringify(pref));
+    return pref;
+  }, [user]);
+
+  useEffect(() => {
+    (async () => {
+      const stored = await AsyncStorage.getItem('feedTab');
+      if (stored === 'latest' || stored === 'boosted' || stored === 'trending' || stored === 'forYou') {
+        setActiveTab(stored as any);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem('feedTab', activeTab);
+  }, [activeTab]);
 
   useEffect(() => {
     try {
@@ -77,6 +105,34 @@ export default function Page() {
   const fetchWishes = useCallback(() => {
     setLoading(true);
     try {
+      if (activeTab === 'forYou') {
+        (async () => {
+          try {
+            const stored = await AsyncStorage.getItem('forYouPref');
+            let pref = stored ? JSON.parse(stored) : { categories: [], type: undefined };
+            const fresh = await loadPersonalPrefs();
+            if (fresh.categories.length) pref = fresh;
+            const snap = await getDocs(query(collection(db, 'wishes'), orderBy('timestamp', 'desc'), limit(30)));
+            const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
+            let list = all.filter((w) =>
+              (pref.categories.includes(w.category)) || (pref.type && w.type === pref.type)
+            );
+            if (list.length === 0) list = all;
+            const filtered = list.filter((wish) => {
+              const inCategory = !selectedCategory || wish.category === selectedCategory;
+              const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+              return inCategory && inSearch;
+            });
+            setFilteredWishes(filtered);
+          } catch (err) {
+            console.error('❌ Failed to load personalized wishes:', err);
+            setError('Failed to load wishes');
+          } finally {
+            setLoading(false);
+          }
+        })();
+        return () => {};
+      }
       if (activeTab === 'boosted') {
         return listenBoostedWishes((all: Wish[]) => {
           const filtered = all.filter((wish) => {
@@ -139,7 +195,19 @@ export default function Page() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      if (activeTab === 'boosted') {
+      if (activeTab === 'forYou') {
+        const pref = await loadPersonalPrefs();
+        const snap = await getDocs(query(collection(db, 'wishes'), orderBy('timestamp', 'desc'), limit(30)));
+        const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
+        let list = all.filter((w) => pref.categories.includes(w.category) || (pref.type && w.type === pref.type));
+        if (list.length === 0) list = all;
+        const filtered = list.filter((wish) => {
+          const inCategory = !selectedCategory || wish.category === selectedCategory;
+          const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+          return inCategory && inSearch;
+        });
+        setFilteredWishes(filtered);
+      } else if (activeTab === 'boosted') {
         const now = new Date();
         const boostedSnap = await getDocs(
           query(collection(db, 'wishes'), where('boostedUntil', '>', now), orderBy('boostedUntil', 'desc'))
@@ -230,63 +298,15 @@ export default function Page() {
     }
   };
 
-  const renderWish = ({ item }: { item: Wish }) => {
-    const isBoosted =
-      item.boostedUntil && item.boostedUntil.toDate && item.boostedUntil.toDate() > new Date();
-    const timeLeft = isBoosted ? formatTimeLeft(item.boostedUntil.toDate()) : '';
-    const canBoost =
-      user &&
-      item.userId === user.uid &&
-      (!item.boostedUntil || !item.boostedUntil.toDate || item.boostedUntil.toDate() < new Date());
-
-    return (
-    <View style={[styles.wishItem, { backgroundColor: typeInfo[item.type || 'wish'].color }]}>
-      <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-        <Text style={styles.wishCategory}>
-          {typeInfo[item.type || 'wish'].emoji} #{item.category} {item.audioUrl ? '🔊' : ''}
-        </Text>
-        <Text style={styles.wishText}>{item.text}</Text>
-        {item.imageUrl && (
-          <Image source={{ uri: item.imageUrl }} style={styles.preview} />
-        )}
-        {item.isPoll ? (
-          <View style={{ marginTop: 6 }}>
-            <Text style={styles.pollText}>{item.optionA}: {item.votesA ?? 0}</Text>
-            <Text style={styles.pollText}>{item.optionB}: {item.votesB ?? 0}</Text>
-          </View>
-        ) : (
-          <Text style={styles.likes}>❤️ {item.likes}</Text>
-        )}
-        {isBoosted && (
-          <Text style={styles.boostedLabel}>
-            🚀 {item.boosted === 'stripe' ? 'Boosted via Stripe' : 'Boosted'}
-            {timeLeft ? ` (${timeLeft})` : ''}
-          </Text>
-        )}
-      </TouchableOpacity>
-
-      {canBoost && (
-        <TouchableOpacity
-          onPress={() => router.push(`/boost/${item.id}`)}
-          style={{ marginTop: 4 }}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Text style={{ color: '#facc15' }}>Boost 🚀</Text>
-        </TouchableOpacity>
-      )}
-
-      <TouchableOpacity
-        onPress={() => {
-          setReportTarget(item.id);
-          setReportVisible(true);
-        }}
-        style={{ marginTop: 4 }}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-
-        <Text style={{ color: '#f87171' }}>Report</Text>
-      </TouchableOpacity>
-    </View>
+  const renderWish = ({ item }: { item: Wish }) => (
+    <WishCard
+      wish={item}
+      onReport={() => {
+        setReportTarget(item.id);
+        setReportVisible(true);
+      }}
+    />
   );
-  };
 
   try {
     return (
@@ -319,7 +339,7 @@ export default function Page() {
         />
 
         <View style={styles.toggleBar}>
-          {(['boosted', 'latest', 'trending'] as const).map((tab) => (
+          {(['boosted', 'latest', 'trending', 'forYou'] as const).map((tab) => (
             <TouchableOpacity
               key={tab}
               onPress={() => setActiveTab(tab)}
@@ -331,7 +351,13 @@ export default function Page() {
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Text style={[styles.toggleText, activeTab === tab && styles.activeToggleText]}>
-                {tab === 'boosted' ? '🔥 Boosted' : tab === 'latest' ? '💬 Latest' : '📈 Trending'}
+                {tab === 'boosted'
+                  ? '🔥 Boosted'
+                  : tab === 'latest'
+                  ? '💬 Latest'
+                  : tab === 'trending'
+                  ? '📈 Trending'
+                  : '🧠 For You'}
               </Text>
             </TouchableOpacity>
           ))}

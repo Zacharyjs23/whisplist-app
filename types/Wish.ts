@@ -33,5 +33,19 @@ export interface Wish {
   optionB?: string;
   votesA?: number;
   votesB?: number;
+  /**
+   * Optional mood emoji used for styling
+   */
+  mood?: string;
+  /**
+   * Emoji reaction counts
+   */
+  reactions?: {
+    heart?: number;
+    lightbulb?: number;
+    hug?: number;
+    pray?: number;
+    [key: string]: number | undefined;
+  };
   [key: string]: any;
 }

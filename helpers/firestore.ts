@@ -127,6 +127,12 @@ export async function getFollowingIds(userId: string): Promise<string[]> {
 export async function addWish(data: Omit<Wish, 'id'>) {
   return addDoc(collection(db, 'wishes'), {
     likes: 0,
+    reactions: {
+      heart: 0,
+      lightbulb: 0,
+      hug: 0,
+      pray: 0,
+    },
     timestamp: serverTimestamp(),
     ...data,
   });
@@ -135,6 +141,11 @@ export async function addWish(data: Omit<Wish, 'id'>) {
 export async function likeWish(id: string) {
   const ref = doc(db, 'wishes', id);
   return updateDoc(ref, { likes: increment(1) });
+}
+
+export async function updateWishReaction(id: string, emoji: string) {
+  const ref = doc(db, 'wishes', id);
+  return updateDoc(ref, { [`reactions.${emoji}`]: increment(1) });
 }
 
 export async function boostWish(id: string, hours: number) {
