@@ -55,6 +55,7 @@ interface Profile {
   giftingEnabled?: boolean;
   stripeAccountId?: string;
   giftsReceived?: number;
+  referralDisplayName?: string;
 }
 
 interface AuthContextValue {
