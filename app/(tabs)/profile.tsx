@@ -218,6 +218,12 @@ export default function Page() {
       <TouchableOpacity style={styles.button} onPress={handleSave} disabled={saving}>
         <Text style={styles.buttonText}>{saving ? 'Saving...' : 'Save Profile'}</Text>
       </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.button, { marginBottom: 10 }]}
+        onPress={() => router.push('/journal')}
+      >
+        <Text style={styles.buttonText}>Open Journal</Text>
+      </TouchableOpacity>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>🔥 Boosts</Text>
