@@ -12,6 +12,7 @@ export interface Wish {
   photoURL?: string;
   isAnonymous?: boolean;
   boostedUntil?: any;
+  boosted?: string;
   audioUrl?: string;
   imageUrl?: string;
   giftLink?: string;

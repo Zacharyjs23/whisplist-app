@@ -179,7 +179,8 @@ export default function Page() {
           )}
           {item.boostedUntil && item.boostedUntil.toDate && (
             <Text style={styles.boostedLabel}>
-              🚀 Boosted{timeLeft ? ` (${timeLeft})` : ''}
+              🚀 {item.boosted === 'stripe' ? 'Boosted via Stripe' : 'Boosted'}
+              {timeLeft ? ` (${timeLeft})` : ''}
             </Text>
           )}
         </TouchableOpacity>

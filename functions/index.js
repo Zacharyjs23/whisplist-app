@@ -67,3 +67,5 @@ exports.notifyWishComment = functions.firestore
     }
     return null;
   });
+exports.createCheckoutSession = require('./createCheckoutSession').createCheckoutSession;
+exports.stripeWebhook = require('./stripeWebhook').stripeWebhook;
