@@ -100,10 +100,18 @@ export default function Page() {
   const [sound, setSound] = useState<AudioPlayer | null>(null);
   const [postingComment, setPostingComment] = useState(false);
   const [useProfileComment, setUseProfileComment] = useState(true);
+  const [nickname, setNickname] = useState('');
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
   const [verifiedStatus, setVerifiedStatus] = useState<Record<string, boolean>>({});
   const [refreshing, setRefreshing] = useState(false);
   const { user, profile } = useAuth();
+  useEffect(() => {
+    const loadNickname = async () => {
+      const n = await AsyncStorage.getItem('nickname');
+      if (n) setNickname(n);
+    };
+    loadNickname();
+  }, []);
 
   const isBoosted =
     wish?.boostedUntil &&
@@ -275,12 +283,14 @@ try {
         displayName: useProfileComment ? profile?.displayName || '' : '',
         photoURL: useProfileComment ? profile?.photoURL || '' : '',
         isAnonymous: !useProfileComment,
+        ...(nickname && !useProfileComment ? { nickname } : {}),
         parentId: replyTo,
         reactions: {},
         userReactions: {},
       });
       setComment('');
       setReplyTo(null);
+      if (nickname) await AsyncStorage.setItem('nickname', nickname);
 
       // Push notifications are sent from Cloud Functions
       Alert.alert('Comment posted!');
@@ -289,7 +299,7 @@ try {
     } finally {
       setPostingComment(false);
     }
-  }, [comment, id, replyTo, wish, user, profile, useProfileComment]);
+  }, [comment, id, replyTo, wish, user, profile, useProfileComment, nickname]);
 
 
   const handleReact = useCallback(async (commentId: string, emoji: string) => {
@@ -401,18 +411,22 @@ try {
               ],
             }}
           >
-            {!item.isAnonymous &&
-              publicStatus[item.userId || ''] && (
-                <TouchableOpacity
-                  onPress={() => router.push(`/profile/${item.displayName}`)}
-                  hitSlop={HIT_SLOP}
-                >
-                  <Text style={styles.nickname}>
-                    {item.displayName}
-                    {verifiedStatus[item.userId || ''] ? ' \u2705 Verified' : ''}
-                  </Text>
-                </TouchableOpacity>
-              )}
+            {!item.isAnonymous && publicStatus[item.userId || ''] ? (
+              <TouchableOpacity
+                onPress={() => router.push(`/profile/${item.displayName}`)}
+                hitSlop={HIT_SLOP}
+              >
+                <Text style={styles.nickname}>
+                  {item.displayName}
+                  {verifiedStatus[item.userId || ''] ? ' \u2705 Verified' : ''}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.nickname}>{item.nickname || 'Anonymous'}</Text>
+            )}
+            {item.userId === wish?.userId && (
+              <Text style={[styles.nickname, { color: '#a78bfa' }]}> (author)</Text>
+            )}
             <Text style={styles.comment}>{item.text}</Text>
             <Text style={styles.timestamp}>
               {item.timestamp?.seconds
@@ -650,6 +664,15 @@ try {
           value={comment}
           onChangeText={setComment}
         />
+        {!useProfileComment && (
+          <TextInput
+            style={styles.input}
+            placeholder="Nickname or emoji"
+            placeholderTextColor="#aaa"
+            value={nickname}
+            onChangeText={setNickname}
+          />
+        )}
 
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
           <Text style={{ color: '#fff', marginRight: 8 }}>Comment with profile</Text>

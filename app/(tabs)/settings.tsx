@@ -174,6 +174,12 @@ export default function Page() {
     Alert.alert('Content deleted');
   };
 
+  const handleShareInvite = async () => {
+    if (!profile?.displayName) return;
+    const url = Linking.createURL('/', { queryParams: { ref: profile.displayName } });
+    await Share.share({ message: `Join me on WhispList! ${url}` });
+  };
+
   const permissionsInfo = async () => {
     const mic = await Audio.getRecordingPermissionsAsync();
     const notif = await Notifications.getPermissionsAsync();
@@ -252,6 +258,12 @@ export default function Page() {
 
       <ThemedButton title="Pick Avatar" onPress={pickAvatar} />
       {avatarUrl && <Image source={{ uri: avatarUrl }} style={styles.avatar} />}
+      {profile?.boostCredits !== undefined && (
+        <ThemedText style={styles.section}>
+          You've earned {profile.boostCredits} free boosts!
+        </ThemedText>
+      )}
+      <ThemedButton title="Refer a Friend" onPress={handleShareInvite} />
 
       <ThemedText style={styles.section}>Default Category</ThemedText>
       <Picker

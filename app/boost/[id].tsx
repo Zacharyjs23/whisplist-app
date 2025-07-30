@@ -8,10 +8,11 @@ import ConfettiCannon from 'react-native-confetti-cannon';
 import * as Linking from 'expo-linking';
 import { getWish } from '../../helpers/firestore';
 import { formatTimeLeft } from '../../helpers/time';
+import { boostWish } from '../../helpers/firestore';
 
 export default function BoostPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, profile, updateProfile } = useAuth();
   const router = useRouter();
   const { theme } = useTheme();
   const [loading, setLoading] = useState(false);
@@ -19,6 +20,22 @@ export default function BoostPage() {
   const [alreadyBoosted, setAlreadyBoosted] = useState(false);
   const [boostedUntil, setBoostedUntil] = useState<Date | null>(null);
   const [timeLeft, setTimeLeft] = useState('');
+
+  const handleFreeBoost = async () => {
+    if (alreadyBoosted) {
+      Alert.alert('This wish is already boosted — try again later.');
+      return;
+    }
+    if (!id || !profile) return;
+    try {
+      await boostWish(id, 24);
+      await updateProfile({ boostCredits: (profile.boostCredits || 1) - 1 });
+      setBoostedUntil(new Date(Date.now() + 24 * 60 * 60 * 1000));
+      setDone(true);
+    } catch (err) {
+      console.error('Failed to apply free boost', err);
+    }
+  };
 
   useEffect(() => {
     const checkBoost = async () => {
@@ -105,6 +122,11 @@ export default function BoostPage() {
           <Text style={{ color: theme.text, marginBottom: 20 }}>
             Boost this wish for $0.50
           </Text>
+          {profile?.boostCredits && profile.boostCredits > 0 && (
+            <TouchableOpacity onPress={handleFreeBoost} style={[styles.button, { marginBottom: 10 }]}>\
+              <Text style={styles.buttonText}>Use Free Boost ({profile.boostCredits})</Text>\
+            </TouchableOpacity>
+          )}
           <TouchableOpacity onPress={handleBoost} style={styles.button} disabled={loading || alreadyBoosted}>
             {loading ? (
               <ActivityIndicator color="#000" />
