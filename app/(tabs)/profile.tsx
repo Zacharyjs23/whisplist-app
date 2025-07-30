@@ -8,11 +8,13 @@ import {
   Image,
   ScrollView,
   Animated,
+  Switch,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
+import * as Notifications from 'expo-notifications';
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -30,6 +32,12 @@ export default function Page() {
   const [streakCount, setStreakCount] = useState(0);
   const [dailyPrompt, setDailyPrompt] = useState<string | null>(null);
   const [latestWish, setLatestWish] = useState<Wish | null>(null);
+  const [reflectionHistory, setReflectionHistory] = useState<
+    { text: string; timestamp: number }[]
+  >([]);
+  const [boostImpact, setBoostImpact] = useState({ likes: 0, comments: 0 });
+  const [dailyReminder, setDailyReminder] = useState(false);
+  const [showSparkle, setShowSparkle] = useState(false);
   const boostAnim = useRef(new Animated.Value(1)).current;
   const { theme } = useTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
@@ -48,6 +56,23 @@ export default function Page() {
     if (!profile?.displayName) return;
     const url = Linking.createURL(`/profile/${profile.displayName}`);
     await Clipboard.setStringAsync(url);
+  };
+
+  const toggleReminder = async (val: boolean) => {
+    setDailyReminder(val);
+    await AsyncStorage.setItem('dailyPromptReminder', val ? 'true' : 'false');
+    const id = await AsyncStorage.getItem('dailyPromptReminderId');
+    if (id) await Notifications.cancelScheduledNotificationAsync(id);
+    if (val) {
+      const newId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'WhispList',
+          body: 'Time to post your wish for today!',
+        },
+        trigger: { hour: 9, minute: 0, repeats: true },
+      });
+      await AsyncStorage.setItem('dailyPromptReminderId', newId);
+    }
   };
 
   useEffect(() => {
@@ -72,6 +97,25 @@ export default function Page() {
       if (list.length > 0) {
         setLatestWish(list[0]);
       }
+
+      const boosted = list.filter(w => w.boosted != null);
+      const totalBoosts = boosted.length;
+      if ([5, 10, 20].includes(totalBoosts)) {
+        setShowSparkle(true);
+        setTimeout(() => setShowSparkle(false), 3000);
+      }
+      let likes = 0;
+      let comments = 0;
+      for (const w of boosted) {
+        likes += w.likes || 0;
+        try {
+          const cSnap = await getDocs(collection(db, 'wishes', w.id, 'comments'));
+          comments += cSnap.size;
+        } catch (err) {
+          console.error('Failed to count comments', err);
+        }
+      }
+      setBoostImpact({ likes, comments });
     };
     load();
   }, [user]);
@@ -94,19 +138,24 @@ export default function Page() {
       if (streak) setStreakCount(parseInt(streak, 10));
       const prompt = await AsyncStorage.getItem('dailyPromptText');
       if (prompt) setDailyPrompt(prompt);
+      const historyRaw = await AsyncStorage.getItem('reflectionHistory');
+      if (historyRaw) setReflectionHistory(JSON.parse(historyRaw));
+      const reminder = await AsyncStorage.getItem('dailyPromptReminder');
+      setDailyReminder(reminder === 'true');
     };
     loadLocal();
   }, []);
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={boostCount > 0 ? styles.avatarGlow : undefined}>
+      <View style={boostCount > 0 || streakCount >= 7 ? styles.avatarGlow : undefined}>
         {profile?.photoURL ? (
           <Image source={{ uri: profile.photoURL }} style={styles.avatar} />
         ) : (
           <View style={[styles.avatar, { backgroundColor: '#444' }]} />
         )}
       </View>
+      {showSparkle && <ConfettiCannon count={30} origin={{ x: 0, y: 0 }} fadeOut />}
       <TouchableOpacity onPress={handleImage} style={styles.imageButton}>
         <Text style={styles.imageButtonText}>Change Photo</Text>
       </TouchableOpacity>
@@ -140,6 +189,9 @@ export default function Page() {
         >
           You've boosted {boostCount} wishes 🌟
         </Animated.Text>
+        <Text style={styles.info}>
+          Your boosts earned ❤️ {boostImpact.likes} likes, 💬 {boostImpact.comments} comments
+        </Text>
         {latestBoost && (
           <View style={styles.boostPreview}>
             <Text style={styles.previewText} numberOfLines={2}>
@@ -162,6 +214,7 @@ export default function Page() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🌐 Public Profile</Text>
           <Text style={styles.info}>@{profile.displayName}</Text>
+          {profile.bio && <Text style={styles.info}>{profile.bio}</Text>}
           {latestWish && (
             <Text style={styles.previewText} numberOfLines={2}>
               {latestWish.text}
@@ -174,12 +227,31 @@ export default function Page() {
         </View>
       )}
 
+      {reflectionHistory.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🧠 Your reflections this week</Text>
+          {reflectionHistory.slice(0, 3).map((r, i) => (
+            <Text key={i} style={styles.info}>
+              {new Date(r.timestamp).toLocaleDateString()} — {r.text}
+            </Text>
+          ))}
+        </View>
+      )}
+
       {dailyPrompt && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🧠 Reflection</Text>
           <Text style={styles.info}>Yesterday, you said: '{dailyPrompt}'</Text>
         </View>
       )}
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>⏰ Daily Prompt Reminder</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={styles.info}>Remind me to post a wish daily</Text>
+          <Switch value={dailyReminder} onValueChange={toggleReminder} />
+        </View>
+      </View>
 
       <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
         <Text style={styles.signOutText}>Sign Out</Text>
