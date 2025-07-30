@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, StyleSheet, Text, TouchableOpacity, View, Share } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
@@ -8,6 +8,8 @@ import * as Linking from 'expo-linking';
 import { formatDistanceToNow } from 'date-fns';
 import { formatTimeLeft } from '../../helpers/time';
 import { db } from '../../firebase';
+import { followUser, unfollowUser } from '../../helpers/firestore';
+import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
 import type { Wish } from '../../types/Wish';
@@ -27,6 +29,9 @@ export default function Page() {
   const [profile, setProfile] = useState<any | null>(null);
   const [wishes, setWishes] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     const load = async () => {
@@ -39,13 +44,23 @@ export default function Page() {
         setLoading(false);
         return;
       }
-      const userData = userSnap.docs[0].data();
+      const userDoc = userSnap.docs[0];
+      const userData = userDoc.data();
+      setProfileId(userDoc.id);
       if (userData.publicProfileEnabled === false) {
         setProfile(null);
         setLoading(false);
         return;
       }
       setProfile(userData);
+      if (user && user.uid !== userDoc.id) {
+        try {
+          const followSnap = await getDoc(doc(db, 'users', user.uid, 'following', userDoc.id));
+          setIsFollowing(followSnap.exists());
+        } catch (err) {
+          console.warn('Failed to fetch follow status', err);
+        }
+      }
       const wishSnap = await getDocs(
         query(
           collection(db, 'wishes'),
@@ -100,6 +115,25 @@ export default function Page() {
       {profile.bio ? (
         <Text style={[styles.bio, { color: theme.text }]}>{profile.bio}</Text>
       ) : null}
+      {user && profileId && user.uid !== profileId && (
+        <TouchableOpacity
+          onPress={async () => {
+            if (isFollowing) {
+              await unfollowUser(user.uid, profileId);
+              setIsFollowing(false);
+            } else {
+              await followUser(user.uid, profileId);
+              setIsFollowing(true);
+            }
+          }}
+          style={{ marginBottom: 10 }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Text style={{ color: '#a78bfa', textAlign: 'center' }}>
+            {isFollowing ? 'Unfollow' : 'Follow'}
+          </Text>
+        </TouchableOpacity>
+      )}
       <TouchableOpacity
         onPress={handleCopy}
         style={[styles.copyButton, { backgroundColor: theme.input }]}

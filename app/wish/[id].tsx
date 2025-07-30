@@ -123,6 +123,10 @@ export default function Page() {
     wish?.boostedUntil &&
     wish.boostedUntil.toDate &&
     wish.boostedUntil.toDate() > new Date();
+  const isActiveWish =
+    isBoosted ||
+    (wish?.likes || 0) > 5 ||
+    wish?.active === true;
   const [timeLeft, setTimeLeft] = useState(
     isBoosted && wish?.boostedUntil?.toDate ? formatTimeLeft(wish.boostedUntil.toDate()) : ''
   );
@@ -432,7 +436,7 @@ try {
 
       const currentUser = user?.uid || 'anon';
       const userReaction = item.userReactions?.[currentUser];
-      const replies = comments.filter((c) => c.parentId === item.id);
+      const replies = isActiveWish ? comments.filter((c) => c.parentId === item.id) : [];
 
       return (
         <View key={item.id}>
@@ -486,9 +490,11 @@ try {
                   </Text>
                 </TouchableOpacity>
               ))}
-              <TouchableOpacity onPress={() => setReplyTo(item.id)} style={{ marginLeft: 8 }}>
-                <Text style={{ color: '#a78bfa' }}>Reply</Text>
-              </TouchableOpacity>
+              {isActiveWish && (
+                <TouchableOpacity onPress={() => setReplyTo(item.id)} style={{ marginLeft: 8 }}>
+                  <Text style={{ color: '#a78bfa' }}>Reply</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 onLongPress={() => {
                   setReportTarget({ type: 'comment', id: item.id });
@@ -505,7 +511,7 @@ try {
         </View>
       );
     },
-    [comments, handleReact, user]
+    [comments, handleReact, user, isActiveWish]
   );
 
   const renderComment = useCallback(({ item }: { item: Comment }) => renderCommentItem(item), [renderCommentItem]);
@@ -691,7 +697,7 @@ try {
 
 <FlatList
   ref={flatListRef}
-  data={comments.filter((c) => !c.parentId)}
+  data={comments.filter((c) => isActiveWish || !c.parentId)}
   keyExtractor={(item) => item.id}
   renderItem={renderComment}
   refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
