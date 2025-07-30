@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   View,
+  Text,
   Alert,
   Image,
   Share,
@@ -25,7 +26,7 @@ import * as Audio from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
 import * as Notifications from 'expo-notifications';
 import ReferralNameDialog from '@/components/ReferralNameDialog';
-import { addDoc, collection, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, serverTimestamp, getDocs, collectionGroup, query, where } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import React, { useEffect, useState } from 'react';
 import { db, storage } from '../../firebase';
@@ -76,7 +77,7 @@ export default function Page() {
   const [language, setLanguage] = useState('en');
   const [feedback, setFeedback] = useState('');
   const [anonymize, setAnonymize] = useState(false);
-  const [devMode, setDevMode] = useState(false);
+  const [devMode, setDevMode] = useState(profile?.developerMode === true);
   const [dailyQuote, setDailyQuote] = useState(false);
   const [publicProfileEnabled, setPublicProfileEnabled] = useState(
     profile?.publicProfileEnabled !== false
@@ -88,6 +89,12 @@ export default function Page() {
     new_comment: true,
     referral_bonus: true,
   });
+  const [analytics, setAnalytics] = useState({
+    wishCount: 0,
+    boostCount: 0,
+    giftCount: 0,
+    userCount: 0,
+  });
 
   useEffect(() => {
     const load = async () => {
@@ -95,14 +102,13 @@ export default function Page() {
       const cat = await AsyncStorage.getItem('defaultCategory');
       const lang = await AsyncStorage.getItem('language');
       const anon = await AsyncStorage.getItem('anonymize');
-      const dev = await AsyncStorage.getItem('devMode');
       const quote = await AsyncStorage.getItem('dailyQuote');
       const storedNickname = await AsyncStorage.getItem('nickname');
       if (a) setAvatarUrl(a);
       if (cat) setDefaultCategory(cat);
       if (lang) setLanguage(lang);
       setAnonymize(anon === 'true');
-      setDevMode(dev === 'true');
+      setDevMode(profile?.developerMode === true);
       setDailyQuote(quote === 'true');
         if (storedNickname)
           setLocalUser({ id: 'local', nickname: storedNickname });
@@ -112,6 +118,42 @@ export default function Page() {
     };
     load();
   }, [profile]);
+
+  useEffect(() => {
+    if (!profile?.developerMode) return;
+    let cancelled = false;
+    const fetchStats = async () => {
+      try {
+        const wishSnap = await getDocs(collection(db, 'wishes'));
+        let boost = 0;
+        wishSnap.forEach(d => {
+          const b = d.data().boostedUntil;
+          if (b && b.toDate && b.toDate() > new Date()) boost += 1;
+        });
+        const giftSnap = await getDocs(collectionGroup(db, 'gifts'));
+        const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const userSnap = await getDocs(
+          query(collection(db, 'users'), where('createdAt', '>=', since))
+        );
+        if (!cancelled) {
+          setAnalytics({
+            wishCount: wishSnap.size,
+            boostCount: boost,
+            giftCount: giftSnap.size,
+            userCount: userSnap.size,
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to load analytics', err);
+      }
+    };
+    fetchStats();
+    const id = setInterval(fetchStats, 5 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [profile?.developerMode]);
 
   const pickAvatar = async () => {
     const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -212,7 +254,7 @@ export default function Page() {
 
   const toggleDevMode = async (val: boolean) => {
     setDevMode(val);
-    await AsyncStorage.setItem('devMode', val ? 'true' : 'false');
+    await updateProfile({ developerMode: val });
   };
 
   const toggleDailyQuote = async (val: boolean) => {
@@ -381,6 +423,14 @@ export default function Page() {
       <ThemedButton title="Permissions" onPress={permissionsInfo} />
       <ThemedButton title="Delete My Content" onPress={handleDeleteContent} />
       <ThemedButton title="Reset App Data" onPress={handleReset} />
+      {profile?.developerMode && (
+        <View style={[styles.devAnalytics, { backgroundColor: theme.input }]}>
+          <Text style={{ color: theme.text }}>Total Wishes: {analytics.wishCount}</Text>
+          <Text style={{ color: theme.text }}>Total Boosts: {analytics.boostCount}</Text>
+          <Text style={{ color: theme.text }}>Total Gifts: {analytics.giftCount}</Text>
+          <Text style={{ color: theme.text }}>Active Users (past 7d): {analytics.userCount}</Text>
+        </View>
+      )}
       <ReferralNameDialog
         visible={refDialogVisible}
         defaultName={profile?.referralDisplayName || profile?.displayName || ''}
@@ -451,5 +501,10 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     alignSelf: 'center',
     marginVertical: 10,
+  },
+  devAnalytics: {
+    marginTop: 20,
+    padding: 12,
+    borderRadius: 8,
   },
 });
