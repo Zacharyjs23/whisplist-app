@@ -18,7 +18,8 @@ function LayoutInner() {
     const check = async () => {
       const seen = await AsyncStorage.getItem('hasSeenOnboarding');
       if (!seen && pathname !== '/onboarding') {
-        router.replace('/onboarding');
+        // Temporarily bypass onboarding for testing purposes
+        // router.replace('/onboarding');
       }
     };
     check();
