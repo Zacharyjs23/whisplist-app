@@ -56,6 +56,7 @@ interface Profile {
   stripeAccountId?: string;
   giftsReceived?: number;
   referralDisplayName?: string;
+  developerMode?: boolean;
 }
 
 interface AuthContextValue {
@@ -133,6 +134,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
             data.publicProfileEnabled = true;
           }
           if (data.boostCredits === undefined) data.boostCredits = 0;
+          if (data.developerMode === undefined) data.developerMode = false;
           setProfile(data);
         } else {
           const data: Profile = {
@@ -144,6 +146,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
             publicProfileEnabled: true,
             boostCredits: 0,
             createdAt: serverTimestamp(),
+            developerMode: false,
           };
           await setDoc(ref, data);
           try {
@@ -255,6 +258,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
       const snap = await getDoc(ref);
       const newData = snap.data() as Profile;
       if (newData.publicProfileEnabled === undefined) newData.publicProfileEnabled = true;
+      if (newData.developerMode === undefined) newData.developerMode = false;
       setProfile(newData);
     } catch (err) {
       console.error('Failed to update profile', err);

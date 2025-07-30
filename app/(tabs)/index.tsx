@@ -41,6 +41,7 @@ import {
   RefreshControl,
   Modal,
   Animated,
+  LayoutAnimation,
   ToastAndroid,
 } from 'react-native';
 import { Colors } from '@/constants/Colors';
@@ -87,7 +88,6 @@ export default function Page() {
   const [giftType, setGiftType] = useState('');
   const [giftLabel, setGiftLabel] = useState('');
   const [posting, setPosting] = useState(false);
-  const [showGiftOptions, setShowGiftOptions] = useState(false);
   const [autoDelete, setAutoDelete] = useState(false);
   const [rephrasing, setRephrasing] = useState(false);
   const [confirmGift, setConfirmGift] = useState<{link?: string; amount?: number; wishId?: string; recipientId?: string} | null>(null);
@@ -95,7 +95,8 @@ export default function Page() {
   const [thanksMessage, setThanksMessage] = useState('');
   const { theme } = useTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
-  const [useProfilePost, setUseProfilePost] = useState(true);
+  const [useProfilePost, setUseProfilePost] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
   const [stripeAccounts, setStripeAccounts] = useState<Record<string, string | null>>({});
   const [followStatus, setFollowStatus] = useState<Record<string, boolean>>({});
@@ -104,6 +105,8 @@ export default function Page() {
   const [impact, setImpact] = useState({ wishes: 0, boosts: 0, gifts: 0, giftTotal: 0 });
   const promptOpacity = useRef(new Animated.Value(0)).current;
   const { user, profile } = useAuth();
+  const stripeEnabled = profile?.giftingEnabled && profile?.stripeAccountId;
+  const [enableExternalGift, setEnableExternalGift] = useState(!stripeEnabled);
 
   if (!db || !storage) {
     console.error('Firebase modules undefined in index page', { db, storage });
@@ -426,7 +429,7 @@ useEffect(() => {
         displayName: useProfilePost ? profile?.displayName || '' : '',
         photoURL: useProfilePost ? profile?.photoURL || '' : '',
         isAnonymous: !useProfilePost,
-        ...(giftLink.trim() && {
+        ...(enableExternalGift && giftLink.trim() && {
           giftLink: giftLink.trim(),
           ...(giftType.trim() && { giftType: giftType.trim() }),
           ...(giftLabel.trim() && { giftLabel: giftLabel.trim() }),
@@ -463,6 +466,7 @@ useEffect(() => {
       setGiftLink('');
       setGiftType('');
       setGiftLabel('');
+      setEnableExternalGift(!stripeEnabled);
       setPostType('wish');
       Alert.alert('Wish posted!');
       await updateStreak();
@@ -534,11 +538,32 @@ useEffect(() => {
 
   const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
     const [timeLeft, setTimeLeft] = useState('');
+    const [giftCount, setGiftCount] = useState(0);
+    const [hasGiftMsg, setHasGiftMsg] = useState(false);
     const glowAnim = useRef(new Animated.Value(0)).current;
     const isBoosted =
       item.boostedUntil &&
       item.boostedUntil.toDate &&
       item.boostedUntil.toDate() > new Date();
+
+    useEffect(() => {
+      if (!item.id) return;
+      const load = async () => {
+        try {
+          const snaps = await Promise.all([
+            getDocs(collection(db, 'wishes', item.id, 'gifts')),
+            getDocs(collection(db, 'gifts', item.id, 'gifts')),
+          ]);
+          let msg = false;
+          snaps[0].forEach(d => { if (d.data().message) msg = true; });
+          setGiftCount(snaps[0].size + snaps[1].size);
+          setHasGiftMsg(msg);
+        } catch (err) {
+          console.warn('Failed to fetch gifts', err);
+        }
+      };
+      load();
+    }, [item.id]);
 
     useEffect(() => {
       if (isBoosted && item.boostedUntil?.toDate) {
@@ -618,7 +643,13 @@ useEffect(() => {
             <Text style={styles.likeText}>❤️ {item.likes}</Text>
           )}
           {isBoosted && (
-            <Text style={styles.boostedLabel}>⏳ Time left: {timeLeft}</Text>
+            <Text style={styles.boostedLabel}>⏳ Boost expires in {timeLeft}</Text>
+          )}
+          {(item.giftLink || giftCount > 0) && (
+            <Text style={styles.boostedLabel}>🎁 Supported by {giftCount} people</Text>
+          )}
+          {user?.uid === item.userId && hasGiftMsg && (
+            <Text style={styles.boostedLabel}>💬 You received a gift message</Text>
           )}
           {profile?.giftingEnabled && item.giftLink && (
             <TouchableOpacity
@@ -799,93 +830,101 @@ useEffect(() => {
                 <Picker.Item label="Dream 🌙" value="dream" />
               </Picker>
 
-                <TouchableOpacity onPress={() => setShowGiftOptions(!showGiftOptions)}>
-                  <Text style={styles.sectionTitle}>Gifting Options {showGiftOptions ? '▲' : '▼'}</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                    setShowAdvanced(!showAdvanced);
+                  }}
+                >
+                  <Text style={styles.sectionTitle}>Advanced Options {showAdvanced ? '▲' : '▼'}</Text>
                 </TouchableOpacity>
-                {showGiftOptions && (
+                {showAdvanced && (
                   <>
-                    {profile?.stripeAccountId && (
-                      <Text style={styles.info}>🎁 Accepting Apple Pay / card gifts via WhispList</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                      <Text style={{ color: theme.text, marginRight: 8 }}>Poll Mode</Text>
+                      <Switch value={isPoll} onValueChange={setIsPoll} />
+                    </View>
+                    {isPoll && (
+                      <>
+                        <Text style={styles.label}>Option A</Text>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Option A"
+                          placeholderTextColor="#999"
+                          value={optionA}
+                          onChangeText={setOptionA}
+                        />
+                        <Text style={styles.label}>Option B</Text>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Option B"
+                          placeholderTextColor="#999"
+                          value={optionB}
+                          onChangeText={setOptionB}
+                        />
+                      </>
                     )}
-                    <Text style={styles.label}>Add a gift link (e.g., Venmo, wishlist)</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Gift link (optional)"
-                      placeholderTextColor="#999"
-                      value={giftLink}
-                      onChangeText={setGiftLink}
-                    />
-                    <Text style={styles.label}>Gift Type</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="kofi, paypal, etc"
-                      placeholderTextColor="#999"
-                      value={giftType}
-                      onChangeText={setGiftType}
-                    />
-                    <Text style={styles.label}>Gift Label</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Support on Ko-fi"
-                      placeholderTextColor="#999"
-                      value={giftLabel}
-                      onChangeText={setGiftLabel}
-                    />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                      <Text style={{ color: theme.text, marginRight: 8 }}>Include Audio</Text>
+                      <Switch
+                        value={includeAudio}
+                        onValueChange={(v) => {
+                          setIncludeAudio(v);
+                          if (!v) {
+                            if (isRecording) stopRecording();
+                            setRecordedUri(null);
+                          }
+                        }}
+                      />
+                    </View>
+                    {stripeEnabled && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                        <Text style={{ color: theme.text, marginRight: 8 }}>Add External Gift Option</Text>
+                        <Switch value={enableExternalGift} onValueChange={setEnableExternalGift} />
+                      </View>
+                    )}
+                    {(!stripeEnabled || enableExternalGift) && (
+                      <>
+                        <Text style={styles.label}>Add a gift link (e.g., Venmo, wishlist)</Text>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Gift link (optional)"
+                          placeholderTextColor="#999"
+                          value={giftLink}
+                          onChangeText={setGiftLink}
+                        />
+                        <Text style={styles.label}>Gift Type</Text>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="kofi, paypal, etc"
+                          placeholderTextColor="#999"
+                          value={giftType}
+                          onChangeText={setGiftType}
+                        />
+                        <Text style={styles.label}>Gift Label</Text>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Support on Ko-fi"
+                          placeholderTextColor="#999"
+                          value={giftLabel}
+                          onChangeText={setGiftLabel}
+                        />
+                      </>
+                    )}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                      <Text style={{ color: theme.text, marginRight: 8 }}>Post with profile</Text>
+                      <Switch value={useProfilePost} onValueChange={setUseProfilePost} />
+                    </View>
                   </>
                 )}
 
-        {/* Poll Mode Switch and Inputs */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-          <Text style={{ color: '#fff', marginRight: 8 }}>Poll Mode</Text>
-          <Switch value={isPoll} onValueChange={setIsPoll} />
-        </View>
+        {/* Poll Mode Switch and Inputs removed, handled above */}
 
-        {/* Audio toggle */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-          <Text style={{ color: '#fff', marginRight: 8 }}>Include Audio</Text>
-          <Switch
-            value={includeAudio}
-            onValueChange={(v) => {
-              setIncludeAudio(v);
-              if (!v) {
-                if (isRecording) stopRecording();
-                setRecordedUri(null);
-              }
-            }}
-          />
-        </View>
-
-        {/* Post anonymously */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-          <Text style={{ color: '#fff', marginRight: 8 }}>Post with profile</Text>
-          <Switch value={useProfilePost} onValueChange={setUseProfilePost} />
-        </View>
-
+        {/* Auto-delete after 24h */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
           <Text style={{ color: '#fff', marginRight: 8 }}>Auto-delete after 24h</Text>
           <Switch value={autoDelete} onValueChange={setAutoDelete} />
         </View>
-
-        {isPoll && (
-          <>
-            <Text style={styles.label}>Option A</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Option A"
-              placeholderTextColor="#999"
-              value={optionA}
-              onChangeText={setOptionA}
-            />
-            <Text style={styles.label}>Option B</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Option B"
-              placeholderTextColor="#999"
-              value={optionB}
-              onChangeText={setOptionB}
-            />
-          </>
-        )}
 
         {/* Audio Recording Button */}
         {includeAudio && (
@@ -1188,6 +1227,10 @@ const createStyles = (c: (typeof Colors)['light'] & { name: string }) =>
       top: 6,
       right: 6,
       color: c.tint,
+      backgroundColor: c.input,
+      paddingHorizontal: 4,
+      paddingVertical: 2,
+      borderRadius: 4,
       fontSize: 12,
     },
     noResults: {

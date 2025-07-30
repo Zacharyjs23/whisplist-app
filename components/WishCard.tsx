@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -6,6 +6,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSavedWishes } from '@/contexts/SavedWishesContext';
 import type { Wish } from '../types/Wish';
 import { updateWishReaction } from '../helpers/firestore';
+import { db } from '../firebase';
+import { collection, getDocs } from 'firebase/firestore';
+import { formatTimeLeft } from '../helpers/time';
+import { useAuth } from '@/contexts/AuthContext';
 
 const typeColors: Record<string, string> = {
   dream: '#312e81',
@@ -33,6 +37,45 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void }> = ({ wish
   const { theme } = useTheme();
   const router = useRouter();
   const { saved, toggleSave } = useSavedWishes();
+  const { user } = useAuth();
+  const [giftCount, setGiftCount] = useState(0);
+  const [hasGiftMsg, setHasGiftMsg] = useState(false);
+  const [timeLeft, setTimeLeft] = useState('');
+
+  const isBoosted =
+    wish.boostedUntil &&
+    wish.boostedUntil.toDate &&
+    wish.boostedUntil.toDate() > new Date();
+
+  useEffect(() => {
+    if (!wish.id) return;
+    const load = async () => {
+      try {
+        const snaps = await Promise.all([
+          getDocs(collection(db, 'wishes', wish.id, 'gifts')),
+          getDocs(collection(db, 'gifts', wish.id, 'gifts')),
+        ]);
+        let msg = false;
+        snaps[0].forEach(d => { if (d.data().message) msg = true; });
+        setGiftCount(snaps[0].size + snaps[1].size);
+        setHasGiftMsg(msg);
+      } catch (err) {
+        console.warn('Failed to fetch gifts', err);
+      }
+    };
+    load();
+  }, [wish.id]);
+
+  useEffect(() => {
+    if (!isBoosted || !wish.boostedUntil?.toDate) {
+      setTimeLeft('');
+      return;
+    }
+    const update = () => setTimeLeft(formatTimeLeft(wish.boostedUntil.toDate()));
+    update();
+    const id = setInterval(update, 60000);
+    return () => clearInterval(id);
+  }, [isBoosted, wish.boostedUntil]);
 
   const borderColor = moodColors[wish.mood || ''] || typeColors[wish.type || ''] || theme.tint;
   const bgTint = `${borderColor}33`;
@@ -75,6 +118,15 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void }> = ({ wish
           />
         </TouchableOpacity>
       </View>
+      {isBoosted && (
+        <Text style={[styles.boostLabel, { color: theme.tint }]}>⏳ Boost expires in {timeLeft}</Text>
+      )}
+      {(wish.giftLink || giftCount > 0) && (
+        <Text style={[styles.giftInfo, { color: theme.tint }]}>🎁 Supported by {giftCount} people</Text>
+      )}
+      {user?.uid === wish.userId && hasGiftMsg && (
+        <Text style={[styles.giftInfo, { color: theme.tint }]}>💬 You received a gift message</Text>
+      )}
       {wish.expiresAt && (
         <Text style={{ color: theme.tint, marginTop: 4 }}>
           ⏳{' '}
@@ -125,6 +177,14 @@ const styles = StyleSheet.create({
   },
   reactionText: {
     fontSize: 18,
+  },
+  boostLabel: {
+    marginTop: 4,
+    fontSize: 12,
+  },
+  giftInfo: {
+    marginTop: 4,
+    fontSize: 12,
   },
   reportButton: {
     marginTop: 4,
