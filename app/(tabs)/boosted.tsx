@@ -58,13 +58,18 @@ export default function Page() {
       await Promise.all(
         ids.map(async (id) => {
           if (publicStatus[id] === undefined) {
-            const snap = await getDoc(doc(db, 'users', id));
-            setPublicStatus((prev) => ({
-              ...prev,
-              [id]: snap.exists()
-                ? snap.data().publicProfileEnabled !== false
-                : false,
-            }));
+            try {
+              const snap = await getDoc(doc(db, 'users', id));
+              setPublicStatus((prev) => ({
+                ...prev,
+                [id]: snap.exists()
+                  ? snap.data().publicProfileEnabled !== false
+                  : false,
+              }));
+            } catch (err) {
+              console.warn('Failed to fetch profile status', err);
+              setPublicStatus((prev) => ({ ...prev, [id]: false }));
+            }
           }
         })
       );

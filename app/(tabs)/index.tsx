@@ -127,18 +127,28 @@ useEffect(() => {
       await Promise.all(
         ids.map(async (id) => {
           if (publicStatus[id] === undefined || stripeAccounts[id] === undefined) {
-            const snap = await getDoc(doc(db, 'users', id));
-            if (publicStatus[id] === undefined) {
-              setPublicStatus((prev) => ({
-                ...prev,
-                [id]: snap.exists() ? snap.data().publicProfileEnabled !== false : false,
-              }));
-            }
-            if (stripeAccounts[id] === undefined) {
-              setStripeAccounts((prev) => ({
-                ...prev,
-                [id]: snap.exists() ? snap.data().stripeAccountId || null : null,
-              }));
+            try {
+              const snap = await getDoc(doc(db, 'users', id));
+              if (publicStatus[id] === undefined) {
+                setPublicStatus((prev) => ({
+                  ...prev,
+                  [id]: snap.exists() ? snap.data().publicProfileEnabled !== false : false,
+                }));
+              }
+              if (stripeAccounts[id] === undefined) {
+                setStripeAccounts((prev) => ({
+                  ...prev,
+                  [id]: snap.exists() ? snap.data().stripeAccountId || null : null,
+                }));
+              }
+            } catch (err) {
+              console.warn('Failed to fetch user', err);
+              if (publicStatus[id] === undefined) {
+                setPublicStatus((prev) => ({ ...prev, [id]: false }));
+              }
+              if (stripeAccounts[id] === undefined) {
+                setStripeAccounts((prev) => ({ ...prev, [id]: null }));
+              }
             }
           }
         })
@@ -164,8 +174,13 @@ useEffect(() => {
       await Promise.all(
         ids.map(async (id) => {
           if (followStatus[id] === undefined) {
-            const snap = await getDoc(doc(db, 'users', user.uid, 'following', id));
-            setFollowStatus((prev) => ({ ...prev, [id]: snap.exists() }));
+            try {
+              const snap = await getDoc(doc(db, 'users', user.uid, 'following', id));
+              setFollowStatus((prev) => ({ ...prev, [id]: snap.exists() }));
+            } catch (err) {
+              console.warn('Failed to fetch follow status for', id, err);
+              setFollowStatus((prev) => ({ ...prev, [id]: false }));
+            }
           }
         })
       );

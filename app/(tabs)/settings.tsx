@@ -324,7 +324,7 @@ export default function Page() {
       {avatarUrl && <Image source={{ uri: avatarUrl }} style={styles.avatar} />}
       {profile?.boostCredits !== undefined && (
         <ThemedText style={styles.section}>
-          You've earned {profile.boostCredits} free boosts!
+          You&apos;ve earned {profile.boostCredits} free boosts!
         </ThemedText>
       )}
       <ThemedButton title="Refer a Friend" onPress={handleShareInvite} />

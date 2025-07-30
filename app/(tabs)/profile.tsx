@@ -208,7 +208,7 @@ export default function Page() {
         <Animated.Text
           style={[styles.boostCount, { transform: [{ scale: boostAnim }] }]}
         >
-          You've boosted {boostCount} wishes 🌟
+          You&apos;ve boosted {boostCount} wishes 🌟
         </Animated.Text>
         <Text style={styles.info}>
           Your boosts earned ❤️ {boostImpact.likes} likes, 💬 {boostImpact.comments} comments
@@ -226,7 +226,7 @@ export default function Page() {
       {streakCount > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📅 Streak</Text>
-          <Text style={styles.info}>🔥 {streakCount}-day streak — you're on fire!</Text>
+          <Text style={styles.info}>🔥 {streakCount}-day streak — you&apos;re on fire!</Text>
           {streakCount > 3 && <ConfettiCannon count={40} origin={{ x: 0, y: 0 }} fadeOut />}
         </View>
       )}
@@ -234,7 +234,7 @@ export default function Page() {
       {profile?.giftsReceived != null && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>💝 Gifts</Text>
-          <Text style={styles.info}>You've received {profile.giftsReceived} gifts</Text>
+          <Text style={styles.info}>You&apos;ve received {profile.giftsReceived} gifts</Text>
         </View>
       )}
 
@@ -242,7 +242,7 @@ export default function Page() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🎁 Referrals</Text>
           <Text style={styles.info}>
-            You've invited {referralCount} people — max {Math.max(0, 4 - referralCount)} more to unlock another reward
+            You&apos;ve invited {referralCount} people — max {Math.max(0, 4 - referralCount)} more to unlock another reward
           </Text>
         </View>
       )}
@@ -286,7 +286,7 @@ export default function Page() {
       {dailyPrompt && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🧠 Reflection</Text>
-          <Text style={styles.info}>Yesterday, you said: '{dailyPrompt}'</Text>
+            <Text style={styles.info}>Yesterday, you said: &apos;{dailyPrompt}&apos;</Text>
         </View>
       )}
 
