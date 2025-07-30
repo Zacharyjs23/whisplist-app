@@ -1,4 +1,4 @@
-// app/(tabs)/explore.tsx — Visually Enhanced Explore Screen with Pull-to-Refresh
+// app/(tabs)/feed.tsx — Combined Feed Screen with segmented tabs
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
@@ -23,6 +23,7 @@ import {
   getFollowingIds,
   listenBoostedWishes,
 } from '../../helpers/firestore';
+import { formatTimeLeft } from '../../helpers/time';
 import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
@@ -45,7 +46,7 @@ export default function Page() {
   const { theme } = useTheme();
 
   if (!db) {
-    console.error('Firebase database undefined in explore page');
+    console.error('Firebase database undefined in feed page');
   }
   if (user === undefined) {
     console.error('AuthContext returned undefined user');
@@ -55,8 +56,7 @@ export default function Page() {
   const [topWishes, setTopWishes] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [trendingMode, setTrendingMode] = useState(false);
-  const [boostedMode, setBoostedMode] = useState(false);
+  const [activeTab, setActiveTab] = useState<'latest' | 'boosted' | 'trending'>('latest');
   const [searchTerm, setSearchTerm] = useState('');
   const [reportVisible, setReportVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
@@ -77,7 +77,7 @@ export default function Page() {
   const fetchWishes = useCallback(() => {
     setLoading(true);
     try {
-      if (boostedMode) {
+      if (activeTab === 'boosted') {
         return listenBoostedWishes((all: Wish[]) => {
           const filtered = all.filter((wish) => {
             const inCategory = !selectedCategory || wish.category === selectedCategory;
@@ -89,12 +89,12 @@ export default function Page() {
         });
       }
 
-      const unsubscribe = trendingMode
+      const unsubscribe = activeTab === 'trending'
         ? listenTrendingWishes((all: Wish[]) => {
             try {
               const filtered = all.filter((wish) => {
                 const inCategory =
-                  trendingMode || !selectedCategory || wish.category === selectedCategory;
+                  activeTab === 'trending' || !selectedCategory || wish.category === selectedCategory;
                 const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
                 return inCategory && inSearch;
               });
@@ -110,7 +110,7 @@ export default function Page() {
             try {
               const filtered = all.filter((wish) => {
                 const inCategory =
-                  trendingMode || !selectedCategory || wish.category === selectedCategory;
+                  activeTab === 'trending' || !selectedCategory || wish.category === selectedCategory;
                 const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
                 return inCategory && inSearch;
               });
@@ -127,9 +127,9 @@ export default function Page() {
       console.error('❌ Failed to load wishes:', err);
       setError('Failed to load wishes');
       setLoading(false);
-      return () => { };
+      return () => {};
     }
-  }, [trendingMode, boostedMode, selectedCategory, searchTerm, user]);
+  }, [activeTab, selectedCategory, searchTerm, user]);
 
   useEffect(() => {
     const unsubscribe = fetchWishes();
@@ -139,7 +139,7 @@ export default function Page() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      if (boostedMode) {
+      if (activeTab === 'boosted') {
         const now = new Date();
         const boostedSnap = await getDocs(
           query(collection(db, 'wishes'), where('boostedUntil', '>', now), orderBy('boostedUntil', 'desc'))
@@ -151,13 +151,13 @@ export default function Page() {
           return inCategory && inSearch;
         });
         setFilteredWishes(filtered);
-      } else if (trendingMode) {
+      } else if (activeTab === 'trending') {
         const q = query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(20));
         const snap = await getDocs(q);
         const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
         const filtered = all.filter((wish) => {
           const inCategory =
-            trendingMode || !selectedCategory || wish.category === selectedCategory;
+            activeTab === 'trending' || !selectedCategory || wish.category === selectedCategory;
           const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
           return inCategory && inSearch;
         });
@@ -199,11 +199,7 @@ export default function Page() {
     } finally {
       setRefreshing(false);
     }
-  }, [boostedMode, trendingMode, selectedCategory, searchTerm, user]);
-
-  const toggleTrending = (mode: boolean) => {
-    setTrendingMode(mode);
-  };
+  }, [activeTab, selectedCategory, searchTerm, user]);
 
   const Skeleton: React.FC = () => (
     <View style={styles.skeletonContainer}>
@@ -309,7 +305,7 @@ export default function Page() {
           contentContainerStyle={styles.contentContainer}
           ListHeaderComponent={
             <>
-              <Text style={styles.title}>Explore Wishes 🧭</Text>
+              <Text style={styles.title}>Feed</Text>
 
         <TextInput
           style={[
@@ -323,48 +319,23 @@ export default function Page() {
         />
 
         <View style={styles.toggleBar}>
-          <TouchableOpacity
-            onPress={() => setBoostedMode(false)}
-            style={[styles.toggleButton, { backgroundColor: theme.input }, !boostedMode && styles.activeToggle]}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Text style={[styles.toggleText, !boostedMode && styles.activeToggleText]}>Explore</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setBoostedMode(true)}
-            style={[styles.toggleButton, { backgroundColor: theme.input }, boostedMode && styles.activeToggle]}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Text style={[styles.toggleText, boostedMode && styles.activeToggleText]}>🚀 Boosted</Text>
-          </TouchableOpacity>
+          {(['boosted', 'latest', 'trending'] as const).map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              onPress={() => setActiveTab(tab)}
+              style={[
+                styles.toggleButton,
+                { backgroundColor: theme.input },
+                activeTab === tab && { backgroundColor: theme.tint },
+              ]}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={[styles.toggleText, activeTab === tab && styles.activeToggleText]}>
+                {tab === 'boosted' ? '🔥 Boosted' : tab === 'latest' ? '💬 Latest' : '📈 Trending'}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
-
-        {!boostedMode && (
-        <View style={styles.toggleBar}>
-          <TouchableOpacity
-            onPress={() => toggleTrending(false)}
-            style={[
-              styles.toggleButton,
-              { backgroundColor: theme.input },
-              !trendingMode && styles.activeToggle,
-            ]}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Text style={[styles.toggleText, !trendingMode && styles.activeToggleText]}>Latest</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => toggleTrending(true)}
-            style={[
-              styles.toggleButton,
-              { backgroundColor: theme.input },
-              trendingMode && styles.activeToggle,
-            ]}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Text style={[styles.toggleText, trendingMode && styles.activeToggleText]}>🔥 Trending</Text>
-          </TouchableOpacity>
-        </View>
-        )}
 
         <Picker
           selectedValue={selectedCategory}
@@ -382,7 +353,7 @@ export default function Page() {
           ))}
         </Picker>
 
-        {!trendingMode && topWishes.length > 0 && (
+        {activeTab !== 'trending' && topWishes.length > 0 && (
           <View style={styles.topSection}>
             <Text style={styles.sectionTitle}>🔥 <Text style={{ color: '#a78bfa' }}>Top Wishes</Text></Text>
             {topWishes.map((wish) => (
@@ -421,7 +392,7 @@ export default function Page() {
       </SafeAreaView>
     );
   } catch (err) {
-    console.error('Error rendering explore page', err);
+    console.error('Error rendering feed page', err);
     return null;
   }
 }
