@@ -12,6 +12,7 @@ import {
   boostWish,
   setFulfillmentLink,
 } from '../../helpers/firestore';
+import { createGiftCheckout } from '../../helpers/firestore';
 
 import {
   addDoc,
@@ -47,7 +48,7 @@ import {
   RefreshControl,
   ScrollView,
 } from 'react-native';
-import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '@/contexts/ThemeContext';
 import { BarChart } from 'react-native-chart-kit';
 import ReportDialog from '../../components/ReportDialog';
@@ -101,6 +102,7 @@ export default function Page() {
   const [postingComment, setPostingComment] = useState(false);
   const [useProfileComment, setUseProfileComment] = useState(true);
   const [nickname, setNickname] = useState('');
+  const [owner, setOwner] = useState<any | null>(null);
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
   const [verifiedStatus, setVerifiedStatus] = useState<Record<string, boolean>>({});
   const [refreshing, setRefreshing] = useState(false);
@@ -159,6 +161,10 @@ export default function Page() {
       const data = await getWish(id as string);
       if (data) {
         setWish(data);
+        if (data.userId) {
+          const snap = await getDoc(doc(db, 'users', data.userId));
+          setOwner(snap.exists() ? snap.data() : null);
+        }
       }
     } catch (err) {
       console.error('❌ Failed to load wish:', err);
@@ -382,6 +388,26 @@ try {
     router.push(`/boost/${wish.id}`);
   }, [router, wish]);
 
+  const openGiftLink = useCallback((link: string) => {
+    Alert.alert('Leaving WhispList', "You're leaving WhispList to send a gift.", [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Continue', onPress: () => WebBrowser.openBrowserAsync(link) },
+    ]);
+  }, []);
+
+  const handleSendMoney = useCallback(
+    async (amount: number) => {
+      if (!wish || !wish.userId) return;
+      try {
+        const res = await createGiftCheckout(wish.id, amount, wish.userId);
+        if (res.url) await WebBrowser.openBrowserAsync(res.url);
+      } catch (err) {
+        console.error('Failed to create gift checkout', err);
+      }
+    },
+    [wish]
+  );
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchWish();
@@ -597,13 +623,39 @@ try {
           </TouchableOpacity>
         )}
 
-        {wish.giftLink && (
+        {profile?.giftingEnabled && wish.giftLink && (
           <TouchableOpacity
-            onPress={() => Linking.openURL(wish.giftLink!)}
-            style={{ marginTop: 8 }}
+            onPress={() =>
+              Alert.alert('Leaving WhispList', 'You\'re leaving WhispList to send a gift.', [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Continue',
+                  onPress: () => WebBrowser.openBrowserAsync(wish.giftLink!),
+                },
+              ])
+            }
+            style={{ marginTop: 8, backgroundColor: theme.input, padding: 8, borderRadius: 8 }}
           >
-            <Text style={{ color: '#34d399' }}>Fulfill this wish</Text>
+            <Text style={{ color: theme.tint }}>🎁 {wish.giftLabel || 'Send Gift'}</Text>
           </TouchableOpacity>
+        )}
+        {profile?.giftingEnabled && owner?.stripeAccountId && (
+          <View style={{ flexDirection: 'row', marginTop: 8 }}>
+            {[3,5,10].map((amt) => (
+              <TouchableOpacity
+                key={amt}
+                onPress={() => handleSendMoney(amt)}
+                style={{
+                  backgroundColor: theme.input,
+                  padding: 8,
+                  borderRadius: 8,
+                  marginRight: 6,
+                }}
+              >
+                <Text style={{ color: theme.tint }}>${amt}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         )}
 
         {canBoost && (

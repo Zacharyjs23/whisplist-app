@@ -52,6 +52,9 @@ interface Profile {
   publicProfileEnabled?: boolean;
   boostCredits?: number;
   createdAt?: any;
+  giftingEnabled?: boolean;
+  stripeAccountId?: string;
+  giftsReceived?: number;
 }
 
 interface AuthContextValue {

@@ -18,6 +18,7 @@ import {
   TextInput,
   SafeAreaView,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { Picker } from '@react-native-picker/picker';
 import * as Audio from 'expo-audio';
@@ -80,6 +81,7 @@ export default function Page() {
   const [publicProfileEnabled, setPublicProfileEnabled] = useState(
     profile?.publicProfileEnabled !== false
   );
+  const [stripeEnabled, setStripeEnabled] = useState(profile?.giftingEnabled === true);
   const [refDialogVisible, setRefDialogVisible] = useState(false);
   const [pushPrefs, setPushPrefs] = useState({
     wish_boosted: true,
@@ -222,6 +224,28 @@ export default function Page() {
     await updateProfile({ publicProfileEnabled: val });
   };
 
+  const toggleStripe = async (val: boolean) => {
+    setStripeEnabled(val);
+    await updateProfile({ giftingEnabled: val });
+    if (val && !profile?.stripeAccountId && user?.uid) {
+      try {
+        const resp = await fetch(
+          `https://us-central1-${process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID}.cloudfunctions.net/createStripeAccountLink`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid: user.uid }),
+          }
+        );
+        const data = await resp.json();
+        if (data.accountId) await updateProfile({ stripeAccountId: data.accountId });
+        if (data.url) await WebBrowser.openBrowserAsync(data.url);
+      } catch (err) {
+        console.error('Failed to start Stripe onboarding', err);
+      }
+    }
+  };
+
   const togglePush = async (key: keyof typeof pushPrefs, val: boolean) => {
     const updated = { ...pushPrefs, [key]: val };
     setPushPrefs(updated);
@@ -289,6 +313,10 @@ export default function Page() {
       <View style={styles.row}>
         <ThemedText style={styles.label}>Public Profile Enabled</ThemedText>
         <Switch value={publicProfileEnabled} onValueChange={togglePublicProfile} />
+      </View>
+      <View style={styles.row}>
+        <ThemedText style={styles.label}>Enable Stripe Gifting</ThemedText>
+        <Switch value={stripeEnabled} onValueChange={toggleStripe} />
       </View>
 
       <ThemedButton title="Pick Avatar" onPress={pickAvatar} />
