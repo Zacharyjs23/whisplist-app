@@ -170,21 +170,34 @@ export default function JournalPage() {
 
   const requestNewPrompt = async () => {
     const recentRaw = await AsyncStorage.getItem('recentPrompts');
-    let recent = recentRaw ? JSON.parse(recentRaw) as string[] : [];
+    let recent = recentRaw ? (JSON.parse(recentRaw) as string[]) : [];
+
     let newPrompt = prompt;
-    for (let i = 0; i < 10; i++) {
-      const p = prompts[Math.floor(Math.random() * prompts.length)];
-      if (p !== prompt && !recent.includes(p)) {
-        newPrompt = p;
-        break;
+    const available = prompts.filter((p) => p !== prompt && !recent.includes(p));
+    if (available.length > 0) {
+      newPrompt = available[Math.floor(Math.random() * available.length)];
+    } else {
+      // fallback to any prompt different from current
+      for (let i = 0; i < 10; i++) {
+        const p = prompts[Math.floor(Math.random() * prompts.length)];
+        if (p !== prompt) {
+          newPrompt = p;
+          break;
+        }
       }
     }
+
     await AsyncStorage.setItem('dailyPromptText', newPrompt);
-    recent = [newPrompt, ...recent.filter(r => r !== newPrompt)].slice(0, 3);
+    recent = [newPrompt, ...recent.filter((r) => r !== newPrompt)].slice(0, 3);
     await AsyncStorage.setItem('recentPrompts', JSON.stringify(recent));
+
     promptOpacity.setValue(0);
     setPrompt(newPrompt);
-    Animated.timing(promptOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+    Animated.timing(promptOpacity, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
     const msg = "✨ That's a deep one.";
     if (Platform.OS === 'android') {
       ToastAndroid.show(msg, ToastAndroid.SHORT);

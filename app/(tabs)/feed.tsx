@@ -379,7 +379,7 @@ export default function Page() {
           ))}
         </Picker>
 
-        {activeTab !== 'trending' && topWishes.length > 0 && (
+        {activeTab === 'trending' && topWishes.length > 0 && (
           <View style={styles.topSection}>
             <Text style={styles.sectionTitle}>🔥 <Text style={{ color: '#a78bfa' }}>Top Wishes</Text></Text>
             {topWishes.map((wish) => (
