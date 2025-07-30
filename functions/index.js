@@ -95,4 +95,6 @@ exports.notifyWishBoost = functions.firestore
     return null;
   });
 exports.createCheckoutSession = require('./createCheckoutSession').createCheckoutSession;
+exports.createGiftCheckoutSession = require('./createGiftCheckoutSession').createGiftCheckoutSession;
+exports.createStripeAccountLink = require('./createStripeAccountLink').createStripeAccountLink;
 exports.stripeWebhook = require('./stripeWebhook').stripeWebhook;

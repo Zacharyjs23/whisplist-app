@@ -17,6 +17,14 @@ export interface Wish {
   imageUrl?: string;
   giftLink?: string;
   /**
+   * Type of external gift link (e.g. 'kofi', 'paypal')
+   */
+  giftType?: string;
+  /**
+   * Label shown on gift button
+   */
+  giftLabel?: string;
+  /**
    * Link provided by a user after fulfilling the wish
    */
   fulfillmentLink?: string;

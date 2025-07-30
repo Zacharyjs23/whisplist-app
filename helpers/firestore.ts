@@ -155,6 +155,22 @@ export async function createBoostCheckout(wishId: string, userId: string) {
   return (await resp.json()) as { url: string; sessionId: string };
 }
 
+export async function createGiftCheckout(
+  wishId: string,
+  amount: number,
+  recipientId: string
+) {
+  const resp = await fetch(
+    `https://us-central1-${process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID}.cloudfunctions.net/createGiftCheckoutSession`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wishId, amount, recipientId }),
+    }
+  );
+  return (await resp.json()) as { url: string };
+}
+
 export async function setFulfillmentLink(id: string, link: string) {
   const ref = doc(db, 'wishes', id);
   return updateDoc(ref, { fulfillmentLink: link });
@@ -223,6 +239,8 @@ export async function getWishesByNickname(nickname: string): Promise<Wish[]> {
       audioUrl: data.audioUrl,
       imageUrl: data.imageUrl,
       giftLink: data.giftLink,
+      giftType: data.giftType,
+      giftLabel: data.giftLabel,
       fulfillmentLink: data.fulfillmentLink,
       isPoll: data.isPoll,
       optionA: data.optionA,
@@ -259,6 +277,8 @@ export async function getAllWishes(): Promise<Wish[]> {
       audioUrl: data.audioUrl,
       imageUrl: data.imageUrl,
       giftLink: data.giftLink,
+      giftType: data.giftType,
+      giftLabel: data.giftLabel,
       fulfillmentLink: data.fulfillmentLink,
       isPoll: data.isPoll,
       optionA: data.optionA,

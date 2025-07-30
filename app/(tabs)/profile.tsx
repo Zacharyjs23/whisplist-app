@@ -231,6 +231,13 @@ export default function Page() {
         </View>
       )}
 
+      {profile?.giftsReceived != null && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>💝 Gifts</Text>
+          <Text style={styles.info}>You've received {profile.giftsReceived} gifts</Text>
+        </View>
+      )}
+
       {referralCount > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🎁 Referrals</Text>

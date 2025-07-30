@@ -15,9 +15,11 @@ import {
   followUser,
   unfollowUser,
 } from '../../helpers/firestore';
+import { createGiftCheckout } from '../../helpers/firestore';
 import { formatTimeLeft } from '../../helpers/time';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
+import * as WebBrowser from 'expo-web-browser';
 import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
@@ -79,11 +81,14 @@ export default function Page() {
   const [includeAudio, setIncludeAudio] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [giftLink, setGiftLink] = useState('');
+  const [giftType, setGiftType] = useState('');
+  const [giftLabel, setGiftLabel] = useState('');
   const [posting, setPosting] = useState(false);
   const { theme } = useTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const [useProfilePost, setUseProfilePost] = useState(true);
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
+  const [stripeAccounts, setStripeAccounts] = useState<Record<string, string | null>>({});
   const [followStatus, setFollowStatus] = useState<Record<string, boolean>>({});
   const [streakCount, setStreakCount] = useState(0);
   const [dailyPrompt, setDailyPrompt] = useState('');
@@ -121,12 +126,20 @@ useEffect(() => {
     try {
       await Promise.all(
         ids.map(async (id) => {
-          if (publicStatus[id] === undefined) {
+          if (publicStatus[id] === undefined || stripeAccounts[id] === undefined) {
             const snap = await getDoc(doc(db, 'users', id));
-            setPublicStatus((prev) => ({
-              ...prev,
-              [id]: snap.exists() ? snap.data().publicProfileEnabled !== false : false,
-            }));
+            if (publicStatus[id] === undefined) {
+              setPublicStatus((prev) => ({
+                ...prev,
+                [id]: snap.exists() ? snap.data().publicProfileEnabled !== false : false,
+              }));
+            }
+            if (stripeAccounts[id] === undefined) {
+              setStripeAccounts((prev) => ({
+                ...prev,
+                [id]: snap.exists() ? snap.data().stripeAccountId || null : null,
+              }));
+            }
           }
         })
       );
@@ -288,6 +301,11 @@ useEffect(() => {
 
     setPosting(true);
     try {
+      if (giftLink.trim() && !/^https?:\/\//.test(giftLink.trim())) {
+        Alert.alert('Invalid link', 'Gift link must start with http:// or https://');
+        setPosting(false);
+        return;
+      }
       let audioUrl = '';
       let imageUrl = '';
       if (includeAudio && recordedUri) {
@@ -312,7 +330,11 @@ useEffect(() => {
         displayName: useProfilePost ? profile?.displayName || '' : '',
         photoURL: useProfilePost ? profile?.photoURL || '' : '',
         isAnonymous: !useProfilePost,
-        ...(giftLink.trim() && { giftLink: giftLink.trim() }),
+        ...(giftLink.trim() && {
+          giftLink: giftLink.trim(),
+          ...(giftType.trim() && { giftType: giftType.trim() }),
+          ...(giftLabel.trim() && { giftLabel: giftLabel.trim() }),
+        }),
         ...(isPoll && {
           isPoll: true,
           optionA: optionA.trim(),
@@ -342,6 +364,8 @@ useEffect(() => {
       setIncludeAudio(false);
       setSelectedImage(null);
       setGiftLink('');
+      setGiftType('');
+      setGiftLabel('');
       setPostType('wish');
       Alert.alert('Wish posted!');
       await updateStreak();
@@ -450,6 +474,23 @@ useEffect(() => {
         !item.boostedUntil.toDate ||
         item.boostedUntil.toDate() < new Date());
 
+    const openGiftLink = (link: string) => {
+      Alert.alert('Leaving WhispList', 'You\'re leaving WhispList to send a gift.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Continue', onPress: () => WebBrowser.openBrowserAsync(link) },
+      ]);
+    };
+
+    const sendMoney = async (amount: number) => {
+      if (!item.id || !item.userId) return;
+      try {
+        const res = await createGiftCheckout(item.id, amount, item.userId);
+        if (res.url) await WebBrowser.openBrowserAsync(res.url);
+      } catch (err) {
+        console.error('Failed to create gift checkout', err);
+      }
+    };
+
     return (
       <Animated.View
         style={[
@@ -487,6 +528,32 @@ useEffect(() => {
           )}
           {isBoosted && (
             <Text style={styles.boostedLabel}>⏳ Time left: {timeLeft}</Text>
+          )}
+          {profile?.giftingEnabled && item.giftLink && (
+            <TouchableOpacity
+              onPress={() => openGiftLink(item.giftLink!)}
+              style={{ marginTop: 6, backgroundColor: theme.input, padding: 6, borderRadius: 6 }}
+            >
+              <Text style={{ color: theme.tint }}>🎁 {item.giftLabel || 'Send Gift'}</Text>
+            </TouchableOpacity>
+          )}
+          {profile?.giftingEnabled && stripeAccounts[item.userId || ''] && (
+            <View style={{ flexDirection: 'row', marginTop: 4 }}>
+              {[3,5,10].map((amt) => (
+                <TouchableOpacity
+                  key={amt}
+                  onPress={() => sendMoney(amt)}
+                  style={{
+                    backgroundColor: theme.input,
+                    padding: 6,
+                    borderRadius: 6,
+                    marginRight: 4,
+                  }}
+                >
+                  <Text style={{ color: theme.tint }}>${amt}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           )}
         </TouchableOpacity>
 
@@ -628,6 +695,22 @@ useEffect(() => {
           placeholderTextColor="#999"
           value={giftLink}
           onChangeText={setGiftLink}
+        />
+        <Text style={styles.label}>Gift Type</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="kofi, paypal, etc"
+          placeholderTextColor="#999"
+          value={giftType}
+          onChangeText={setGiftType}
+        />
+        <Text style={styles.label}>Gift Label</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Support on Ko-fi"
+          placeholderTextColor="#999"
+          value={giftLabel}
+          onChangeText={setGiftLabel}
         />
 
         {/* Poll Mode Switch and Inputs */}
