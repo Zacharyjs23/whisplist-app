@@ -47,6 +47,7 @@ import {
   Alert,
   RefreshControl,
   ScrollView,
+  Modal,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -101,6 +102,9 @@ export default function Page() {
   const [sound, setSound] = useState<AudioPlayer | null>(null);
   const [postingComment, setPostingComment] = useState(false);
   const [useProfileComment, setUseProfileComment] = useState(true);
+  const [confirmGift, setConfirmGift] = useState<{link?: string; amount?: number; wishId?: string; recipientId?: string} | null>(null);
+  const [showThanks, setShowThanks] = useState(false);
+  const [thanksMessage, setThanksMessage] = useState('');
   const [nickname, setNickname] = useState('');
   const [owner, setOwner] = useState<any | null>(null);
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
@@ -399,21 +403,13 @@ try {
   }, [router, wish]);
 
   const openGiftLink = useCallback((link: string) => {
-    Alert.alert('Leaving WhispList', "You&apos;re leaving WhispList to send a gift.", [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Continue', onPress: () => WebBrowser.openBrowserAsync(link) },
-    ]);
+    setConfirmGift({ link });
   }, []);
 
   const handleSendMoney = useCallback(
-    async (amount: number) => {
+    (amount: number) => {
       if (!wish || !wish.userId) return;
-      try {
-        const res = await createGiftCheckout(wish.id, amount, wish.userId);
-        if (res.url) await WebBrowser.openBrowserAsync(res.url);
-      } catch (err) {
-        console.error('Failed to create gift checkout', err);
-      }
+      setConfirmGift({ amount, wishId: wish.id, recipientId: wish.userId });
     },
     [wish]
   );
@@ -635,18 +631,20 @@ try {
 
         {profile?.giftingEnabled && wish.giftLink && (
           <TouchableOpacity
-            onPress={() =>
-              Alert.alert('Leaving WhispList', 'You\'re leaving WhispList to send a gift.', [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Continue',
-                  onPress: () => WebBrowser.openBrowserAsync(wish.giftLink!),
-                },
-              ])
-            }
+            onPress={() => openGiftLink(wish.giftLink!)}
             style={{ marginTop: 8, backgroundColor: theme.input, padding: 8, borderRadius: 8 }}
           >
-            <Text style={{ color: theme.tint }}>🎁 {wish.giftLabel || 'Send Gift'}</Text>
+            <Text style={{ color: theme.tint }}>
+              {(() => {
+                try {
+                  const url = new URL(wish.giftLink!);
+                  const trusted = ['venmo.com', 'paypal.me', 'amazon.com'].some(d => url.hostname.includes(d));
+                  return `${trusted ? '✅' : '⚠️'} 🎁 ${wish.giftLabel || 'Send Gift'}`;
+                } catch {
+                  return `⚠️ 🎁 ${wish.giftLabel || 'Send Gift'}`;
+                }
+              })()}
+            </Text>
           </TouchableOpacity>
         )}
         {profile?.giftingEnabled && owner?.stripeAccountId && (
@@ -798,6 +796,82 @@ try {
             handleFulfillWish(link);
           }}
         />
+
+        {confirmGift && (
+          <Modal transparent animationType="fade" visible onRequestClose={() => setConfirmGift(null)}>
+            <View style={styles.modalBackdrop}>
+              <View style={[styles.modalCard, { backgroundColor: theme.input }]}>
+                <Text style={[styles.modalText, { color: theme.text }]}>Confirm sending gift?</Text>
+                <View style={{ flexDirection: 'row', marginTop: 10 }}>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      if (confirmGift.link) {
+                        await WebBrowser.openBrowserAsync(confirmGift.link);
+                        setShowThanks(true);
+                      } else if (confirmGift.wishId && confirmGift.recipientId && confirmGift.amount) {
+                        try {
+                          const res = await createGiftCheckout(confirmGift.wishId, confirmGift.amount, confirmGift.recipientId);
+                          if (res.url) await WebBrowser.openBrowserAsync(res.url);
+                          setShowThanks(true);
+                        } catch (err) {
+                          console.error('Failed to checkout', err);
+                        }
+                      }
+                      setConfirmGift(null);
+                    }}
+                    style={[styles.button, { marginRight: 8 }]}
+                    hitSlop={HIT_SLOP}
+                  >
+                    <Text style={styles.buttonText}>Send</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setConfirmGift(null)} style={[styles.button, { backgroundColor: '#ccc' }]} hitSlop={HIT_SLOP}>
+                    <Text style={[styles.buttonText, { color: '#000' }]}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        )}
+        {showThanks && (
+          <Modal transparent animationType="fade" visible onRequestClose={() => setShowThanks(false)}>
+            <View style={styles.modalBackdrop}>
+              <View style={[styles.modalCard, { backgroundColor: theme.input }]}>
+                <Text style={[styles.modalText, { color: theme.text }]}>💝 Thanks for supporting this wish!</Text>
+                <TextInput
+                  style={[styles.input, { marginTop: 10 }]}
+                  placeholder="Add a message (optional)"
+                  placeholderTextColor="#999"
+                  value={thanksMessage}
+                  onChangeText={setThanksMessage}
+                />
+                {confirmGift?.wishId && (
+                  <TouchableOpacity
+                    onPress={async () => {
+                      try {
+                        await addDoc(collection(db, 'wishes', confirmGift!.wishId!, 'gifts'), {
+                          message: thanksMessage,
+                          sender: user?.uid || 'anon',
+                          timestamp: serverTimestamp(),
+                        });
+                      } catch (err) {
+                        console.error('Failed to save message', err);
+                      }
+                      setThanksMessage('');
+                      setShowThanks(false);
+                    }}
+                    style={[styles.button, { marginTop: 10 }]}
+                    hitSlop={HIT_SLOP}
+                  >
+                    <Text style={styles.buttonText}>Send</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={() => setShowThanks(false)} style={[styles.button, { marginTop: 10 }]} hitSlop={HIT_SLOP}>
+                  <Text style={styles.buttonText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+        )}
         </ScrollView>
 
       </KeyboardAvoidingView>
@@ -913,5 +987,20 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontWeight: '600',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCard: {
+    padding: 20,
+    borderRadius: 10,
+    width: '80%',
+  },
+  modalText: {
+    fontSize: 16,
+    textAlign: 'center',
   },
 });
