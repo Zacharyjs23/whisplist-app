@@ -1,47 +1,54 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isBoosted() {
-      return resource.data.boostedUntil > request.time;
-    }
-    function isFollowerOf(userId) {
-      return request.auth != null &&
-        exists(/databases/$(database)/documents/users/$(userId)/followers/$(request.auth.uid));
+    function signedIn() {
+      return request.auth != null;
     }
 
-    function isAuthenticated() {
-      return request.auth != null &&
-        (request.auth.token.firebase.sign_in_provider == 'anonymous' ||
-         request.auth.token.firebase.sign_in_provider == 'password');
-    }
+    match /users/{uid} {
+      allow read: if resource.data.publicProfileEnabled == true || request.auth.uid == uid;
+      allow create, update, delete: if request.auth.uid == uid;
 
-    function isSignedIn() {
-      return isAuthenticated();
+      match /notifications/{notificationId} {
+        allow write: if request.auth.uid == uid;
+      }
+
+      match /referrals/{referralId} {
+        allow write: if request.auth.uid == uid;
+      }
+
+      match /journalEntries/{entryId} {
+        allow read, write: if request.auth.uid == uid;
+      }
+
+      match /followers/{followerId} {
+        allow read, write: if request.auth.uid == followerId;
+      }
+
+      match /following/{targetUserId} {
+        allow read, write: if request.auth.uid == uid;
+      }
     }
 
     match /wishes/{wishId} {
       allow read: if true;
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if signedIn() && request.auth.uid == resource.data.userId;
+
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+        allow update, delete: if signedIn() && request.auth.uid == resource.data.userId;
+      }
+
+      match /commentReports/{reportId} {
+        allow create: if signedIn();
+        allow read: if false;
+      }
     }
 
-    match /wishes/{wishId}/comments/{commentId} {
-      allow read: if true;
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
-    }
-
-    match /users/{userId} {
-      allow read: if true;
-      allow create, update, delete: if isAuthenticated() && request.auth.uid == userId;
-    }
-
-    match /users/{userId}/followers/{followerId} {
-      allow read, write: if request.auth != null && request.auth.uid == followerId;
-    }
-
-    match /users/{userId}/following/{targetUserId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    match /gifts/{giftId} {
+      allow write: if signedIn();
     }
 
     match /{document=**} {
