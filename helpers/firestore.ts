@@ -143,6 +143,18 @@ export async function boostWish(id: string, hours: number) {
   return updateDoc(ref, { boostedUntil });
 }
 
+export async function createBoostCheckout(wishId: string, userId: string) {
+  const resp = await fetch(
+    `https://us-central1-${process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID}.cloudfunctions.net/createCheckoutSession`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wishId, userId }),
+    }
+  );
+  return (await resp.json()) as { url: string; sessionId: string };
+}
+
 export async function setFulfillmentLink(id: string, link: string) {
   const ref = doc(db, 'wishes', id);
   return updateDoc(ref, { fulfillmentLink: link });

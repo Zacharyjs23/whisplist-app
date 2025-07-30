@@ -105,6 +105,21 @@ export default function Page() {
   const [refreshing, setRefreshing] = useState(false);
   const { user, profile } = useAuth();
 
+  const isBoosted =
+    wish?.boostedUntil &&
+    wish.boostedUntil.toDate &&
+    wish.boostedUntil.toDate() > new Date();
+  const timeLeft =
+    isBoosted && wish?.boostedUntil?.toDate
+      ? formatTimeLeft(wish.boostedUntil.toDate())
+      : '';
+  const canBoost =
+    user &&
+    wish?.userId === user.uid &&
+    (!wish?.boostedUntil ||
+      !wish.boostedUntil.toDate ||
+      wish.boostedUntil.toDate() < new Date());
+
   const flatListRef = useRef<FlatList<Comment>>(null);
 
   const animationRefs = useRef<{ [key: string]: Animated.Value }>({});
@@ -324,16 +339,10 @@ try {
     [fetchWish, id]
   );
 
-  const handleBoostWish = useCallback(async () => {
+  const handleBoostWish = useCallback(() => {
     if (!wish) return;
-    try {
-      // Payment flow would occur here
-      await boostWish(wish.id, 24);
-      await fetchWish();
-    } catch (err) {
-      console.error('❌ Failed to boost wish:', err);
-    }
-  }, [fetchWish, wish]);
+    router.push(`/boost/${wish.id}`);
+  }, [router, wish]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -530,6 +539,12 @@ try {
         ) : (
           <Text style={[styles.likes, { color: theme.tint }]}>❤️ {wish.likes}</Text>
         )}
+        {isBoosted && (
+          <Text style={styles.boostedLabel}>
+            🚀 {wish.boosted === 'stripe' ? 'Boosted via Stripe' : 'Boosted'}
+            {timeLeft ? ` (${timeLeft})` : ''}
+          </Text>
+        )}
 
         {wish.audioUrl && (
           <TouchableOpacity onPress={playAudio} style={{ marginTop: 10 }}>
@@ -546,9 +561,11 @@ try {
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity onPress={handleBoostWish} style={{ marginTop: 8 }}>
-          <Text style={{ color: '#facc15' }}>Boost Wish</Text>
-        </TouchableOpacity>
+        {canBoost && (
+          <TouchableOpacity onPress={handleBoostWish} style={{ marginTop: 8 }}>
+            <Text style={{ color: '#facc15' }}>Boost Wish</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           onPress={() => {
@@ -714,6 +731,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 8,
     fontWeight: '500',
+  },
+  boostedLabel: {
+    color: '#facc15',
+    fontSize: 12,
+    marginTop: 4,
   },
   pollOption: {
     backgroundColor: '#2e2e2e',

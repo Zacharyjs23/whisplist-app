@@ -208,7 +208,16 @@ export default function Page() {
     }
   };
 
-  const renderWish = ({ item }: { item: Wish }) => (
+  const renderWish = ({ item }: { item: Wish }) => {
+    const isBoosted =
+      item.boostedUntil && item.boostedUntil.toDate && item.boostedUntil.toDate() > new Date();
+    const timeLeft = isBoosted ? formatTimeLeft(item.boostedUntil.toDate()) : '';
+    const canBoost =
+      user &&
+      item.userId === user.uid &&
+      (!item.boostedUntil || !item.boostedUntil.toDate || item.boostedUntil.toDate() < new Date());
+
+    return (
     <View style={[styles.wishItem, { backgroundColor: typeInfo[item.type || 'wish'].color }]}>
       <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
         <Text style={styles.wishCategory}>
@@ -226,8 +235,22 @@ export default function Page() {
         ) : (
           <Text style={styles.likes}>❤️ {item.likes}</Text>
         )}
+        {isBoosted && (
+          <Text style={styles.boostedLabel}>
+            🚀 {item.boosted === 'stripe' ? 'Boosted via Stripe' : 'Boosted'}
+            {timeLeft ? ` (${timeLeft})` : ''}
+          </Text>
+        )}
       </TouchableOpacity>
 
+      {canBoost && (
+        <TouchableOpacity
+          onPress={() => router.push(`/boost/${item.id}`)}
+          style={{ marginTop: 4 }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Text style={{ color: '#facc15' }}>Boost 🚀</Text>
+        </TouchableOpacity>
+      )}
 
       <TouchableOpacity
         onPress={() => {
@@ -241,6 +264,7 @@ export default function Page() {
       </TouchableOpacity>
     </View>
   );
+  };
 
   try {
     return (
@@ -467,6 +491,11 @@ const styles = StyleSheet.create({
   pollText: {
     color: '#fff',
     fontSize: 14,
+  },
+  boostedLabel: {
+    color: '#facc15',
+    fontSize: 12,
+    marginTop: 4,
   },
   errorText: {
     color: '#f87171',

@@ -597,6 +597,12 @@ useEffect(() => {
             const timeLeft = isBoosted
               ? formatTimeLeft(item.boostedUntil.toDate())
               : '';
+            const canBoost =
+              user &&
+              item.userId === user.uid &&
+              (!item.boostedUntil ||
+                !item.boostedUntil.toDate ||
+                item.boostedUntil.toDate() < new Date());
 
             return (
             <View
@@ -636,11 +642,22 @@ useEffect(() => {
                   <Text style={styles.likeText}>❤️ {item.likes}</Text>
                 )}
                 {isBoosted && (
-                    <Text style={styles.boostedLabel}>
-                      🚀 Boosted{timeLeft ? ` (${timeLeft})` : ''}
-                    </Text>
-                  )}
+                  <Text style={styles.boostedLabel}>
+                    🚀 {item.boosted === 'stripe' ? 'Boosted via Stripe' : 'Boosted'}
+                    {timeLeft ? ` (${timeLeft})` : ''}
+                  </Text>
+                )}
               </TouchableOpacity>
+
+              {canBoost && (
+                <TouchableOpacity
+                  onPress={() => router.push(`/boost/${item.id}`)}
+                  style={{ marginTop: 4 }}
+                  hitSlop={HIT_SLOP}
+                >
+                  <Text style={{ color: '#facc15' }}>Boost 🚀</Text>
+                </TouchableOpacity>
+              )}
 
               {user && item.userId && user.uid !== item.userId && (
                 <TouchableOpacity
