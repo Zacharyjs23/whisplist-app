@@ -19,7 +19,7 @@ import * as Notifications from 'expo-notifications';
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, collectionGroup } from 'firebase/firestore';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 
@@ -38,6 +38,7 @@ export default function Page() {
     { text: string; timestamp: number }[]
   >([]);
   const [boostImpact, setBoostImpact] = useState({ likes: 0, comments: 0 });
+  const [giftStats, setGiftStats] = useState({ count: 0, total: 0 });
   const [dailyReminder, setDailyReminder] = useState(false);
   const [showSparkle, setShowSparkle] = useState(false);
   const [referralCount, setReferralCount] = useState(0);
@@ -160,6 +161,21 @@ export default function Page() {
   }, [user]);
 
   useEffect(() => {
+    if (!user?.uid) return;
+    const loadGifts = async () => {
+      const snap = await getDocs(query(collectionGroup(db, 'gifts'), where('recipientId', '==', user.uid)));
+      let count = 0;
+      let total = 0;
+      snap.forEach(d => {
+        count += 1;
+        total += d.data().amount || 0;
+      });
+      setGiftStats({ count, total });
+    };
+    loadGifts();
+  }, [user]);
+
+  useEffect(() => {
     if (profile?.boostCredits != null && prevCredits.current != null && profile.boostCredits > prevCredits.current) {
       setShowSparkle(true);
       setTimeout(() => setShowSparkle(false), 3000);
@@ -231,10 +247,10 @@ export default function Page() {
         </View>
       )}
 
-      {profile?.giftsReceived != null && (
+      {giftStats.count > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>💝 Gifts</Text>
-          <Text style={styles.info}>You&apos;ve received {profile.giftsReceived} gifts</Text>
+          <Text style={styles.info}>You&apos;ve received {giftStats.count} gifts 🎁 (${giftStats.total} total)</Text>
         </View>
       )}
 

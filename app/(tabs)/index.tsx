@@ -20,7 +20,7 @@ import { formatTimeLeft } from '../../helpers/time';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as WebBrowser from 'expo-web-browser';
-import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, doc, getDoc } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, doc, getDoc, collectionGroup } from 'firebase/firestore';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   ActivityIndicator,
@@ -39,6 +39,7 @@ import {
   Image,
   View,
   RefreshControl,
+  Modal,
   Animated,
 } from 'react-native';
 import { Colors } from '@/constants/Colors';
@@ -84,6 +85,10 @@ export default function Page() {
   const [giftType, setGiftType] = useState('');
   const [giftLabel, setGiftLabel] = useState('');
   const [posting, setPosting] = useState(false);
+  const [showGiftOptions, setShowGiftOptions] = useState(false);
+  const [confirmGift, setConfirmGift] = useState<{link?: string; amount?: number; wishId?: string; recipientId?: string} | null>(null);
+  const [showThanks, setShowThanks] = useState(false);
+  const [thanksMessage, setThanksMessage] = useState('');
   const { theme } = useTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const [useProfilePost, setUseProfilePost] = useState(true);
@@ -92,6 +97,7 @@ export default function Page() {
   const [followStatus, setFollowStatus] = useState<Record<string, boolean>>({});
   const [streakCount, setStreakCount] = useState(0);
   const [dailyPrompt, setDailyPrompt] = useState('');
+  const [impact, setImpact] = useState({ wishes: 0, boosts: 0, gifts: 0, giftTotal: 0 });
   const promptOpacity = useRef(new Animated.Value(0)).current;
   const { user, profile } = useAuth();
 
@@ -112,6 +118,29 @@ useEffect(() => {
   });
 
   return () => unsubscribe();
+}, [user]);
+
+useEffect(() => {
+  const loadImpact = async () => {
+    if (!user?.uid) return;
+    try {
+      const snap = await getDocs(query(collection(db, 'wishes'), where('userId', '==', user.uid)));
+      const list = snap.docs.map(d => d.data());
+      const wishes = list.length;
+      const boosts = list.filter(l => l.boostedUntil).length;
+      let gifts = 0;
+      let giftTotal = 0;
+      const giftSnap = await getDocs(query(collectionGroup(db, 'gifts'), where('recipientId', '==', user.uid)));
+      giftSnap.forEach(g => {
+        gifts += 1;
+        giftTotal += g.data().amount || 0;
+      });
+      setImpact({ wishes, boosts, gifts, giftTotal });
+    } catch (err) {
+      console.error('Failed to load impact', err);
+    }
+  };
+  loadImpact();
 }, [user]);
 
 useEffect(() => {
@@ -490,20 +519,12 @@ useEffect(() => {
         item.boostedUntil.toDate() < new Date());
 
     const openGiftLink = (link: string) => {
-      Alert.alert('Leaving WhispList', 'You\'re leaving WhispList to send a gift.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Continue', onPress: () => WebBrowser.openBrowserAsync(link) },
-      ]);
+      setConfirmGift({ link });
     };
 
-    const sendMoney = async (amount: number) => {
+    const sendMoney = (amount: number) => {
       if (!item.id || !item.userId) return;
-      try {
-        const res = await createGiftCheckout(item.id, amount, item.userId);
-        if (res.url) await WebBrowser.openBrowserAsync(res.url);
-      } catch (err) {
-        console.error('Failed to create gift checkout', err);
-      }
+      setConfirmGift({ amount, wishId: item.id, recipientId: item.userId });
     };
 
     return (
@@ -517,6 +538,7 @@ useEffect(() => {
           },
         ]}
       >
+        {(item.giftLink) && <Text style={styles.giftBadge}>🎁 Gifted</Text>}
         <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)} hitSlop={HIT_SLOP}>
           {!item.isAnonymous &&
             item.displayName &&
@@ -549,7 +571,17 @@ useEffect(() => {
               onPress={() => openGiftLink(item.giftLink!)}
               style={{ marginTop: 6, backgroundColor: theme.input, padding: 6, borderRadius: 6 }}
             >
-              <Text style={{ color: theme.tint }}>🎁 {item.giftLabel || 'Send Gift'}</Text>
+              <Text style={{ color: theme.tint }}>
+                {(() => {
+                  try {
+                    const url = new URL(item.giftLink!);
+                    const trusted = ['venmo.com', 'paypal.me', 'amazon.com'].some(d => url.hostname.includes(d));
+                    return `${trusted ? '✅' : '⚠️'} 🎁 ${item.giftLabel || 'Send Gift'}`;
+                  } catch {
+                    return `⚠️ 🎁 ${item.giftLabel || 'Send Gift'}`;
+                  }
+                })()}
+              </Text>
             </TouchableOpacity>
           )}
           {profile?.giftingEnabled && stripeAccounts[item.userId || ''] && (
@@ -672,61 +704,72 @@ useEffect(() => {
                 <Picker.Item label="Dream 🌙" value="dream" />
               </Picker>
 
-        <Text style={styles.label}>Wish</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="What's your wish?"
-          placeholderTextColor="#999"
-          value={wish}
-          onChangeText={setWish}
-        />
+              <View style={styles.formCard}>
+                <Text style={styles.sectionTitle}>💭 What’s your wish today?</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="What's your wish?"
+                  placeholderTextColor="#999"
+                  value={wish}
+                  onChangeText={setWish}
+                />
 
-        {dailyPrompt !== '' && (
-          <>
-            <Text style={styles.promptTitle}>Daily Prompt ✨</Text>
-            <Animated.View style={[styles.promptCard, { opacity: promptOpacity }]}> 
-              <Text style={styles.promptText}>{dailyPrompt}</Text>
-            </Animated.View>
-          </>
-        )}
+                {dailyPrompt !== '' && (
+                  <>
+                    <Text style={styles.promptTitle}>Daily Prompt ✨</Text>
+                    <Animated.View style={[styles.promptCard, { opacity: promptOpacity }]}>
+                      <Text style={styles.promptText}>{dailyPrompt}</Text>
+                    </Animated.View>
+                  </>
+                )}
 
-        <Text style={styles.label}>Post Type</Text>
-        <Picker
-          selectedValue={postType}
-          onValueChange={(val) => setPostType(val)}
-          style={styles.input}
-          dropdownIconColor="#fff"
-        >
-          <Picker.Item label="Wish 💭" value="wish" />
-          <Picker.Item label="Confession 😶‍🌫️" value="confession" />
-          <Picker.Item label="Advice Request 🧠" value="advice" />
-          <Picker.Item label="Dream 🌙" value="dream" />
-        </Picker>
+                <Text style={styles.label}>Post Type</Text>
+                <Picker
+                  selectedValue={postType}
+                  onValueChange={(val) => setPostType(val)}
+                  style={styles.input}
+                  dropdownIconColor="#fff"
+                >
+                  <Picker.Item label="Wish 💭" value="wish" />
+                  <Picker.Item label="Confession 😶‍🌫️" value="confession" />
+                  <Picker.Item label="Advice Request 🧠" value="advice" />
+                <Picker.Item label="Dream 🌙" value="dream" />
+              </Picker>
 
-        <Text style={styles.label}>Gift Link</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Gift link (optional)"
-          placeholderTextColor="#999"
-          value={giftLink}
-          onChangeText={setGiftLink}
-        />
-        <Text style={styles.label}>Gift Type</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="kofi, paypal, etc"
-          placeholderTextColor="#999"
-          value={giftType}
-          onChangeText={setGiftType}
-        />
-        <Text style={styles.label}>Gift Label</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Support on Ko-fi"
-          placeholderTextColor="#999"
-          value={giftLabel}
-          onChangeText={setGiftLabel}
-        />
+                <TouchableOpacity onPress={() => setShowGiftOptions(!showGiftOptions)}>
+                  <Text style={styles.sectionTitle}>Gifting Options {showGiftOptions ? '▲' : '▼'}</Text>
+                </TouchableOpacity>
+                {showGiftOptions && (
+                  <>
+                    {profile?.stripeAccountId && (
+                      <Text style={styles.info}>🎁 Accepting Apple Pay / card gifts via WhispList</Text>
+                    )}
+                    <Text style={styles.label}>Add a gift link (e.g., Venmo, wishlist)</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Gift link (optional)"
+                      placeholderTextColor="#999"
+                      value={giftLink}
+                      onChangeText={setGiftLink}
+                    />
+                    <Text style={styles.label}>Gift Type</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="kofi, paypal, etc"
+                      placeholderTextColor="#999"
+                      value={giftType}
+                      onChangeText={setGiftType}
+                    />
+                    <Text style={styles.label}>Gift Label</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Support on Ko-fi"
+                      placeholderTextColor="#999"
+                      value={giftLabel}
+                      onChangeText={setGiftLabel}
+                    />
+                  </>
+                )}
 
         {/* Poll Mode Switch and Inputs */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
@@ -817,6 +860,14 @@ useEffect(() => {
         <TouchableOpacity onPress={() => router.push('/auth')} style={styles.authButton}>
           <Text style={styles.authButtonText}>Go to Auth</Text>
         </TouchableOpacity>
+                </View>
+
+                <View style={styles.formCard}>
+                  <Text style={styles.sectionTitle}>Your Impact</Text>
+                  <Text style={styles.info}>🔥 You’ve posted {impact.wishes} wishes</Text>
+                  <Text style={styles.info}>🌟 Boosted {impact.boosts} — earned {impact.wishes > 0 ? impact.boosts * 9 : 0} likes</Text>
+                  <Text style={styles.info}>🎁 Received {impact.gifts} gifts — ${impact.giftTotal}</Text>
+                </View>
             </>
           }
           ListEmptyComponent={
@@ -836,6 +887,81 @@ useEffect(() => {
           }}
           onSubmit={handleReport}
         />
+        {confirmGift && (
+          <Modal transparent animationType="fade" visible onRequestClose={() => setConfirmGift(null)}>
+            <View style={styles.modalBackdrop}>
+              <View style={[styles.modalCard, { backgroundColor: theme.input }]}>
+                <Text style={[styles.modalText, { color: theme.text }]}>Confirm sending gift?</Text>
+                <View style={{ flexDirection: 'row', marginTop: 10 }}>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      if (confirmGift.link) {
+                        await WebBrowser.openBrowserAsync(confirmGift.link);
+                        setShowThanks(true);
+                      } else if (confirmGift.wishId && confirmGift.recipientId && confirmGift.amount) {
+                        try {
+                          const res = await createGiftCheckout(confirmGift.wishId, confirmGift.amount, confirmGift.recipientId);
+                          if (res.url) await WebBrowser.openBrowserAsync(res.url);
+                          setShowThanks(true);
+                        } catch (err) {
+                          console.error('Failed to checkout', err);
+                        }
+                      }
+                      setConfirmGift(null);
+                    }}
+                    style={[styles.button, { marginRight: 8 }]}
+                    hitSlop={HIT_SLOP}
+                  >
+                    <Text style={styles.buttonText}>Send</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setConfirmGift(null)} style={[styles.button, { backgroundColor: '#ccc' }]} hitSlop={HIT_SLOP}>
+                    <Text style={[styles.buttonText, { color: '#000' }]}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        )}
+        {showThanks && (
+          <Modal transparent animationType="fade" visible onRequestClose={() => setShowThanks(false)}>
+            <View style={styles.modalBackdrop}>
+              <View style={[styles.modalCard, { backgroundColor: theme.input }]}>
+                <Text style={[styles.modalText, { color: theme.text }]}>💝 Thanks for supporting this wish!</Text>
+                <TextInput
+                  style={[styles.input, { marginTop: 10 }]}
+                  placeholder="Add a message (optional)"
+                  placeholderTextColor="#999"
+                  value={thanksMessage}
+                  onChangeText={setThanksMessage}
+                />
+                {confirmGift?.wishId && (
+                  <TouchableOpacity
+                    onPress={async () => {
+                      try {
+                        await addDoc(collection(db, 'wishes', confirmGift.wishId, 'gifts'), {
+                          message: thanksMessage,
+                          sender: user?.uid || 'anon',
+                          timestamp: serverTimestamp(),
+                        });
+                      } catch (err) {
+                        console.error('Failed to save message', err);
+                      }
+                      setThanksMessage('');
+                      setShowThanks(false);
+                    }}
+                    style={[styles.button, { marginTop: 10 }]}
+                    hitSlop={HIT_SLOP}
+                  >
+                    <Text style={styles.buttonText}>Send</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={() => setShowThanks(false)} style={[styles.button, { marginTop: 10 }]} hitSlop={HIT_SLOP}>
+                  <Text style={styles.buttonText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+        )}
       </KeyboardAvoidingView>
       </SafeAreaView>
     );
@@ -947,6 +1073,7 @@ const createStyles = (c: (typeof Colors)['light'] & { name: string }) =>
       padding: 12,
       borderRadius: 8,
       marginBottom: 10,
+      position: 'relative',
     },
     wishText: {
       color: c.text,
@@ -962,19 +1089,58 @@ const createStyles = (c: (typeof Colors)['light'] & { name: string }) =>
       fontSize: 12,
       marginTop: 4,
     },
+    formCard: {
+      backgroundColor: c.input,
+      padding: 12,
+      borderRadius: 10,
+      marginBottom: 20,
+    },
+    sectionTitle: {
+      color: c.text,
+      fontWeight: '600',
+      marginBottom: 8,
+      fontSize: 16,
+    },
     pollText: {
       color: c.text,
       fontSize: 14,
+    },
+    info: {
+      color: c.text,
+      fontSize: 14,
+      marginBottom: 6,
     },
     author: {
       color: c.text,
       fontSize: 12,
       marginBottom: 2,
     },
+    giftBadge: {
+      position: 'absolute',
+      top: 6,
+      right: 6,
+      color: c.tint,
+      fontSize: 12,
+    },
     noResults: {
       color: c.text,
       textAlign: 'center',
       marginTop: 20,
+    },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalCard: {
+      padding: 20,
+      borderRadius: 10,
+      width: '80%',
+    },
+    modalText: {
+      fontSize: 16,
+      textAlign: 'center',
     },
   });
 

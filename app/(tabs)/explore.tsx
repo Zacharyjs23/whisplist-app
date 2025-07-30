@@ -21,6 +21,7 @@ import {
   listenTrendingWishes,
   listenWishes,
   getFollowingIds,
+  listenBoostedWishes,
 } from '../../helpers/firestore';
 import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -55,6 +56,7 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [trendingMode, setTrendingMode] = useState(false);
+  const [boostedMode, setBoostedMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [reportVisible, setReportVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
@@ -75,6 +77,18 @@ export default function Page() {
   const fetchWishes = useCallback(() => {
     setLoading(true);
     try {
+      if (boostedMode) {
+        return listenBoostedWishes((all: Wish[]) => {
+          const filtered = all.filter((wish) => {
+            const inCategory = !selectedCategory || wish.category === selectedCategory;
+            const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+            return inCategory && inSearch;
+          });
+          setFilteredWishes(filtered);
+          setLoading(false);
+        });
+      }
+
       const unsubscribe = trendingMode
         ? listenTrendingWishes((all: Wish[]) => {
             try {
@@ -115,7 +129,7 @@ export default function Page() {
       setLoading(false);
       return () => { };
     }
-  }, [trendingMode, selectedCategory, searchTerm, user]);
+  }, [trendingMode, boostedMode, selectedCategory, searchTerm, user]);
 
   useEffect(() => {
     const unsubscribe = fetchWishes();
@@ -125,7 +139,19 @@ export default function Page() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      if (trendingMode) {
+      if (boostedMode) {
+        const now = new Date();
+        const boostedSnap = await getDocs(
+          query(collection(db, 'wishes'), where('boostedUntil', '>', now), orderBy('boostedUntil', 'desc'))
+        );
+        const boosted = boostedSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
+        const filtered = boosted.filter((wish) => {
+          const inCategory = !selectedCategory || wish.category === selectedCategory;
+          const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+          return inCategory && inSearch;
+        });
+        setFilteredWishes(filtered);
+      } else if (trendingMode) {
         const q = query(collection(db, 'wishes'), orderBy('likes', 'desc'), limit(20));
         const snap = await getDocs(q);
         const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
@@ -173,7 +199,7 @@ export default function Page() {
     } finally {
       setRefreshing(false);
     }
-  }, [trendingMode, selectedCategory, searchTerm, user]);
+  }, [boostedMode, trendingMode, selectedCategory, searchTerm, user]);
 
   const toggleTrending = (mode: boolean) => {
     setTrendingMode(mode);
@@ -298,6 +324,24 @@ export default function Page() {
 
         <View style={styles.toggleBar}>
           <TouchableOpacity
+            onPress={() => setBoostedMode(false)}
+            style={[styles.toggleButton, { backgroundColor: theme.input }, !boostedMode && styles.activeToggle]}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={[styles.toggleText, !boostedMode && styles.activeToggleText]}>Explore</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setBoostedMode(true)}
+            style={[styles.toggleButton, { backgroundColor: theme.input }, boostedMode && styles.activeToggle]}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={[styles.toggleText, boostedMode && styles.activeToggleText]}>🚀 Boosted</Text>
+          </TouchableOpacity>
+        </View>
+
+        {!boostedMode && (
+        <View style={styles.toggleBar}>
+          <TouchableOpacity
             onPress={() => toggleTrending(false)}
             style={[
               styles.toggleButton,
@@ -320,6 +364,7 @@ export default function Page() {
             <Text style={[styles.toggleText, trendingMode && styles.activeToggleText]}>🔥 Trending</Text>
           </TouchableOpacity>
         </View>
+        )}
 
         <Picker
           selectedValue={selectedCategory}
