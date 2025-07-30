@@ -319,12 +319,20 @@ try {
     async (reason: string) => {
       if (!reportTarget) return;
       try {
-        await addDoc(collection(db, 'reports'), {
-          itemId: reportTarget.id,
-          type: reportTarget.type,
-          reason,
-          timestamp: serverTimestamp(),
-        });
+        if (reportTarget.type === 'comment') {
+          await addDoc(collection(db, 'wishes', id as string, 'commentReports'), {
+            commentId: reportTarget.id,
+            reason,
+            timestamp: serverTimestamp(),
+          });
+        } else {
+          await addDoc(collection(db, 'reports'), {
+            itemId: reportTarget.id,
+            type: reportTarget.type,
+            reason,
+            timestamp: serverTimestamp(),
+          });
+        }
       } catch (err) {
         console.error('❌ Failed to submit report:', err);
       } finally {
@@ -450,14 +458,14 @@ try {
                 <Text style={{ color: '#a78bfa' }}>Reply</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => {
+                onLongPress={() => {
                   setReportTarget({ type: 'comment', id: item.id });
                   setReportVisible(true);
                 }}
                 style={{ marginLeft: 8 }}
                 hitSlop={HIT_SLOP}
               >
-                <Text style={{ color: '#f87171' }}>Report</Text>
+                <Text style={{ color: '#f87171' }}>🚩</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>

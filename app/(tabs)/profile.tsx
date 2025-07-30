@@ -40,6 +40,8 @@ export default function Page() {
   const [boostImpact, setBoostImpact] = useState({ likes: 0, comments: 0 });
   const [dailyReminder, setDailyReminder] = useState(false);
   const [showSparkle, setShowSparkle] = useState(false);
+  const [referralCount, setReferralCount] = useState(0);
+  const prevCredits = useRef<number | null>(profile?.boostCredits ?? null);
   const boostAnim = useRef(new Animated.Value(1)).current;
   const { theme } = useTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
@@ -148,6 +150,23 @@ export default function Page() {
     loadLocal();
   }, []);
 
+  useEffect(() => {
+    if (!user?.uid) return;
+    const loadReferrals = async () => {
+      const snap = await getDocs(query(collection(db, 'referrals'), where('referrerId', '==', user.uid)));
+      setReferralCount(snap.size);
+    };
+    loadReferrals();
+  }, [user]);
+
+  useEffect(() => {
+    if (profile?.boostCredits != null && prevCredits.current != null && profile.boostCredits > prevCredits.current) {
+      setShowSparkle(true);
+      setTimeout(() => setShowSparkle(false), 3000);
+    }
+    prevCredits.current = profile?.boostCredits ?? null;
+  }, [profile?.boostCredits]);
+
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={boostCount > 0 || streakCount >= 7 ? styles.avatarGlow : undefined}>
@@ -209,6 +228,15 @@ export default function Page() {
           <Text style={styles.sectionTitle}>📅 Streak</Text>
           <Text style={styles.info}>🔥 {streakCount}-day streak — you're on fire!</Text>
           {streakCount > 3 && <ConfettiCannon count={40} origin={{ x: 0, y: 0 }} fadeOut />}
+        </View>
+      )}
+
+      {referralCount > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🎁 Referrals</Text>
+          <Text style={styles.info}>
+            You've invited {referralCount} people — max {Math.max(0, 4 - referralCount)} more to unlock another reward
+          </Text>
         </View>
       )}
 

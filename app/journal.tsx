@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
+import { formatDistanceToNow } from 'date-fns';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { collection, addDoc, serverTimestamp, query, orderBy, getDocs } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,6 +20,9 @@ export default function JournalPage() {
   const [entry, setEntry] = useState('');
   const [entries, setEntries] = useState<any[]>([]);
   const [streak, setStreak] = useState(0);
+  const [mood, setMood] = useState('😊');
+  const [showHistory, setShowHistory] = useState(false);
+  const [usePrompt, setUsePrompt] = useState(true);
 
   useEffect(() => {
     const load = async () => {
@@ -64,21 +68,42 @@ export default function JournalPage() {
     if (!entry.trim() || !user) return;
     await addDoc(collection(db, 'users', user.uid, 'journalEntries'), {
       text: entry.trim(),
-      prompt,
+      ...(usePrompt ? { prompt } : {}),
+      mood,
       date: new Date().toISOString().split('T')[0],
       timestamp: serverTimestamp(),
     });
-    setEntries([{ id: Math.random().toString(), text: entry.trim(), prompt, date: new Date().toISOString().split('T')[0] }, ...entries]);
+    setEntries([
+      {
+        id: Math.random().toString(),
+        text: entry.trim(),
+        ...(usePrompt ? { prompt } : {}),
+        mood,
+        date: new Date().toISOString().split('T')[0],
+        timestamp: new Date(),
+      },
+      ...entries,
+    ]);
     setEntry('');
     await updateStreak();
   };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <Text style={[styles.prompt, { color: theme.text }]}>{prompt}</Text>
+      {usePrompt && <Text style={[styles.prompt, { color: theme.text }]}>{prompt}</Text>}
       {streak > 0 && (
         <Text style={[styles.streak, { color: theme.tint }]}>🧠 You’ve written {streak} days in a row</Text>
       )}
+      <View style={styles.row}>
+        {['😢','😐','😊','😄'].map((m) => (
+          <TouchableOpacity key={m} onPress={() => setMood(m)} style={{ marginRight: 8, opacity: mood === m ? 1 : 0.5 }}>
+            <Text style={{ fontSize: 20 }}>{m}</Text>
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity onPress={() => setUsePrompt((p) => !p)} style={{ marginLeft: 'auto' }}>
+          <Text style={{ color: theme.tint }}>{usePrompt ? 'Freeform' : 'Use Prompt'}</Text>
+        </TouchableOpacity>
+      </View>
       <TextInput
         style={[styles.input, { backgroundColor: theme.input, color: theme.text }]}
         placeholder="Write your thoughts"
@@ -90,17 +115,28 @@ export default function JournalPage() {
       <TouchableOpacity style={[styles.button, { backgroundColor: theme.tint }]} onPress={handlePost}>
         <Text style={styles.buttonText}>Save Entry</Text>
       </TouchableOpacity>
-      <FlatList
-        data={entries}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.entryItem}>
-            <Text style={[styles.entryText, { color: theme.text }]}>{item.text}</Text>
-            <Text style={styles.entryDate}>{item.date}</Text>
-          </View>
-        )}
-        style={{ marginTop: 20 }}
-      />
+      <TouchableOpacity onPress={() => setShowHistory((s) => !s)} style={{ marginTop: 10 }}>
+        <Text style={{ color: theme.tint }}>{showHistory ? 'Hide' : 'Show'} Past Entries</Text>
+      </TouchableOpacity>
+      {showHistory && (
+        <FlatList
+          data={entries.slice(0, 7)}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <View style={styles.entryItem}>
+              <Text style={[styles.entryText, { color: theme.text }]}>
+                {item.mood || '😊'} {item.text}
+              </Text>
+              <Text style={styles.entryDate}>
+                {item.timestamp?.seconds
+                  ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), { addSuffix: true })
+                  : 'Just now'}
+              </Text>
+            </View>
+          )}
+          style={{ marginTop: 10 }}
+        />
+      )}
     </View>
   );
 }
@@ -115,4 +151,5 @@ const styles = StyleSheet.create({
   entryItem: { marginBottom: 12 },
   entryText: { fontSize: 14 },
   entryDate: { fontSize: 12, color: '#888' },
+  row: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
 });
