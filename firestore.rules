@@ -21,13 +21,13 @@ service cloud.firestore {
 
     match /wishes/{wishId} {
       allow read: if true;
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
     }
 
     match /wishes/{wishId}/comments/{commentId} {
       allow read: if true;
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
     }
 
