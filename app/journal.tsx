@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,9 @@ import {
   FlatList,
   StyleSheet,
   Alert,
+  Animated,
+  Platform,
+  ToastAndroid,
 } from 'react-native';
 import { formatDistanceToNow } from 'date-fns';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -33,17 +36,33 @@ export default function JournalPage() {
   const [usePrompt, setUsePrompt] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [moodSummary, setMoodSummary] = useState<Record<string, number>>({});
+  const promptOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     const load = async () => {
-      const savedPrompt = await AsyncStorage.getItem('dailyPromptText');
-      if (savedPrompt) {
-        setPrompt(savedPrompt);
-      } else {
-        const p = prompts[Math.floor(Math.random() * prompts.length)];
-        setPrompt(p);
-        await AsyncStorage.setItem('dailyPromptText', p);
+      const today = new Date().toISOString().split('T')[0];
+      const savedDate = await AsyncStorage.getItem('dailyPromptDate');
+      let savedPrompt = await AsyncStorage.getItem('dailyPromptText');
+      const recentRaw = await AsyncStorage.getItem('recentPrompts');
+      let recent = recentRaw ? JSON.parse(recentRaw) as string[] : [];
+      if (savedDate !== today || !savedPrompt) {
+        let newPrompt = savedPrompt || '';
+        for (let i = 0; i < 10; i++) {
+          const p = prompts[Math.floor(Math.random() * prompts.length)];
+          if (p !== savedPrompt && !recent.includes(p)) {
+            newPrompt = p;
+            break;
+          }
+        }
+        savedPrompt = newPrompt;
+        await AsyncStorage.setItem('dailyPromptDate', today);
+        await AsyncStorage.setItem('dailyPromptText', newPrompt);
+        recent = [newPrompt, ...recent.filter(r => r !== newPrompt)].slice(0, 3);
+        await AsyncStorage.setItem('recentPrompts', JSON.stringify(recent));
       }
+      promptOpacity.setValue(0);
+      setPrompt(savedPrompt || '');
+      Animated.timing(promptOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
       const sc = await AsyncStorage.getItem('journalStreakCount');
       setStreak(sc ? parseInt(sc, 10) : 0);
       if (user) {
@@ -77,7 +96,7 @@ export default function JournalPage() {
       }
     };
     load();
-  }, [user]);
+  }, [user, promptOpacity]);
 
   const updateStreak = async () => {
     const today = new Date().toISOString().split('T')[0];
@@ -149,10 +168,44 @@ export default function JournalPage() {
     }
   };
 
+  const requestNewPrompt = async () => {
+    const recentRaw = await AsyncStorage.getItem('recentPrompts');
+    let recent = recentRaw ? JSON.parse(recentRaw) as string[] : [];
+    let newPrompt = prompt;
+    for (let i = 0; i < 10; i++) {
+      const p = prompts[Math.floor(Math.random() * prompts.length)];
+      if (p !== prompt && !recent.includes(p)) {
+        newPrompt = p;
+        break;
+      }
+    }
+    await AsyncStorage.setItem('dailyPromptText', newPrompt);
+    recent = [newPrompt, ...recent.filter(r => r !== newPrompt)].slice(0, 3);
+    await AsyncStorage.setItem('recentPrompts', JSON.stringify(recent));
+    promptOpacity.setValue(0);
+    setPrompt(newPrompt);
+    Animated.timing(promptOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+    const msg = "✨ That's a deep one.";
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(msg, ToastAndroid.SHORT);
+    } else {
+      Alert.alert(msg);
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <Text style={[styles.header, { color: theme.text }]}>Your Private Journal ✨</Text>
-      {usePrompt && <Text style={[styles.prompt, { color: theme.text }]}>{prompt}</Text>}
+      {usePrompt && (
+        <>
+          <Animated.View style={{ opacity: promptOpacity }}>
+            <Text style={[styles.prompt, { color: theme.text }]}>{prompt}</Text>
+          </Animated.View>
+          <TouchableOpacity onPress={requestNewPrompt}>
+            <Text style={{ color: theme.tint }}>🔄 Give me a different prompt</Text>
+          </TouchableOpacity>
+        </>
+      )}
       {streak > 0 && (
         <Text style={[styles.streak, { color: theme.tint }]}>🔥 {streak}-day streak</Text>
       )}
