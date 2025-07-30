@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'expo-router';
 import {
   View,
   Text,
@@ -24,6 +25,7 @@ import type { Wish } from '../../types/Wish';
 
 export default function Page() {
   const { user, profile, updateProfile, pickImage, signOut } = useAuth();
+  const router = useRouter();
   const [displayName, setDisplayName] = useState(profile?.displayName || '');
   const [bio, setBio] = useState(profile?.bio || '');
   const [saving, setSaving] = useState(false);
@@ -224,6 +226,14 @@ export default function Page() {
           <TouchableOpacity onPress={handleCopyLink} style={[styles.button, { marginTop: 10 }]}>
             <Text style={styles.buttonText}>Copy Link</Text>
           </TouchableOpacity>
+          {profile.displayName && (
+            <TouchableOpacity
+              onPress={() => router.push(`/profile/${profile.displayName}`)}
+              style={[styles.button, { marginTop: 10 }]}
+            >
+              <Text style={styles.buttonText}>Preview My Public Profile</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 

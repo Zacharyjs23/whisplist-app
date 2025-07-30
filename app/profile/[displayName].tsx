@@ -1,7 +1,8 @@
 import { useLocalSearchParams } from 'expo-router';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, StyleSheet, Text, TouchableOpacity, View, Share } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import { formatDistanceToNow } from 'date-fns';
@@ -66,6 +67,12 @@ export default function Page() {
     await Clipboard.setStringAsync(url);
   };
 
+  const handleShare = async () => {
+    if (!displayName) return;
+    const url = Linking.createURL(`/profile/${displayName}`);
+    await Share.share({ message: url });
+  };
+
   if (loading) {
     return (
       <View style={[styles.center, { backgroundColor: theme.background }]}> 
@@ -100,6 +107,13 @@ export default function Page() {
       >
         <Text style={{ color: theme.tint }}>Copy Link</Text>
       </TouchableOpacity>
+      <View style={[styles.qrBlock, { backgroundColor: theme.input, borderColor: theme.tint }]}>
+        <QRCode value={Linking.createURL(`/profile/${displayName}`)} color={theme.text} backgroundColor={theme.input} size={150} />
+        <TouchableOpacity onPress={handleShare} style={[styles.shareButton, { backgroundColor: theme.background }]}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Text style={{ color: theme.tint }}>Share Profile</Text>
+        </TouchableOpacity>
+      </View>
       <FlatList
         data={wishes}
         keyExtractor={(item) => item.id}
@@ -150,5 +164,13 @@ const createStyles = (c: (typeof Colors)['light'] & { name: string }) =>
     timestamp: { fontSize: 12, marginTop: 4 },
     noResults: { textAlign: 'center', marginTop: 20 },
     preview: { width: '100%', height: 200, borderRadius: 10, marginTop: 8 },
+    qrBlock: {
+      padding: 12,
+      borderRadius: 10,
+      alignItems: 'center',
+      borderWidth: 1,
+      marginBottom: 20,
+    },
+    shareButton: { marginTop: 10, padding: 8, borderRadius: 8 },
   });
 
