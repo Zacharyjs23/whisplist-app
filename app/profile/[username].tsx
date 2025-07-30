@@ -23,39 +23,49 @@ export default function Page() {
   useEffect(() => {
     const load = async () => {
       if (!username) return;
-      const userSnap = await getDocs(
-        query(collection(db, 'users'), where('displayName', '==', username))
-      );
-      if (userSnap.empty) {
-        setPrivateProfile(true);
-        setLoading(false);
-        return;
-      }
-      const userDoc = userSnap.docs[0];
-      const userData = userDoc.data();
-      setProfileId(userDoc.id);
-      if (userData.publicProfileEnabled === false) {
-        setPrivateProfile(true);
-        setLoading(false);
-        return;
-      }
-      setProfile(userData);
-      if (user && user.uid !== userDoc.id) {
-        const followSnap = await getDoc(
-          doc(db, 'users', user.uid, 'following', userDoc.id)
+      try {
+        const userSnap = await getDocs(
+          query(collection(db, 'users'), where('displayName', '==', username))
         );
-        setIsFollowing(followSnap.exists());
+        if (userSnap.empty) {
+          setPrivateProfile(true);
+          setLoading(false);
+          return;
+        }
+        const userDoc = userSnap.docs[0];
+        const userData = userDoc.data();
+        setProfileId(userDoc.id);
+        if (userData.publicProfileEnabled === false) {
+          setPrivateProfile(true);
+          setLoading(false);
+          return;
+        }
+        setProfile(userData);
+        if (user && user.uid !== userDoc.id) {
+          try {
+            const followSnap = await getDoc(
+              doc(db, 'users', user.uid, 'following', userDoc.id)
+            );
+            setIsFollowing(followSnap.exists());
+          } catch (err) {
+            console.warn('Failed to fetch follow status', err);
+          }
+        }
+        const q = query(
+          collection(db, 'wishes'),
+          where('displayName', '==', username),
+          where('isAnonymous', '==', false),
+          orderBy('timestamp', 'desc')
+        );
+        const snap = await getDocs(q);
+        const list = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Wish,'id'>) })) as Wish[];
+        setWishes(list);
+      } catch (err) {
+        console.warn('Failed to load profile', err);
+        setPrivateProfile(true);
+      } finally {
+        setLoading(false);
       }
-      const q = query(
-        collection(db, 'wishes'),
-        where('displayName', '==', username),
-        where('isAnonymous', '==', false),
-        orderBy('timestamp', 'desc')
-      );
-      const snap = await getDocs(q);
-      const list = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Wish,'id'>) })) as Wish[];
-      setWishes(list);
-      setLoading(false);
     };
     load();
   }, [username]);

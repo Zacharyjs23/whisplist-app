@@ -162,8 +162,13 @@ export default function Page() {
       if (data) {
         setWish(data);
         if (data.userId) {
-          const snap = await getDoc(doc(db, 'users', data.userId));
-          setOwner(snap.exists() ? snap.data() : null);
+          try {
+            const snap = await getDoc(doc(db, 'users', data.userId));
+            setOwner(snap.exists() ? snap.data() : null);
+          } catch (err) {
+            console.warn('Failed to fetch wish owner', err);
+            setOwner(null);
+          }
         }
       }
     } catch (err) {
@@ -230,11 +235,16 @@ try {
       await Promise.all(
         Array.from(ids).map(async (uid) => {
           if (publicStatus[uid] === undefined) {
-            const snap = await getDoc(doc(db, 'users', uid));
-            setPublicStatus((prev) => ({
-              ...prev,
-              [uid]: snap.exists() ? snap.data().publicProfileEnabled !== false : false,
-            }));
+            try {
+              const snap = await getDoc(doc(db, 'users', uid));
+              setPublicStatus((prev) => ({
+                ...prev,
+                [uid]: snap.exists() ? snap.data().publicProfileEnabled !== false : false,
+              }));
+            } catch (err) {
+              console.warn('Failed to fetch user status', err);
+              setPublicStatus((prev) => ({ ...prev, [uid]: false }));
+            }
           }
         })
       );
@@ -389,7 +399,7 @@ try {
   }, [router, wish]);
 
   const openGiftLink = useCallback((link: string) => {
-    Alert.alert('Leaving WhispList', "You're leaving WhispList to send a gift.", [
+    Alert.alert('Leaving WhispList', "You&apos;re leaving WhispList to send a gift.", [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Continue', onPress: () => WebBrowser.openBrowserAsync(link) },
     ]);
