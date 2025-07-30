@@ -850,7 +850,7 @@ try {
                       try {
                         await addDoc(collection(db, 'wishes', confirmGift!.wishId!, 'gifts'), {
                           message: thanksMessage,
-                          sender: user?.uid || 'anon',
+                          from: user?.displayName || 'anonymous',
                           timestamp: serverTimestamp(),
                         });
                       } catch (err) {
