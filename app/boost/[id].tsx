@@ -1,9 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Share, Alert } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import ConfettiCannon from 'react-native-confetti-cannon';
+import * as Linking from 'expo-linking';
+import { getWish } from '../../helpers/firestore';
+import { formatTimeLeft } from '../../helpers/time';
 
 export default function BoostPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -12,8 +16,40 @@ export default function BoostPage() {
   const { theme } = useTheme();
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [alreadyBoosted, setAlreadyBoosted] = useState(false);
+  const [boostedUntil, setBoostedUntil] = useState<Date | null>(null);
+  const [timeLeft, setTimeLeft] = useState('');
+
+  useEffect(() => {
+    const checkBoost = async () => {
+      if (!id) return;
+      const wish = await getWish(id);
+      if (
+        wish?.boostedUntil &&
+        wish.boostedUntil.toDate &&
+        wish.boostedUntil.toDate() > new Date()
+      ) {
+        setAlreadyBoosted(true);
+        setBoostedUntil(wish.boostedUntil.toDate());
+        Alert.alert('This wish is already boosted — try again later.');
+      }
+    };
+    checkBoost();
+  }, [id]);
+
+  useEffect(() => {
+    if (!boostedUntil) return;
+    const update = () => setTimeLeft(formatTimeLeft(boostedUntil));
+    update();
+    const id = setInterval(update, 60000);
+    return () => clearInterval(id);
+  }, [boostedUntil]);
 
   const handleBoost = async () => {
+    if (alreadyBoosted) {
+      Alert.alert('This wish is already boosted — try again later.');
+      return;
+    }
     if (!id || !user) return;
     setLoading(true);
     try {
@@ -28,6 +64,7 @@ export default function BoostPage() {
       const data = await resp.json();
       if (data.url) {
         await WebBrowser.openBrowserAsync(data.url);
+        setBoostedUntil(new Date(Date.now() + 24 * 60 * 60 * 1000));
         setDone(true);
       }
     } catch (err) {
@@ -41,9 +78,24 @@ export default function BoostPage() {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {done ? (
         <>
-          <Text style={{ color: theme.text, marginBottom: 20 }}>
-            Thanks for boosting! Your wish will be highlighted shortly.
+          <ConfettiCannon count={120} origin={{ x: 0, y: 0 }} fadeOut />
+          <Text style={{ color: theme.text, marginBottom: 20, fontSize: 18 }}>
+            Your wish is now boosted for 24 hours!
           </Text>
+          {timeLeft && (
+            <Text style={{ color: theme.tint, marginBottom: 20 }}>
+              ⏳ {timeLeft}
+            </Text>
+          )}
+          <TouchableOpacity
+            onPress={async () => {
+              const url = Linking.createURL(`/wish/${id}`);
+              await Share.share({ message: `Check out my wish: ${url}` });
+            }}
+            style={[styles.button, { marginBottom: 10 }]}
+          >
+            <Text style={styles.buttonText}>Let others support your wish</Text>
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => router.back()} style={styles.button}>
             <Text style={styles.buttonText}>Go Back</Text>
           </TouchableOpacity>
@@ -53,9 +105,18 @@ export default function BoostPage() {
           <Text style={{ color: theme.text, marginBottom: 20 }}>
             Boost this wish for $0.50
           </Text>
-          <TouchableOpacity onPress={handleBoost} style={styles.button} disabled={loading}>
-            {loading ? <ActivityIndicator color="#000" /> : <Text style={styles.buttonText}>Boost 🚀</Text>}
+          <TouchableOpacity onPress={handleBoost} style={styles.button} disabled={loading || alreadyBoosted}>
+            {loading ? (
+              <ActivityIndicator color="#000" />
+            ) : (
+              <Text style={styles.buttonText}>Boost 🚀</Text>
+            )}
           </TouchableOpacity>
+          {alreadyBoosted && (
+            <Text style={{ color: theme.text, marginTop: 10, textAlign: 'center' }}>
+              This wish is already boosted—try again later.
+            </Text>
+          )}
         </>
       )}
     </View>
