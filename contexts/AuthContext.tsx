@@ -19,8 +19,21 @@ import {
 } from 'firebase/auth';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { auth, db, storage } from '../firebase';
-import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+  updateDoc,
+  increment,
+  getDocs,
+  query,
+  where,
+} from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -37,6 +50,7 @@ interface Profile {
   photoURL?: string | null;
   isAnonymous: boolean;
   publicProfileEnabled?: boolean;
+  boostCredits?: number;
   createdAt?: any;
 }
 
@@ -77,6 +91,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
   });
 
   useEffect(() => {
+    const checkInvite = async () => {
+      try {
+        const url = await Linking.getInitialURL();
+        if (url) {
+          const parsed = Linking.parse(url);
+          const ref = parsed.queryParams?.ref as string | undefined;
+          if (ref) {
+            await AsyncStorage.setItem('inviteRef', ref);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to parse initial URL', err);
+      }
+    };
+    checkInvite();
+  }, []);
+
+  useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (!u) {
         try {
@@ -96,6 +128,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
           if (data.publicProfileEnabled === undefined) {
             data.publicProfileEnabled = true;
           }
+          if (data.boostCredits === undefined) data.boostCredits = 0;
           setProfile(data);
         } else {
           const data: Profile = {
@@ -105,9 +138,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
             photoURL: u.photoURL,
             isAnonymous: u.isAnonymous,
             publicProfileEnabled: true,
+            boostCredits: 0,
             createdAt: serverTimestamp(),
           };
           await setDoc(ref, data);
+          try {
+            const inviteRef = await AsyncStorage.getItem('inviteRef');
+            if (inviteRef) {
+              const q = query(collection(db, 'users'), where('displayName', '==', inviteRef));
+              const res = await getDocs(q);
+              if (!res.empty) {
+                const referrerId = res.docs[0].id;
+                await updateDoc(doc(db, 'users', referrerId), { boostCredits: increment(1) });
+                await updateDoc(ref, { boostCredits: increment(1) });
+                await setDoc(doc(db, 'referrals', u.uid), {
+                  referrerId,
+                  timestamp: serverTimestamp(),
+                });
+              }
+              await AsyncStorage.removeItem('inviteRef');
+            }
+          } catch (err) {
+            console.error('Failed to process referral', err);
+          }
           setProfile(data);
         }
       } else {

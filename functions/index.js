@@ -9,13 +9,24 @@ const expo = new Expo();
 async function sendPush(userId, title, body) {
   if (!userId) return null;
   const snap = await db.collection('users').doc(userId).get();
-  const token = snap.get('pushToken');
-  if (!token || !Expo.isExpoPushToken(token)) return null;
-  const messages = [{ to: token, sound: 'default', title, body }];
-  try {
-    await expo.sendPushNotificationsAsync(messages);
-  } catch (err) {
-    console.error('Error sending push notification', err);
+  const expoToken = snap.get('pushToken');
+  const fcmToken = snap.get('fcmToken');
+  if (expoToken && Expo.isExpoPushToken(expoToken)) {
+    const messages = [{ to: expoToken, sound: 'default', title, body }];
+    try {
+      await expo.sendPushNotificationsAsync(messages);
+    } catch (err) {
+      console.error('Error sending Expo push notification', err);
+    }
+  } else if (fcmToken) {
+    try {
+      await admin.messaging().send({
+        token: fcmToken,
+        notification: { title, body },
+      });
+    } catch (err) {
+      console.error('Error sending FCM notification', err);
+    }
   }
   return null;
 }
@@ -64,6 +75,22 @@ exports.notifyWishComment = functions.firestore
         'New comment on your wish \ud83d\udcac',
         'Someone left a comment on your wish.'
       );
+    }
+    return null;
+  });
+
+exports.notifyWishBoost = functions.firestore
+  .document('wishes/{wishId}')
+  .onUpdate(async (change) => {
+    const before = change.before.data();
+    const after = change.after.data();
+    if (
+      after.boostedUntil &&
+      (!before.boostedUntil || after.boostedUntil.seconds !== before.boostedUntil.seconds) &&
+      after.userId &&
+      !after.isAnonymous
+    ) {
+      await sendPush(after.userId, 'Your wish was boosted! 🚀', 'Someone boosted your wish.');
     }
     return null;
   });

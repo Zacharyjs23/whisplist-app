@@ -36,7 +36,7 @@ export default function usePushNotifications() {
       const { data } = await Notifications.getExpoPushTokenAsync();
       setToken(data);
       try {
-        await updateDoc(doc(db, 'users', user.uid), { pushToken: data });
+        await updateDoc(doc(db, 'users', user.uid), { fcmToken: data });
       } catch (err) {
         console.error('Failed to save push token', err);
       }
