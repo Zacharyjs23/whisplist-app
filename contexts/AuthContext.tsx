@@ -153,6 +153,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
                 await updateDoc(ref, { boostCredits: increment(1) });
                 await setDoc(doc(db, 'referrals', u.uid), {
                   referrerId,
+                  referrerDisplayName:
+                    res.docs[0].data().referralDisplayName || res.docs[0].data().displayName,
                   timestamp: serverTimestamp(),
                 });
               }

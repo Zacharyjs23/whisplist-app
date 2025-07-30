@@ -23,6 +23,7 @@ import { Picker } from '@react-native-picker/picker';
 import * as Audio from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
 import * as Notifications from 'expo-notifications';
+import ReferralNameDialog from '@/components/ReferralNameDialog';
 import { addDoc, collection, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import React, { useEffect, useState } from 'react';
@@ -79,6 +80,12 @@ export default function Page() {
   const [publicProfileEnabled, setPublicProfileEnabled] = useState(
     profile?.publicProfileEnabled !== false
   );
+  const [refDialogVisible, setRefDialogVisible] = useState(false);
+  const [pushPrefs, setPushPrefs] = useState({
+    wish_boosted: true,
+    new_comment: true,
+    referral_bonus: true,
+  });
 
   useEffect(() => {
     const load = async () => {
@@ -97,6 +104,8 @@ export default function Page() {
       setDailyQuote(quote === 'true');
       if (storedNickname) setUser({ id: 'local', nickname: storedNickname });
       setPublicProfileEnabled(profile?.publicProfileEnabled !== false);
+      const prefs = await AsyncStorage.getItem('pushPrefs');
+      if (prefs) setPushPrefs(JSON.parse(prefs));
     };
     load();
   }, [profile]);
@@ -175,15 +184,22 @@ export default function Page() {
   };
 
   const handleShareInvite = async () => {
-    if (!profile?.displayName) return;
-    const url = Linking.createURL('/', { queryParams: { ref: profile.displayName } });
-    await Share.share({ message: `Join me on WhispList! ${url}` });
+    setRefDialogVisible(true);
   };
 
   const permissionsInfo = async () => {
     const mic = await Audio.getRecordingPermissionsAsync();
     const notif = await Notifications.getPermissionsAsync();
     Alert.alert('Permissions', `Microphone: ${mic.status}\nNotifications: ${notif.status}`);
+  };
+
+  const sendInvite = async (name: string) => {
+    if (!profile) return;
+    await updateProfile({ referralDisplayName: name });
+    const refName = name || profile.displayName || '';
+    const url = Linking.createURL('/', { queryParams: { ref: refName } });
+    await Share.share({ message: `Join me on WhispList! ${url}` });
+    setRefDialogVisible(false);
   };
 
   const toggleAnonymize = async (val: boolean) => {
@@ -204,6 +220,12 @@ export default function Page() {
   const togglePublicProfile = async (val: boolean) => {
     setPublicProfileEnabled(val);
     await updateProfile({ publicProfileEnabled: val });
+  };
+
+  const togglePush = async (key: keyof typeof pushPrefs, val: boolean) => {
+    const updated = { ...pushPrefs, [key]: val };
+    setPushPrefs(updated);
+    await AsyncStorage.setItem('pushPrefs', JSON.stringify(updated));
   };
 
   return (
@@ -249,6 +271,19 @@ export default function Page() {
       <View style={styles.row}>
         <ThemedText style={styles.label}>Daily Quote</ThemedText>
         <Switch value={dailyQuote} onValueChange={toggleDailyQuote} />
+      </View>
+
+      <View style={styles.row}>
+        <ThemedText style={styles.label}>Boost Notifications</ThemedText>
+        <Switch value={pushPrefs.wish_boosted} onValueChange={(v) => togglePush('wish_boosted', v)} />
+      </View>
+      <View style={styles.row}>
+        <ThemedText style={styles.label}>Comment Notifications</ThemedText>
+        <Switch value={pushPrefs.new_comment} onValueChange={(v) => togglePush('new_comment', v)} />
+      </View>
+      <View style={styles.row}>
+        <ThemedText style={styles.label}>Referral Bonuses</ThemedText>
+        <Switch value={pushPrefs.referral_bonus} onValueChange={(v) => togglePush('referral_bonus', v)} />
       </View>
 
       <View style={styles.row}>
@@ -317,6 +352,12 @@ export default function Page() {
       <ThemedButton title="Permissions" onPress={permissionsInfo} />
       <ThemedButton title="Delete My Content" onPress={handleDeleteContent} />
       <ThemedButton title="Reset App Data" onPress={handleReset} />
+      <ReferralNameDialog
+        visible={refDialogVisible}
+        defaultName={profile?.referralDisplayName || profile?.displayName || ''}
+        onClose={() => setRefDialogVisible(false)}
+        onSubmit={sendInvite}
+      />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
