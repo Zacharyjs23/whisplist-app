@@ -9,9 +9,25 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/users/$(userId)/followers/$(request.auth.uid));
     }
 
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
     match /wishes/{wishId} {
-      allow read: if isBoosted() || isFollowerOf(resource.data.userId);
-      allow write: if request.auth != null;
+      allow read: if true;
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.userId;
+      allow update, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+    }
+
+    match /wishes/{wishId}/comments/{commentId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.userId;
+      allow update, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+    }
+
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update, delete: if isSignedIn() && request.auth.uid == userId;
     }
 
     match /users/{userId}/followers/{followerId} {
@@ -20,6 +36,10 @@ service cloud.firestore {
 
     match /users/{userId}/following/{targetUserId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
