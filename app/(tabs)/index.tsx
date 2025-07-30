@@ -938,7 +938,7 @@ useEffect(() => {
                   <TouchableOpacity
                     onPress={async () => {
                       try {
-                        await addDoc(collection(db, 'wishes', confirmGift.wishId, 'gifts'), {
+                        await addDoc(collection(db, 'wishes', confirmGift!.wishId!, 'gifts'), {
                           message: thanksMessage,
                           sender: user?.uid || 'anon',
                           timestamp: serverTimestamp(),
