@@ -110,6 +110,7 @@ export default function Page() {
 
   const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
+    const glowAnim = useRef(new Animated.Value(0)).current;
     const [timeLeft, setTimeLeft] = useState('');
 
     useEffect(() => {
@@ -119,6 +120,19 @@ export default function Page() {
         useNativeDriver: true,
       }).start();
     }, [fadeAnim]);
+
+    useEffect(() => {
+      if (item.boostedUntil) {
+        const loop = Animated.loop(
+          Animated.sequence([
+            Animated.timing(glowAnim, { toValue: 1, duration: 1000, useNativeDriver: false }),
+            Animated.timing(glowAnim, { toValue: 0, duration: 1000, useNativeDriver: false }),
+          ])
+        );
+        loop.start();
+        return () => loop.stop();
+      }
+    }, [item.boostedUntil]);
 
     useEffect(() => {
       if (item.boostedUntil && item.boostedUntil.toDate) {
@@ -140,7 +154,9 @@ export default function Page() {
           {
             opacity: fadeAnim,
             backgroundColor: typeInfo[item.type || 'wish'].color,
-            borderColor: item.boostedUntil ? '#facc15' : 'transparent',
+            borderColor: item.boostedUntil
+              ? glowAnim.interpolate({ inputRange: [0, 1], outputRange: ['#facc15', '#fde68a'] })
+              : 'transparent',
             borderWidth: item.boostedUntil ? 2 : 0,
           },
         ]}
@@ -178,10 +194,7 @@ export default function Page() {
             <Text style={[styles.likes, { color: theme.tint }]}>❤️ {item.likes}</Text>
           )}
           {item.boostedUntil && item.boostedUntil.toDate && (
-            <Text style={styles.boostedLabel}>
-              🚀 {item.boosted === 'stripe' ? 'Boosted via Stripe' : 'Boosted'}
-              {timeLeft ? ` (${timeLeft})` : ''}
-            </Text>
+            <Text style={styles.boostedLabel}>⏳ Time left: {timeLeft}</Text>
           )}
         </TouchableOpacity>
         <TouchableOpacity

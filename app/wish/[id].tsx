@@ -109,10 +109,30 @@ export default function Page() {
     wish?.boostedUntil &&
     wish.boostedUntil.toDate &&
     wish.boostedUntil.toDate() > new Date();
-  const timeLeft =
-    isBoosted && wish?.boostedUntil?.toDate
-      ? formatTimeLeft(wish.boostedUntil.toDate())
-      : '';
+  const [timeLeft, setTimeLeft] = useState(
+    isBoosted && wish?.boostedUntil?.toDate ? formatTimeLeft(wish.boostedUntil.toDate()) : ''
+  );
+  const glowAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (isBoosted && wish?.boostedUntil?.toDate) {
+      const update = () => setTimeLeft(formatTimeLeft(wish.boostedUntil.toDate()));
+      update();
+      const id = setInterval(update, 60000);
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, { toValue: 1, duration: 1000, useNativeDriver: false }),
+          Animated.timing(glowAnim, { toValue: 0, duration: 1000, useNativeDriver: false }),
+        ])
+      );
+      loop.start();
+      return () => {
+        clearInterval(id);
+        loop.stop();
+      };
+    } else {
+      setTimeLeft('');
+    }
+  }, [isBoosted, wish?.boostedUntil]);
   const canBoost =
     user &&
     wish?.userId === user.uid &&
@@ -461,10 +481,16 @@ try {
 ) : (
   <>
     {wish && (
-      <View
+      <Animated.View
         style={[
           styles.wishBox,
-          { backgroundColor: typeInfo[wish.type || 'wish'].color },
+          {
+            backgroundColor: typeInfo[wish.type || 'wish'].color,
+            borderColor: isBoosted
+              ? glowAnim.interpolate({ inputRange: [0, 1], outputRange: ['#facc15', '#fde68a'] })
+              : 'transparent',
+            borderWidth: isBoosted ? 2 : 0,
+          },
         ]}
       >
         <Text style={[styles.wishCategory, { color: theme.tint }]}>
@@ -540,10 +566,7 @@ try {
           <Text style={[styles.likes, { color: theme.tint }]}>❤️ {wish.likes}</Text>
         )}
         {isBoosted && (
-          <Text style={styles.boostedLabel}>
-            🚀 {wish.boosted === 'stripe' ? 'Boosted via Stripe' : 'Boosted'}
-            {timeLeft ? ` (${timeLeft})` : ''}
-          </Text>
+          <Text style={styles.boostedLabel}>⏳ Time left: {timeLeft}</Text>
         )}
 
         {wish.audioUrl && (
@@ -577,7 +600,7 @@ try {
         >
           <Text style={{ color: '#f87171' }}>Report</Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
     )}
   </>
 )}

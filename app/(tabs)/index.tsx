@@ -400,6 +400,135 @@ useEffect(() => {
       (filterType === 'all' || wish.type === filterType)
   );
 
+  const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
+    const [timeLeft, setTimeLeft] = useState('');
+    const glowAnim = useRef(new Animated.Value(0)).current;
+    const isBoosted =
+      item.boostedUntil &&
+      item.boostedUntil.toDate &&
+      item.boostedUntil.toDate() > new Date();
+
+    useEffect(() => {
+      if (isBoosted && item.boostedUntil?.toDate) {
+        const update = () => setTimeLeft(formatTimeLeft(item.boostedUntil.toDate()));
+        update();
+        const id = setInterval(update, 60000);
+        const loop = Animated.loop(
+          Animated.sequence([
+            Animated.timing(glowAnim, { toValue: 1, duration: 1000, useNativeDriver: false }),
+            Animated.timing(glowAnim, { toValue: 0, duration: 1000, useNativeDriver: false }),
+          ])
+        );
+        loop.start();
+        return () => {
+          clearInterval(id);
+          loop.stop();
+        };
+      } else {
+        setTimeLeft('');
+      }
+    }, [isBoosted, item.boostedUntil]);
+
+    const borderColor = isBoosted
+      ? glowAnim.interpolate({ inputRange: [0, 1], outputRange: ['#facc15', '#fde68a'] })
+      : 'transparent';
+
+    const canBoost =
+      user &&
+      item.userId === user.uid &&
+      (!item.boostedUntil ||
+        !item.boostedUntil.toDate ||
+        item.boostedUntil.toDate() < new Date());
+
+    return (
+      <Animated.View
+        style={[
+          styles.wishItem,
+          {
+            backgroundColor: typeInfo[item.type || 'wish'].color,
+            borderColor,
+            borderWidth: isBoosted ? 2 : 0,
+          },
+        ]}
+      >
+        <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)} hitSlop={HIT_SLOP}>
+          {!item.isAnonymous &&
+            item.displayName &&
+            publicStatus[item.userId || ''] && (
+              <TouchableOpacity
+                onPress={() => router.push(`/profile/${item.displayName}`)}
+                hitSlop={HIT_SLOP}
+              >
+                <Text style={styles.author}>by {item.displayName}</Text>
+              </TouchableOpacity>
+            )}
+          <Text style={{ color: '#a78bfa', fontSize: 12 }}>
+            {typeInfo[item.type || 'wish'].emoji} #{item.category} {item.audioUrl ? '🔊' : ''}
+          </Text>
+          <Text style={styles.wishText}>{item.text}</Text>
+          {item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.preview} />}
+          {item.isPoll ? (
+            <View style={{ marginTop: 6 }}>
+              <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
+              <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
+            </View>
+          ) : (
+            <Text style={styles.likeText}>❤️ {item.likes}</Text>
+          )}
+          {isBoosted && (
+            <Text style={styles.boostedLabel}>⏳ Time left: {timeLeft}</Text>
+          )}
+        </TouchableOpacity>
+
+        {canBoost && (
+          <TouchableOpacity
+            onPress={() => router.push(`/boost/${item.id}`)}
+            style={{ marginTop: 4 }}
+            hitSlop={HIT_SLOP}
+          >
+            <Text style={{ color: '#facc15' }}>Boost 🚀</Text>
+          </TouchableOpacity>
+        )}
+
+        {user && item.userId && user.uid !== item.userId && (
+          <TouchableOpacity
+            onPress={async () => {
+              if (!user?.uid) return;
+              if (!item.userId) return;
+
+              const targetId = item.userId;
+
+              if (followStatus[targetId]) {
+                await unfollowUser(user.uid, targetId);
+                setFollowStatus((prev) => ({ ...prev, [targetId]: false }));
+              } else {
+                await followUser(user.uid, targetId);
+                setFollowStatus((prev) => ({ ...prev, [targetId]: true }));
+              }
+            }}
+            style={{ marginTop: 4 }}
+            hitSlop={HIT_SLOP}
+          >
+            <Text style={{ color: '#a78bfa' }}>
+              {followStatus[item.userId] ? 'Unfollow' : 'Follow'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          onPress={() => {
+            setReportTarget(item.id);
+            setReportVisible(true);
+          }}
+          style={{ marginTop: 4 }}
+          hitSlop={HIT_SLOP}
+        >
+          <Text style={{ color: '#f87171' }}>Report</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
   try {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -589,114 +718,7 @@ useEffect(() => {
               <Text style={styles.noResults}>No matching wishes 💭</Text>
             )
           }
-          renderItem={({ item }) => {
-            const isBoosted =
-              item.boostedUntil &&
-              item.boostedUntil.toDate &&
-              item.boostedUntil.toDate() > new Date();
-            const timeLeft = isBoosted
-              ? formatTimeLeft(item.boostedUntil.toDate())
-              : '';
-            const canBoost =
-              user &&
-              item.userId === user.uid &&
-              (!item.boostedUntil ||
-                !item.boostedUntil.toDate ||
-                item.boostedUntil.toDate() < new Date());
-
-            return (
-            <View
-              style={[
-                styles.wishItem,
-                {
-                  backgroundColor: typeInfo[item.type || 'wish'].color,
-                  borderColor: isBoosted ? '#facc15' : 'transparent',
-                  borderWidth: isBoosted ? 2 : 0,
-                },
-              ]}
-            >
-              <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)} hitSlop={HIT_SLOP}>
-                {!item.isAnonymous &&
-                  item.displayName &&
-                  publicStatus[item.userId || ''] && (
-                    <TouchableOpacity
-                      onPress={() => router.push(`/profile/${item.displayName}`)}
-                      hitSlop={HIT_SLOP}
-                    >
-                      <Text style={styles.author}>by {item.displayName}</Text>
-                    </TouchableOpacity>
-                  )}
-                <Text style={{ color: '#a78bfa', fontSize: 12 }}>
-                  {typeInfo[item.type || 'wish'].emoji} #{item.category} {item.audioUrl ? '🔊' : ''}
-                </Text>
-                <Text style={styles.wishText}>{item.text}</Text>
-                {item.imageUrl && (
-                  <Image source={{ uri: item.imageUrl }} style={styles.preview} />
-                )}
-                {item.isPoll ? (
-                  <View style={{ marginTop: 6 }}>
-                    <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
-                    <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
-                  </View>
-                ) : (
-                  <Text style={styles.likeText}>❤️ {item.likes}</Text>
-                )}
-                {isBoosted && (
-                  <Text style={styles.boostedLabel}>
-                    🚀 {item.boosted === 'stripe' ? 'Boosted via Stripe' : 'Boosted'}
-                    {timeLeft ? ` (${timeLeft})` : ''}
-                  </Text>
-                )}
-              </TouchableOpacity>
-
-              {canBoost && (
-                <TouchableOpacity
-                  onPress={() => router.push(`/boost/${item.id}`)}
-                  style={{ marginTop: 4 }}
-                  hitSlop={HIT_SLOP}
-                >
-                  <Text style={{ color: '#facc15' }}>Boost 🚀</Text>
-                </TouchableOpacity>
-              )}
-
-              {user && item.userId && user.uid !== item.userId && (
-                <TouchableOpacity
-                  onPress={async () => {
-                    if (!user?.uid) return;
-                    if (!item.userId) return;
-
-                    const targetId = item.userId;
-
-                    if (followStatus[targetId]) {
-                      await unfollowUser(user.uid, targetId);
-                      setFollowStatus((prev) => ({ ...prev, [targetId]: false }));
-                    } else {
-                      await followUser(user.uid, targetId);
-                      setFollowStatus((prev) => ({ ...prev, [targetId]: true }));
-                    }
-                  }}
-                  style={{ marginTop: 4 }}
-                  hitSlop={HIT_SLOP}
-                >
-                  <Text style={{ color: '#a78bfa' }}>
-                    {followStatus[item.userId] ? 'Unfollow' : 'Follow'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-
-              <TouchableOpacity
-                onPress={() => {
-                  setReportTarget(item.id);
-                  setReportVisible(true);
-                }}
-                style={{ marginTop: 4 }}
-                hitSlop={HIT_SLOP}
-              >
-                <Text style={{ color: '#f87171' }}>Report</Text>
-              </TouchableOpacity>
-            </View>
-          );
-        }}
+          renderItem={({ item }) => <WishCard item={item} />}
         />
         <ReportDialog
           visible={reportVisible}
