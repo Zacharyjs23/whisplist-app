@@ -48,13 +48,6 @@
       "typedRoutes": true
     },
     "extra": {
-      "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyDVBdi1qJOtOPX6-jGOZgj8uwh9tM7uomc",
-      "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "whisplist-f6b0d.firebaseapp.com",
-      "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "whisplist-f6b0d",
-      "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "whisplist-f6b0d.appspot.com",
-      "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "344114970536",
-      "EXPO_PUBLIC_FIREBASE_APP_ID": "1:344114970536:web:bcd483704259e26881279d",
-      "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID": "G-ZJNFK37Y41",
       "eas": {
         "projectId": "69cf3668-bd8e-4302-a57d-3ba9eabd2e5d"
       }

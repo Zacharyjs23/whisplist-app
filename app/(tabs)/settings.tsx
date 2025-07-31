@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { useRouter } from 'expo-router';
 import { Picker } from '@react-native-picker/picker';
 import * as Audio from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
@@ -39,6 +40,7 @@ import {
 export default function Page() {
   const { theme, setTheme } = useTheme();
   const { user, profile, updateProfile } = useAuth();
+  const router = useRouter();
 
   const themeOptions = Object.keys(Colors) as ThemeName[];
 
@@ -423,6 +425,8 @@ export default function Page() {
       <ThemedButton title="Permissions" onPress={permissionsInfo} />
       <ThemedButton title="Delete My Content" onPress={handleDeleteContent} />
       <ThemedButton title="Reset App Data" onPress={handleReset} />
+      <ThemedButton title="Terms of Service" onPress={() => router.push('/terms')} />
+      <ThemedButton title="Privacy Policy" onPress={() => router.push('/privacy')} />
       {profile?.developerMode && (
         <View style={[styles.devAnalytics, { backgroundColor: theme.input }]}>
           <Text style={{ color: theme.text }}>Total Wishes: {analytics.wishCount}</Text>

@@ -83,7 +83,6 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void; followed?: 
       ])
     );
     loop.start();
-    return () => clearInterval(id);
     return () => {
       clearInterval(id);
       loop.stop();
