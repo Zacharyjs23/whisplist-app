@@ -53,6 +53,7 @@ import { db, storage } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
 import { cleanupExpiredWishes } from '../../helpers/firestore';
+import { DAILY_PROMPTS } from '../../constants/prompts';
 
 const typeInfo: Record<string, { emoji: string; color: string }> = {
   wish: { emoji: '💭', color: '#1e1e1e' },
@@ -61,11 +62,19 @@ const typeInfo: Record<string, { emoji: string; color: string }> = {
   dream: { emoji: '🌙', color: '#312e81' },
 };
 
-const prompts = [
-  '💭 What\u2019s your biggest wish this week?',
-  '🌙 Describe a dream you had recently',
-  '🧠 What advice do you wish you had today?',
-];
+/**
+ * Pick a random prompt index that is not in the recent list. If all prompts
+ * have been used recently, the recent list is cleared to start fresh.
+ */
+const pickPromptIndex = (recent: number[]): number => {
+  let available = DAILY_PROMPTS.map((_, i) => i).filter((i) => !recent.includes(i));
+  if (available.length === 0) {
+    recent = [];
+    available = DAILY_PROMPTS.map((_, i) => i);
+  }
+  return available[Math.floor(Math.random() * available.length)];
+};
+
 
 export default function Page() {
   const [wish, setWish] = useState('');
@@ -252,16 +261,20 @@ useEffect(() => {
     try {
       const today = new Date().toISOString().split('T')[0];
       const savedDate = await AsyncStorage.getItem('dailyPromptDate');
-      const savedPrompt = await AsyncStorage.getItem('dailyPromptText');
+      let savedPrompt = await AsyncStorage.getItem('dailyPromptText');
+      const recentRaw = await AsyncStorage.getItem('recentPromptIndices');
+      let recent: number[] = recentRaw ? JSON.parse(recentRaw) : [];
 
-      if (savedDate === today && savedPrompt) {
-        setDailyPrompt(savedPrompt);
-      } else {
-        const prompt = prompts[Math.floor(Math.random() * prompts.length)];
-        setDailyPrompt(prompt);
+      if (savedDate !== today || !savedPrompt) {
+        const index = pickPromptIndex(recent);
+        savedPrompt = DAILY_PROMPTS[index];
         await AsyncStorage.setItem('dailyPromptDate', today);
-        await AsyncStorage.setItem('dailyPromptText', prompt);
+        await AsyncStorage.setItem('dailyPromptText', savedPrompt);
+        recent = [index, ...recent].slice(0, 20);
+        await AsyncStorage.setItem('recentPromptIndices', JSON.stringify(recent));
       }
+
+      setDailyPrompt(savedPrompt || '');
       Animated.timing(promptOpacity, {
         toValue: 1,
         duration: 500,
@@ -347,6 +360,33 @@ useEffect(() => {
     await AsyncStorage.setItem('lastPostedDate', today);
     await AsyncStorage.setItem('streakCount', streak.toString());
     setStreakCount(streak);
+  };
+
+  /**
+   * Allow the user to fetch a new prompt for the current day.
+   * The date remains the same but the prompt text and recent list update.
+   */
+  const requestNewPrompt = async () => {
+    const recentRaw = await AsyncStorage.getItem('recentPromptIndices');
+    let recent: number[] = recentRaw ? JSON.parse(recentRaw) : [];
+    const index = pickPromptIndex(recent);
+    const newPrompt = DAILY_PROMPTS[index];
+    await AsyncStorage.setItem('dailyPromptText', newPrompt);
+    recent = [index, ...recent].slice(0, 20);
+    await AsyncStorage.setItem('recentPromptIndices', JSON.stringify(recent));
+    promptOpacity.setValue(0);
+    setDailyPrompt(newPrompt);
+    Animated.timing(promptOpacity, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+    const msg = "✨ That's a deep one.";
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(msg, ToastAndroid.SHORT);
+    } else {
+      Alert.alert(msg);
+    }
   };
 
   const handleRephrase = async () => {
@@ -846,6 +886,9 @@ useEffect(() => {
                     <Animated.View style={[styles.promptCard, { opacity: promptOpacity }]}>
                       <Text style={styles.promptText}>{dailyPrompt}</Text>
                     </Animated.View>
+                    <TouchableOpacity onPress={requestNewPrompt}>
+                      <Text style={{ color: theme.tint }}>🔁 Give me a different prompt</Text>
+                    </TouchableOpacity>
                   </>
                 )}
 
