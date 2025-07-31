@@ -23,8 +23,6 @@ import {
   listenWishes,
   getFollowingIds,
   listenBoostedWishes,
-  listenFollowingWishes,
-  getFollowingWishes,
   getTopBoostedCreators,
   getWhispOfTheDay,
 } from '../../helpers/firestore';
@@ -56,7 +54,8 @@ export default function Page() {
   const [whispOfDay, setWhispOfDay] = useState<Wish | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'latest' | 'boosted' | 'trending' | 'forYou' | 'following'>('latest');
+  const [followingIds, setFollowingIds] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<'latest' | 'boosted' | 'trending' | 'forYou'>('latest');
   const [searchTerm, setSearchTerm] = useState('');
   const [reportVisible, setReportVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
@@ -88,7 +87,7 @@ export default function Page() {
   useEffect(() => {
     (async () => {
       const stored = await AsyncStorage.getItem('feedTab');
-      if (stored === 'latest' || stored === 'boosted' || stored === 'trending' || stored === 'forYou' || stored === 'following') {
+      if (stored === 'latest' || stored === 'boosted' || stored === 'trending' || stored === 'forYou') {
         setActiveTab(stored as any);
       }
     })();
@@ -122,6 +121,17 @@ export default function Page() {
     }
   }, []);
 
+  // Load followed user IDs for prioritizing "For You" feed
+  useEffect(() => {
+    if (!user) {
+      setFollowingIds([]);
+      return;
+    }
+    getFollowingIds(user.uid)
+      .then(setFollowingIds)
+      .catch((err) => console.warn('Failed to load following ids', err));
+  }, [user]);
+
   const fetchWishes = useCallback(() => {
     setLoading(true);
     try {
@@ -132,12 +142,18 @@ export default function Page() {
             let pref = stored ? JSON.parse(stored) : { categories: [], type: undefined };
             const fresh = await loadPersonalPrefs();
             if (fresh.categories.length) pref = fresh;
-            const snap = await getDocs(query(collection(db, 'wishes'), orderBy('timestamp', 'desc'), limit(30)));
-            const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
-            let list = all.filter((w) =>
-              (pref.categories.includes(w.category)) || (pref.type && w.type === pref.type)
+            const snap = await getDocs(
+              query(collection(db, 'wishes'), orderBy('timestamp', 'desc'), limit(30))
             );
-            if (list.length === 0) list = all;
+            const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
+            // Prioritize wishes from followed users
+            const followed = all.filter((w) => followingIds.includes(w.userId || ''));
+            const others = all.filter((w) => !followingIds.includes(w.userId || ''));
+            const ordered = [...followed, ...others];
+            let list = ordered.filter(
+              (w) => pref.categories.includes(w.category) || (pref.type && w.type === pref.type)
+            );
+            if (list.length === 0) list = ordered;
             const filtered = list.filter((wish) => {
               const inCategory = !selectedCategory || wish.category === selectedCategory;
               const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
@@ -182,22 +198,6 @@ export default function Page() {
               setLoading(false);
             }
           })
-        : activeTab === 'following'
-        ? listenFollowingWishes(user?.uid ?? '', (all: Wish[]) => {
-            try {
-              const filtered = all.filter((wish) => {
-                const inCategory = !selectedCategory || wish.category === selectedCategory;
-                const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
-                return inCategory && inSearch;
-              });
-              setFilteredWishes(filtered);
-            } catch (err) {
-              console.error('❌ Failed to filter wishes:', err);
-              setError('Failed to load wishes');
-            } finally {
-              setLoading(false);
-            }
-          })
         : listenWishes(user?.uid ?? null, (all: Wish[]) => {
             try {
               const filtered = all.filter((wish) => {
@@ -221,7 +221,7 @@ export default function Page() {
       setLoading(false);
       return () => {};
     }
-  }, [activeTab, selectedCategory, searchTerm, user]);
+  }, [activeTab, selectedCategory, searchTerm, user, followingIds]);
 
   useEffect(() => {
     const unsubscribe = fetchWishes();
@@ -233,10 +233,17 @@ export default function Page() {
     try {
       if (activeTab === 'forYou') {
         const pref = await loadPersonalPrefs();
-        const snap = await getDocs(query(collection(db, 'wishes'), orderBy('timestamp', 'desc'), limit(30)));
+        const snap = await getDocs(
+          query(collection(db, 'wishes'), orderBy('timestamp', 'desc'), limit(30))
+        );
         const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
-        let list = all.filter((w) => pref.categories.includes(w.category) || (pref.type && w.type === pref.type));
-        if (list.length === 0) list = all;
+        const followed = all.filter((w) => followingIds.includes(w.userId || ''));
+        const others = all.filter((w) => !followingIds.includes(w.userId || ''));
+        const ordered = [...followed, ...others];
+        let list = ordered.filter(
+          (w) => pref.categories.includes(w.category) || (pref.type && w.type === pref.type)
+        );
+        if (list.length === 0) list = ordered;
         const filtered = list.filter((wish) => {
           const inCategory = !selectedCategory || wish.category === selectedCategory;
           const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
@@ -266,18 +273,6 @@ export default function Page() {
           return inCategory && inSearch;
         });
         setFilteredWishes(filtered);
-      } else if (activeTab === 'following') {
-        if (user) {
-          const list = await getFollowingWishes(user.uid);
-          const filtered = list.filter((wish) => {
-            const inCategory = !selectedCategory || wish.category === selectedCategory;
-            const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
-            return inCategory && inSearch;
-          });
-          setFilteredWishes(filtered);
-        } else {
-          setFilteredWishes([]);
-        }
       } else {
         const followingIds = user ? await getFollowingIds(user.uid) : [];
 
@@ -315,7 +310,7 @@ export default function Page() {
     } finally {
       setRefreshing(false);
     }
-  }, [activeTab, selectedCategory, searchTerm, user]);
+  }, [activeTab, selectedCategory, searchTerm, user, followingIds]);
 
   const Skeleton: React.FC = () => (
     <View style={styles.skeletonContainer}>
@@ -349,6 +344,7 @@ export default function Page() {
   const renderWish = ({ item }: { item: Wish }) => (
     <WishCard
       wish={item}
+      followed={followingIds.includes(item.userId || '')}
       onReport={() => {
         setReportTarget(item.id);
         setReportVisible(true);
@@ -417,7 +413,7 @@ export default function Page() {
         />
 
         <View style={styles.toggleBar}>
-          {(['boosted', 'latest', 'trending', 'forYou', 'following'] as const).map((tab) => (
+          {(['boosted', 'latest', 'trending', 'forYou'] as const).map((tab) => (
             <TouchableOpacity
               key={tab}
               onPress={() => setActiveTab(tab)}
@@ -435,8 +431,6 @@ export default function Page() {
                   ? '💬 Latest'
                   : tab === 'trending'
                   ? '📈 Trending'
-                  : tab === 'following'
-                  ? '👥 Following'
                   : '🧠 For You'}
               </Text>
             </TouchableOpacity>
