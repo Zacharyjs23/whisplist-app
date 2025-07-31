@@ -98,6 +98,29 @@ export default function Page() {
     userCount: 0,
   });
 
+  const SettingsSection: React.FC<{ title: string } & React.PropsWithChildren> = ({
+    title,
+    children,
+  }) => {
+    const [open, setOpen] = useState(true);
+    return (
+      <View style={styles.sectionContainer}>
+        <TouchableOpacity
+          onPress={() => setOpen((o) => !o)}
+          style={styles.sectionHeader}
+        >
+          <ThemedText style={styles.section}>{title}</ThemedText>
+          <Ionicons
+            name={open ? 'chevron-up' : 'chevron-down'}
+            size={16}
+            color={theme.text}
+          />
+        </TouchableOpacity>
+        {open && <View style={{ marginTop: 8 }}>{children}</View>}
+      </View>
+    );
+  };
+
   useEffect(() => {
     const load = async () => {
       const a = await AsyncStorage.getItem('avatarUrl');
@@ -311,139 +334,146 @@ export default function Page() {
           ]}
         >
         <ThemedText style={styles.title}>Settings</ThemedText>
-      <ThemedText style={styles.section}>Theme</ThemedText>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.themeList}>
-        {themeOptions.map((t) => (
-          <ThemeSwatch key={t} name={t} />
-        ))}
-      </ScrollView>
-      <Picker
-        selectedValue={theme.name}
-        onValueChange={(value) => setTheme(value as ThemeName)}
-        style={[styles.picker, { backgroundColor: theme.input, color: theme.text }]}
-      >
-        {themeOptions.map((t) => (
-          <Picker.Item key={t} label={t} value={t} />
-        ))}
-      </Picker>
 
-      <View style={styles.row}>
-        <ThemedText style={styles.label}>Anonymize Username</ThemedText>
-        <Switch value={anonymize} onValueChange={toggleAnonymize} />
-      </View>
+        <SettingsSection title="Privacy & Profile">
+          <View style={styles.row}>
+            <ThemedText style={styles.label}>Anonymize Username</ThemedText>
+            <Switch value={anonymize} onValueChange={toggleAnonymize} />
+          </View>
+          <View style={styles.row}>
+            <ThemedText style={styles.label}>Public Profile Enabled</ThemedText>
+            <Switch value={publicProfileEnabled} onValueChange={togglePublicProfile} />
+          </View>
+          <View style={styles.row}>
+            <ThemedText style={styles.label}>Enable Stripe Gifting</ThemedText>
+            <Switch value={stripeEnabled} onValueChange={toggleStripe} />
+          </View>
+        </SettingsSection>
 
-      <View style={styles.row}>
-        <ThemedText style={styles.label}>Developer Mode</ThemedText>
-        <Switch value={devMode} onValueChange={toggleDevMode} />
-      </View>
+        <SettingsSection title="Notifications">
+          <View style={styles.row}>
+            <ThemedText style={styles.label}>Daily Quote</ThemedText>
+            <Switch value={dailyQuote} onValueChange={toggleDailyQuote} />
+          </View>
+          <View style={styles.row}>
+            <ThemedText style={styles.label}>Boost Notifications</ThemedText>
+            <Switch
+              value={pushPrefs.wish_boosted}
+              onValueChange={(v) => togglePush('wish_boosted', v)}
+            />
+          </View>
+          <View style={styles.row}>
+            <ThemedText style={styles.label}>Comment Notifications</ThemedText>
+            <Switch
+              value={pushPrefs.new_comment}
+              onValueChange={(v) => togglePush('new_comment', v)}
+            />
+          </View>
+        </SettingsSection>
 
-      <View style={styles.row}>
-        <ThemedText style={styles.label}>Daily Quote</ThemedText>
-        <Switch value={dailyQuote} onValueChange={toggleDailyQuote} />
-      </View>
+        {profile?.isDev === true && (
+          <SettingsSection title="Advanced / Developer">
+            <View style={styles.row}>
+              <ThemedText style={styles.label}>Developer Mode</ThemedText>
+              <Switch value={devMode} onValueChange={toggleDevMode} />
+            </View>
+            <View style={styles.row}>
+              <ThemedText style={styles.label}>Referral Bonuses</ThemedText>
+              <Switch
+                value={pushPrefs.referral_bonus}
+                onValueChange={(v) => togglePush('referral_bonus', v)}
+              />
+            </View>
+            {profile?.developerMode && (
+              <View style={[styles.devAnalytics, { backgroundColor: theme.input }]}>
+                <Text style={{ color: theme.text }}>Total Wishes: {analytics.wishCount}</Text>
+                <Text style={{ color: theme.text }}>Total Boosts: {analytics.boostCount}</Text>
+                <Text style={{ color: theme.text }}>Total Gifts: {analytics.giftCount}</Text>
+                <Text style={{ color: theme.text }}>Active Users (past 7d): {analytics.userCount}</Text>
+              </View>
+            )}
+          </SettingsSection>
+        )}
 
-      <View style={styles.row}>
-        <ThemedText style={styles.label}>Boost Notifications</ThemedText>
-        <Switch value={pushPrefs.wish_boosted} onValueChange={(v) => togglePush('wish_boosted', v)} />
-      </View>
-      <View style={styles.row}>
-        <ThemedText style={styles.label}>Comment Notifications</ThemedText>
-        <Switch value={pushPrefs.new_comment} onValueChange={(v) => togglePush('new_comment', v)} />
-      </View>
-      <View style={styles.row}>
-        <ThemedText style={styles.label}>Referral Bonuses</ThemedText>
-        <Switch value={pushPrefs.referral_bonus} onValueChange={(v) => togglePush('referral_bonus', v)} />
-      </View>
+        <SettingsSection title="System & Account">
+          <ThemedButton title="Pick Avatar" onPress={pickAvatar} />
+          {avatarUrl && <Image source={{ uri: avatarUrl }} style={styles.avatar} />}
+          {profile?.boostCredits !== undefined && (
+            <ThemedText style={styles.section}>
+              You&apos;ve earned {profile.boostCredits} free boosts!
+            </ThemedText>
+          )}
+          <ThemedButton title="Refer a Friend" onPress={handleShareInvite} />
+          <ThemedText style={styles.section}>Default Category</ThemedText>
+          <Picker
+            selectedValue={defaultCategory}
+            onValueChange={async (v) => {
+              setDefaultCategory(v);
+              await AsyncStorage.setItem('defaultCategory', v);
+            }}
+            style={[styles.picker, { backgroundColor: theme.input, color: theme.text }]}
+          >
+            <Picker.Item label="General" value="general" />
+            <Picker.Item label="Love" value="love" />
+            <Picker.Item label="Career" value="career" />
+            <Picker.Item label="Health" value="health" />
+          </Picker>
+          <ThemedText style={styles.section}>Language</ThemedText>
+          <Picker
+            selectedValue={language}
+            onValueChange={async (v) => {
+              setLanguage(v);
+              await AsyncStorage.setItem('language', v);
+            }}
+            style={[styles.picker, { backgroundColor: theme.input, color: theme.text }]}
+          >
+            <Picker.Item label="English" value="en" />
+            <Picker.Item label="Spanish" value="es" />
+          </Picker>
+          <TextInput
+            style={[styles.input, { backgroundColor: theme.input, color: theme.text, height: 80, textAlignVertical: 'top' }]}
+            placeholder="Send feedback"
+            placeholderTextColor="#888"
+            value={feedback}
+            onChangeText={setFeedback}
+            multiline
+          />
+          <ThemedButton title="Submit Feedback" onPress={handleSendFeedback} />
+          <ThemedButton title="Export History" onPress={handleExport} />
+          <ThemedButton title="Rate this App" onPress={() => Linking.openURL('https://example.com')} />
+          <ThemedButton title="Permissions" onPress={permissionsInfo} />
+          <ThemedButton title="Delete My Content" onPress={handleDeleteContent} />
+          <ThemedButton title="Reset App Data" onPress={handleReset} />
+          <Text style={{ color: theme.text, marginBottom: 10, textAlign: 'center' }}>
+            WhispList promises a safe, anonymous place to share your dreams.
+          </Text>
+          <ThemedButton title="Terms of Service" onPress={() => router.push('/terms')} />
+          <ThemedButton title="Privacy Policy" onPress={() => router.push('/privacy')} />
+        </SettingsSection>
 
-      <View style={styles.row}>
-        <ThemedText style={styles.label}>Public Profile Enabled</ThemedText>
-        <Switch value={publicProfileEnabled} onValueChange={togglePublicProfile} />
-      </View>
-      <View style={styles.row}>
-        <ThemedText style={styles.label}>Enable Stripe Gifting</ThemedText>
-        <Switch value={stripeEnabled} onValueChange={toggleStripe} />
-      </View>
+        <SettingsSection title="Theme">
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.themeList}>
+            {themeOptions.map((t) => (
+              <ThemeSwatch key={t} name={t} />
+            ))}
+          </ScrollView>
+          <Picker
+            selectedValue={theme.name}
+            onValueChange={(value) => setTheme(value as ThemeName)}
+            style={[styles.picker, { backgroundColor: theme.input, color: theme.text }]}
+          >
+            {themeOptions.map((t) => (
+              <Picker.Item key={t} label={t} value={t} />
+            ))}
+          </Picker>
+        </SettingsSection>
 
-      <ThemedButton title="Pick Avatar" onPress={pickAvatar} />
-      {avatarUrl && <Image source={{ uri: avatarUrl }} style={styles.avatar} />}
-      {profile?.boostCredits !== undefined && (
-        <ThemedText style={styles.section}>
-          You&apos;ve earned {profile.boostCredits} free boosts!
-        </ThemedText>
-      )}
-      <ThemedButton title="Refer a Friend" onPress={handleShareInvite} />
-
-      <ThemedText style={styles.section}>Default Category</ThemedText>
-      <Picker
-        selectedValue={defaultCategory}
-        onValueChange={async (v) => {
-          setDefaultCategory(v);
-          await AsyncStorage.setItem('defaultCategory', v);
-        }}
-        style={[
-          styles.picker,
-          { backgroundColor: theme.input, color: theme.text },
-        ]}
-      >
-        <Picker.Item label="General" value="general" />
-        <Picker.Item label="Love" value="love" />
-        <Picker.Item label="Career" value="career" />
-        <Picker.Item label="Health" value="health" />
-      </Picker>
-
-      <ThemedText style={styles.section}>Language</ThemedText>
-      <Picker
-        selectedValue={language}
-        onValueChange={async (v) => {
-          setLanguage(v);
-          await AsyncStorage.setItem('language', v);
-        }}
-        style={[
-          styles.picker,
-          { backgroundColor: theme.input, color: theme.text },
-        ]}
-      >
-        <Picker.Item label="English" value="en" />
-        <Picker.Item label="Spanish" value="es" />
-      </Picker>
-
-      <TextInput
-        style={[
-          styles.input,
-          { backgroundColor: theme.input, color: theme.text, height: 80, textAlignVertical: 'top' },
-        ]}
-        placeholder="Send feedback"
-        placeholderTextColor="#888"
-        value={feedback}
-        onChangeText={setFeedback}
-        multiline
-      />
-      <ThemedButton title="Submit Feedback" onPress={handleSendFeedback} />
-
-      <ThemedButton title="Export History" onPress={handleExport} />
-      <ThemedButton title="Rate this App" onPress={() => Linking.openURL('https://example.com')} />
-      <ThemedButton title="Permissions" onPress={permissionsInfo} />
-      <ThemedButton title="Delete My Content" onPress={handleDeleteContent} />
-      <ThemedButton title="Reset App Data" onPress={handleReset} />
-      <Text style={{ color: theme.text, marginBottom: 10, textAlign: 'center' }}>
-        WhispList promises a safe, anonymous place to share your dreams.
-      </Text>
-      <ThemedButton title="Terms of Service" onPress={() => router.push('/terms')} />
-      <ThemedButton title="Privacy Policy" onPress={() => router.push('/privacy')} />
-      {profile?.developerMode && (
-        <View style={[styles.devAnalytics, { backgroundColor: theme.input }]}>
-          <Text style={{ color: theme.text }}>Total Wishes: {analytics.wishCount}</Text>
-          <Text style={{ color: theme.text }}>Total Boosts: {analytics.boostCount}</Text>
-          <Text style={{ color: theme.text }}>Total Gifts: {analytics.giftCount}</Text>
-          <Text style={{ color: theme.text }}>Active Users (past 7d): {analytics.userCount}</Text>
-        </View>
-      )}
-      <ReferralNameDialog
-        visible={refDialogVisible}
-        defaultName={profile?.referralDisplayName || profile?.displayName || ''}
-        onClose={() => setRefDialogVisible(false)}
-        onSubmit={sendInvite}
-      />
+        <ReferralNameDialog
+          visible={refDialogVisible}
+          defaultName={profile?.referralDisplayName || profile?.displayName || ''}
+          onClose={() => setRefDialogVisible(false)}
+          onSubmit={sendInvite}
+        />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -513,5 +543,13 @@ const styles = StyleSheet.create({
     marginTop: 20,
     padding: 12,
     borderRadius: 8,
+  },
+  sectionContainer: {
+    marginBottom: 16,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
 });

@@ -37,6 +37,7 @@ export default function JournalPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [moodSummary, setMoodSummary] = useState<Record<string, number>>({});
   const promptOpacity = useRef(new Animated.Value(1)).current;
+  const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -240,6 +241,7 @@ export default function JournalPage() {
         </TouchableOpacity>
       </View>
       <TextInput
+        ref={inputRef}
         style={[styles.input, { backgroundColor: theme.input, color: theme.text }]}
         placeholder="Write your thoughts"
         placeholderTextColor="#888"
@@ -279,7 +281,12 @@ export default function JournalPage() {
           </TouchableOpacity>
         )}
         ListEmptyComponent={() => (
-          <Text style={[styles.entryText, { color: theme.text }]}>You haven’t written yet this week 💭</Text>
+          <View style={{ alignItems: 'center' }}>
+            <Text style={[styles.entryText, { color: theme.text, marginBottom: 8 }]}>Start your week with a single thought. You’ve got this. 🌱</Text>
+            <TouchableOpacity onPress={() => inputRef.current?.focus()}>
+              <Text style={{ color: theme.tint }}>Use this prompt</Text>
+            </TouchableOpacity>
+          </View>
         )}
         style={{ marginTop: 10 }}
       />

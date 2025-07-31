@@ -3,6 +3,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import {
   getWish,
@@ -661,22 +662,33 @@ try {
         )}
 
         {profile?.giftingEnabled && wish.giftLink && (
-          <TouchableOpacity
-            onPress={() => openGiftLink(wish.giftLink!)}
-            style={{ marginTop: 8, backgroundColor: theme.input, padding: 8, borderRadius: 8 }}
-          >
-            <Text style={{ color: theme.tint }}>
-              {(() => {
-                try {
-                  const url = new URL(wish.giftLink!);
-                  const trusted = ['venmo.com', 'paypal.me', 'amazon.com'].some(d => url.hostname.includes(d));
-                  return `${trusted ? '✅' : '⚠️'} 🎁 ${wish.giftLabel || 'Send Gift'}`;
-                } catch {
-                  return `⚠️ 🎁 ${wish.giftLabel || 'Send Gift'}`;
-                }
-              })()}
-            </Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+            <TouchableOpacity
+              onPress={() => openGiftLink(wish.giftLink!)}
+              style={{ backgroundColor: theme.input, padding: 8, borderRadius: 8 }}
+            >
+              <Text style={{ color: theme.tint }}>
+                {(() => {
+                  try {
+                    const url = new URL(wish.giftLink!);
+                    const trusted = ['venmo.com', 'paypal.me', 'amazon.com'].some(d => url.hostname.includes(d));
+                    return `${trusted ? '✅' : '⚠️'} 🎁 ${wish.giftLabel || 'Send Gift'}`;
+                  } catch {
+                    return `⚠️ 🎁 ${wish.giftLabel || 'Send Gift'}`;
+                  }
+                })()}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() =>
+                Alert.alert('Gift Info', 'Gifting is anonymous support using Stripe or a link.')
+              }
+              style={{ marginLeft: 6 }}
+              hitSlop={HIT_SLOP}
+            >
+              <Ionicons name="information-circle-outline" size={16} color={theme.text} />
+            </TouchableOpacity>
+          </View>
         )}
         {profile?.giftingEnabled && owner?.stripeAccountId && (
           <View style={{ flexDirection: 'row', marginTop: 8 }}>
@@ -698,9 +710,18 @@ try {
         )}
 
         {canBoost && (
-          <TouchableOpacity onPress={handleBoostWish} style={{ marginTop: 8 }}>
-            <Text style={{ color: '#facc15' }}>Boost Wish</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+            <TouchableOpacity onPress={handleBoostWish} hitSlop={HIT_SLOP}>
+              <Text style={{ color: '#facc15' }}>Boost Wish</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => Alert.alert('Boost Info', 'Boosting highlights a wish for 24 hours.')}
+              style={{ marginLeft: 6 }}
+              hitSlop={HIT_SLOP}
+            >
+              <Ionicons name="information-circle-outline" size={16} color={theme.text} />
+            </TouchableOpacity>
+          </View>
         )}
 
         <TouchableOpacity

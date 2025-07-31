@@ -11,6 +11,7 @@ import {
   getDoc,
   serverTimestamp,
   getDocs,
+  startAfter,
   where,
   FieldPath,
   collectionGroup,
@@ -223,9 +224,23 @@ export async function likeWish(id: string) {
   return updateDoc(ref, { likes: increment(1) });
 }
 
-export async function updateWishReaction(id: string, emoji: string) {
-  const ref = doc(db, 'wishes', id);
-  return updateDoc(ref, { [`reactions.${emoji}`]: increment(1) });
+export async function updateWishReaction(
+  id: string,
+  emoji: string,
+  user: string
+) {
+  const wishRef = doc(db, 'wishes', id);
+  const reactRef = doc(db, 'reactions', id, 'users', user);
+  const snap = await getDoc(reactRef);
+  const prev = snap.exists() ? snap.data().emoji : null;
+  const updates: Record<string, any> = {};
+  if (prev) updates[`reactions.${prev}`] = increment(-1);
+  if (prev === emoji) {
+    await Promise.all([deleteDoc(reactRef), updateDoc(wishRef, updates)]);
+    return;
+  }
+  updates[`reactions.${emoji}`] = increment(1);
+  await Promise.all([setDoc(reactRef, { emoji }), updateDoc(wishRef, updates)]);
 }
 
 export async function boostWish(id: string, hours: number) {
@@ -355,30 +370,39 @@ export async function getWishesByDisplayName(displayName: string): Promise<Wish[
 }
 
 export async function getAllWishes(): Promise<Wish[]> {
-  const snap = await getDocs(collection(db, 'wishes'));
-  return snap.docs.map(d => {
-    const data = d.data();
-    const wish: Wish = {
-      id: d.id,
-      text: data.text,
-      category: data.category,
-      type: data.type,
-      likes: data.likes,
-      boostedUntil: data.boostedUntil,
-      audioUrl: data.audioUrl,
-      imageUrl: data.imageUrl,
-      giftLink: data.giftLink,
-      giftType: data.giftType,
-      giftLabel: data.giftLabel,
-      fulfillmentLink: data.fulfillmentLink,
-      isPoll: data.isPoll,
-      optionA: data.optionA,
-      optionB: data.optionB,
-      votesA: data.votesA,
-      votesB: data.votesB,
-    };
-    return wish;
-  });
+  const wishes: Wish[] = [];
+  let last: any = null;
+  while (true) {
+    const q = last
+      ? query(collection(db, 'wishes'), orderBy('timestamp'), startAfter(last), limit(20))
+      : query(collection(db, 'wishes'), orderBy('timestamp'), limit(20));
+    const snap = await getDocs(q);
+    snap.docs.forEach(d => {
+      const data = d.data();
+      wishes.push({
+        id: d.id,
+        text: data.text,
+        category: data.category,
+        type: data.type,
+        likes: data.likes,
+        boostedUntil: data.boostedUntil,
+        audioUrl: data.audioUrl,
+        imageUrl: data.imageUrl,
+        giftLink: data.giftLink,
+        giftType: data.giftType,
+        giftLabel: data.giftLabel,
+        fulfillmentLink: data.fulfillmentLink,
+        isPoll: data.isPoll,
+        optionA: data.optionA,
+        optionB: data.optionB,
+        votesA: data.votesA,
+        votesB: data.votesB,
+      });
+    });
+    if (snap.docs.length < 20) break;
+    last = snap.docs[snap.docs.length - 1];
+  }
+  return wishes;
 }
 
 export async function getWishComments(wishId: string): Promise<Comment[]> {

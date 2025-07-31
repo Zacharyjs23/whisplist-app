@@ -22,6 +22,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as WebBrowser from 'expo-web-browser';
 import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, doc, getDoc, collectionGroup } from 'firebase/firestore';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
   Alert,
@@ -662,22 +663,33 @@ useEffect(() => {
             <Text style={styles.boostedLabel}>💬 You received a gift message</Text>
           )}
           {profile?.giftingEnabled && item.giftLink && (
-            <TouchableOpacity
-              onPress={() => openGiftLink(item.giftLink!)}
-              style={{ marginTop: 6, backgroundColor: theme.input, padding: 6, borderRadius: 6 }}
-            >
-              <Text style={{ color: theme.tint }}>
-                {(() => {
-                  try {
-                    const url = new URL(item.giftLink!);
-                    const trusted = ['venmo.com', 'paypal.me', 'amazon.com'].some(d => url.hostname.includes(d));
-                    return `${trusted ? '✅' : '⚠️'} 🎁 ${item.giftLabel || 'Send Gift'}`;
-                  } catch {
-                    return `⚠️ 🎁 ${item.giftLabel || 'Send Gift'}`;
-                  }
-                })()}
-              </Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+              <TouchableOpacity
+                onPress={() => openGiftLink(item.giftLink!)}
+                style={{ backgroundColor: theme.input, padding: 6, borderRadius: 6 }}
+              >
+                <Text style={{ color: theme.tint }}>
+                  {(() => {
+                    try {
+                      const url = new URL(item.giftLink!);
+                      const trusted = ['venmo.com', 'paypal.me', 'amazon.com'].some(d => url.hostname.includes(d));
+                      return `${trusted ? '✅' : '⚠️'} 🎁 ${item.giftLabel || 'Send Gift'}`;
+                    } catch {
+                      return `⚠️ 🎁 ${item.giftLabel || 'Send Gift'}`;
+                    }
+                  })()}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() =>
+                  Alert.alert('Gift Info', 'Gifting is anonymous support using Stripe or a link.')
+                }
+                style={{ marginLeft: 6 }}
+                hitSlop={HIT_SLOP}
+              >
+                <Ionicons name="information-circle-outline" size={16} color={theme.text} />
+              </TouchableOpacity>
+            </View>
           )}
           {profile?.giftingEnabled && stripeAccounts[item.userId || ''] && (
             <View style={{ flexDirection: 'row', marginTop: 4 }}>
@@ -700,13 +712,23 @@ useEffect(() => {
         </TouchableOpacity>
 
         {canBoost && (
-          <TouchableOpacity
-            onPress={() => router.push(`/boost/${item.id}`)}
-            style={{ marginTop: 4 }}
-            hitSlop={HIT_SLOP}
-          >
-            <Text style={{ color: '#facc15' }}>Boost 🚀</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+            <TouchableOpacity
+              onPress={() => router.push(`/boost/${item.id}`)}
+              hitSlop={HIT_SLOP}
+            >
+              <Text style={{ color: '#facc15' }}>Boost 🚀</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() =>
+                Alert.alert('Boost Info', 'Boosting highlights a wish for 24 hours.')
+              }
+              style={{ marginLeft: 6 }}
+              hitSlop={HIT_SLOP}
+            >
+              <Ionicons name="information-circle-outline" size={16} color={theme.text} />
+            </TouchableOpacity>
+          </View>
         )}
 
         {user && item.userId && user.uid !== item.userId && (
@@ -991,7 +1013,9 @@ useEffect(() => {
             loading ? (
               <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
             ) : (
-              <Text style={styles.noResults}>No matching wishes 💭</Text>
+              <Text style={styles.noResults}>
+                No wishes yet in this category. Be the first to post ✨
+              </Text>
             )
           }
           renderItem={({ item }) => <WishCard item={item} />}
