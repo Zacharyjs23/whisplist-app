@@ -395,7 +395,7 @@ export default function Page() {
           contentContainerStyle={styles.contentContainer}
           ListHeaderComponent={
             <>
-              <Text style={styles.title}>Feed</Text>
+              <Text style={[styles.title, { color: theme.text }]}>Feed</Text>
               {whispOfDay && (
                 <TouchableOpacity
                   onPress={() => router.push(`/wish/${whispOfDay.id}`)}
