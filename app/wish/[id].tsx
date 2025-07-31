@@ -506,7 +506,7 @@ try {
                 <TouchableOpacity
                   key={emoji}
                   onPress={() => handleReact(item.id, emoji)}
-                  style={{ marginRight: 8, opacity: userReaction === emoji ? 1 : 0.4 }}
+                  style={{ marginRight: 8, padding: 6, borderRadius: 6, opacity: userReaction === emoji ? 1 : 0.4 }}
                 >
                   <Text style={{ fontSize: 20 }}>
                     {emoji} {item.reactions?.[emoji] || 0}

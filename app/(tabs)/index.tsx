@@ -90,9 +90,6 @@ export default function Page() {
   const [posting, setPosting] = useState(false);
   const [autoDelete, setAutoDelete] = useState(false);
   const [rephrasing, setRephrasing] = useState(false);
-  const [confirmGift, setConfirmGift] = useState<{link?: string; amount?: number; wishId?: string; recipientId?: string} | null>(null);
-  const [showThanks, setShowThanks] = useState(false);
-  const [thanksMessage, setThanksMessage] = useState('');
   const { theme } = useTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const [useProfilePost, setUseProfilePost] = useState(false);
@@ -356,28 +353,16 @@ useEffect(() => {
     const originalWishText = wish;
     setRephrasing(true);
     try {
-      const apiKey = process.env.EXPO_PUBLIC_OPENAI_KEY;
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            {
-              role: 'system',
-              content:
-                'You are a wish clarity assistant. Rephrase this wish to make it more emotionally honest, concise, and human.',
-            },
-            { role: 'user', content: originalWishText },
-          ],
-          temperature: 0.7,
-        }),
-      });
+      const response = await fetch(
+        `https://us-central1-${process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID}.cloudfunctions.net/rephraseWish`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: originalWishText }),
+        }
+      );
       const data = await response.json();
-      const suggestion = data.choices?.[0]?.message?.content?.trim();
+      const suggestion = data.suggestion?.trim();
       if (suggestion) {
         setWish(suggestion);
         const msg = '✨ Wish rephrased';
@@ -598,12 +583,37 @@ useEffect(() => {
         item.boostedUntil.toDate() < new Date());
 
     const openGiftLink = (link: string) => {
-      setConfirmGift({ link });
+      Alert.alert(
+        'How gifting works',
+        'You will be taken to an external site to send your gift.',
+        [
+          {
+            text: 'Continue',
+            onPress: async () => {
+              await WebBrowser.openBrowserAsync(link);
+            },
+          },
+          { text: 'Cancel', style: 'cancel' },
+        ]
+      );
     };
 
-    const sendMoney = (amount: number) => {
+    const sendMoney = async (amount: number) => {
       if (!item.id || !item.userId) return;
-      setConfirmGift({ amount, wishId: item.id, recipientId: item.userId });
+      Alert.alert('How gifting works', 'Your payment is processed securely.', [
+        {
+          text: 'Continue',
+          onPress: async () => {
+            try {
+              const res = await createGiftCheckout(item.id!, amount, item.userId!);
+              if (res.url) await WebBrowser.openBrowserAsync(res.url);
+            } catch (err) {
+              console.error('Failed to checkout', err);
+            }
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
     };
 
     return (
@@ -994,81 +1004,6 @@ useEffect(() => {
           }}
           onSubmit={handleReport}
         />
-        {confirmGift && (
-          <Modal transparent animationType="fade" visible onRequestClose={() => setConfirmGift(null)}>
-            <View style={styles.modalBackdrop}>
-              <View style={[styles.modalCard, { backgroundColor: theme.input }]}>
-                <Text style={[styles.modalText, { color: theme.text }]}>Confirm sending gift?</Text>
-                <View style={{ flexDirection: 'row', marginTop: 10 }}>
-                  <TouchableOpacity
-                    onPress={async () => {
-                      if (confirmGift.link) {
-                        await WebBrowser.openBrowserAsync(confirmGift.link);
-                        setShowThanks(true);
-                      } else if (confirmGift.wishId && confirmGift.recipientId && confirmGift.amount) {
-                        try {
-                          const res = await createGiftCheckout(confirmGift.wishId, confirmGift.amount, confirmGift.recipientId);
-                          if (res.url) await WebBrowser.openBrowserAsync(res.url);
-                          setShowThanks(true);
-                        } catch (err) {
-                          console.error('Failed to checkout', err);
-                        }
-                      }
-                      setConfirmGift(null);
-                    }}
-                    style={[styles.button, { marginRight: 8 }]}
-                    hitSlop={HIT_SLOP}
-                  >
-                    <Text style={styles.buttonText}>Send</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setConfirmGift(null)} style={[styles.button, { backgroundColor: '#ccc' }]} hitSlop={HIT_SLOP}>
-                    <Text style={[styles.buttonText, { color: '#000' }]}>Cancel</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </Modal>
-        )}
-        {showThanks && (
-          <Modal transparent animationType="fade" visible onRequestClose={() => setShowThanks(false)}>
-            <View style={styles.modalBackdrop}>
-              <View style={[styles.modalCard, { backgroundColor: theme.input }]}>
-                <Text style={[styles.modalText, { color: theme.text }]}>💝 Thanks for supporting this wish!</Text>
-                <TextInput
-                  style={[styles.input, { marginTop: 10 }]}
-                  placeholder="Add a message (optional)"
-                  placeholderTextColor="#999"
-                  value={thanksMessage}
-                  onChangeText={setThanksMessage}
-                />
-                {confirmGift?.wishId && (
-                  <TouchableOpacity
-                    onPress={async () => {
-                      try {
-                        await addDoc(collection(db, 'wishes', confirmGift!.wishId!, 'gifts'), {
-                          message: thanksMessage,
-                          from: user?.displayName || 'anonymous',
-                          timestamp: serverTimestamp(),
-                        });
-                      } catch (err) {
-                        console.error('Failed to save message', err);
-                      }
-                      setThanksMessage('');
-                      setShowThanks(false);
-                    }}
-                    style={[styles.button, { marginTop: 10 }]}
-                    hitSlop={HIT_SLOP}
-                  >
-                    <Text style={styles.buttonText}>Send</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity onPress={() => setShowThanks(false)} style={[styles.button, { marginTop: 10 }]} hitSlop={HIT_SLOP}>
-                  <Text style={styles.buttonText}>Close</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
-        )}
       </KeyboardAvoidingView>
       </SafeAreaView>
     );

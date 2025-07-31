@@ -8,22 +8,36 @@ const expo = new Expo();
 
 async function sendPush(userId, title, body) {
   if (!userId) return null;
-  const snap = await db.collection('users').doc(userId).get();
+  const userRef = db.collection('users').doc(userId);
+  const snap = await userRef.get();
   const expoToken = snap.get('pushToken');
   const fcmToken = snap.get('fcmToken');
+  const metaRef = userRef.collection('meta').doc('push');
+  const metaSnap = await metaRef.get();
+  const last = metaSnap.exists ? metaSnap.get('lastSent') : null;
+  if (last && Date.now() - last.toMillis() < 60000) {
+    return null;
+  }
   if (expoToken && Expo.isExpoPushToken(expoToken)) {
     const messages = [{ to: expoToken, sound: 'default', title, body }];
     try {
       await expo.sendPushNotificationsAsync(messages);
+      await metaRef.set({ lastSent: admin.firestore.FieldValue.serverTimestamp() });
     } catch (err) {
       console.error('Error sending Expo push notification', err);
+      if (fcmToken) {
+        try {
+          await admin.messaging().send({ token: fcmToken, notification: { title, body } });
+          await metaRef.set({ lastSent: admin.firestore.FieldValue.serverTimestamp() });
+        } catch (err2) {
+          console.error('Error sending fallback FCM notification', err2);
+        }
+      }
     }
   } else if (fcmToken) {
     try {
-      await admin.messaging().send({
-        token: fcmToken,
-        notification: { title, body },
-      });
+      await admin.messaging().send({ token: fcmToken, notification: { title, body } });
+      await metaRef.set({ lastSent: admin.firestore.FieldValue.serverTimestamp() });
     } catch (err) {
       console.error('Error sending FCM notification', err);
     }
@@ -143,3 +157,4 @@ exports.createCheckoutSession = require('./createCheckoutSession').createCheckou
 exports.createGiftCheckoutSession = require('./createGiftCheckoutSession').createGiftCheckoutSession;
 exports.createStripeAccountLink = require('./createStripeAccountLink').createStripeAccountLink;
 exports.stripeWebhook = require('./stripeWebhook').stripeWebhook;
+exports.rephraseWish = require('./rephraseWish').rephraseWish;

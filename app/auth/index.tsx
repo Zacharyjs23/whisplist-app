@@ -102,6 +102,11 @@ export default function Page() {
         <Text style={[styles.buttonText, { color: theme.text }]}>Continue as Guest</Text>
       </TouchableOpacity>
 
+      <Text style={{ color: theme.text, fontSize: 12, marginBottom: 10, textAlign: 'center' }}>
+        Google sign in shares your basic profile with WhispList. Guest mode keeps
+        data only on this device.
+      </Text>
+
       <View style={{ flexDirection: 'row', marginTop: 10 }}>
         <Link href="/terms" style={[styles.linkText, { color: theme.tint, marginRight: 16 }]}>Terms</Link>
         <Link href="/privacy" style={[styles.linkText, { color: theme.tint }]}>Privacy</Link>
