@@ -94,6 +94,51 @@ exports.notifyWishBoost = functions.firestore
     }
     return null;
   });
+
+exports.notifyGiftReceived = functions.firestore
+  .document('wishes/{wishId}/gifts/{giftId}')
+  .onCreate(async (snap, context) => {
+    const wishId = context.params.wishId;
+    const wishSnap = await db.collection('wishes').doc(wishId).get();
+    const wish = wishSnap.data();
+    if (wish && wish.userId && !wish.isAnonymous) {
+      await sendPush(wish.userId, 'You received a gift \ud83c\udf81', 'Someone supported your wish.');
+    }
+    return null;
+  });
+
+exports.notifyBoostEnd = functions.pubsub
+  .schedule('every 60 minutes')
+  .onRun(async () => {
+    const now = admin.firestore.Timestamp.now();
+    const oneHourAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 60 * 60 * 1000);
+    const snap = await db
+      .collection('wishes')
+      .where('boostedUntil', '>=', oneHourAgo)
+      .where('boostedUntil', '<=', now)
+      .get();
+    await Promise.all(
+      snap.docs.map((d) => {
+        const data = d.data();
+        if (data.userId && !data.isAnonymous) {
+          return sendPush(data.userId, 'Boost ended', 'Boost again to keep visibility.');
+        }
+        return null;
+      })
+    );
+    return null;
+  });
+
+exports.cleanupExpiredWishesJob = functions.pubsub
+  .schedule('every 24 hours')
+  .onRun(async () => {
+    const now = admin.firestore.Timestamp.now();
+    const snap = await db.collection('wishes').where('expiresAt', '<=', now).get();
+    const batch = db.batch();
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+    return null;
+  });
 exports.createCheckoutSession = require('./createCheckoutSession').createCheckoutSession;
 exports.createGiftCheckoutSession = require('./createGiftCheckoutSession').createGiftCheckoutSession;
 exports.createStripeAccountLink = require('./createStripeAccountLink').createStripeAccountLink;

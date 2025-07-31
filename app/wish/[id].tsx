@@ -3,7 +3,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
-import { createAudioPlayer, AudioPlayer } from 'expo-audio';
+import { Audio } from 'expo-av';
 import {
   getWish,
   listenWishComments,
@@ -99,7 +99,8 @@ export default function Page() {
   const [fulfillmentVisible, setFulfillmentVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sound, setSound] = useState<AudioPlayer | null>(null);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [postingComment, setPostingComment] = useState(false);
   const [useProfileComment, setUseProfileComment] = useState(true);
   const [confirmGift, setConfirmGift] = useState<{link?: string; amount?: number; wishId?: string; recipientId?: string} | null>(null);
@@ -280,20 +281,34 @@ try {
     fetchVerified();
   }, [comments]);
 
-  const playAudio = useCallback(async () => {
-    if (!wish?.audioUrl) return;
+  const toggleAudio = useCallback(async () => {
     try {
-      const player = createAudioPlayer({ uri: wish.audioUrl });
-      setSound(player);
-      player.play();
+      if (sound) {
+        if (isPlaying) {
+          await sound.pauseAsync();
+          setIsPlaying(false);
+        } else {
+          await sound.playAsync();
+          setIsPlaying(true);
+        }
+        return;
+      }
+      if (!wish?.audioUrl) return;
+      const { sound: s } = await Audio.Sound.createAsync({ uri: wish.audioUrl });
+      setSound(s);
+      await s.playAsync();
+      setIsPlaying(true);
     } catch (err) {
       console.error('❌ Failed to play audio:', err);
     }
-  }, [wish]);
+  }, [sound, isPlaying, wish]);
 
   useEffect(() => {
     return () => {
-      sound?.remove();
+      if (sound) {
+        sound.unloadAsync();
+      }
+      setIsPlaying(false);
     };
   }, [sound]);
 
@@ -630,8 +645,10 @@ try {
         )}
 
         {wish.audioUrl && (
-          <TouchableOpacity onPress={playAudio} style={{ marginTop: 10 }}>
-            <Text style={{ color: '#a78bfa' }}>▶ Play Audio</Text>
+          <TouchableOpacity onPress={toggleAudio} style={{ marginTop: 10 }}>
+            <Text style={{ color: '#a78bfa' }}>
+              {isPlaying ? '⏸ Pause Audio' : '▶ Play Audio'}
+            </Text>
           </TouchableOpacity>
         )}
 
