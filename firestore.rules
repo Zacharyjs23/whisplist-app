@@ -12,7 +12,8 @@ service cloud.firestore {
       allow create, update, delete: if request.auth != null && request.auth.uid == uid;
 
       match /notifications/{notificationId} {
-        allow write: if request.auth.uid == uid;
+        // Users can read their own notifications and mark them as read
+        allow read, write: if request.auth.uid == uid;
       }
 
       match /referrals/{referralId} {
