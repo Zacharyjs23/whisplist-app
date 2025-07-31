@@ -75,11 +75,23 @@ target 'WhispList' do
         end
       end
 
-      # Disable modules for react runtime pods to avoid redefinition errors
+      # Delete DEFINES_MODULE to avoid CocoaPods merge conflicts
       installer.pods_project.targets.each do |target|
-        if ['React-RuntimeApple', 'React-RCTRuntime'].include?(target.name)
+        conflicting_targets = [
+          'React-RuntimeApple',
+          'React-RCTRuntime',
+          'React-jsc',
+          'Fabric',
+          'expo-dev-menu',
+          'Main',
+          'ReactNativeCompatibles',
+          'SafeAreaView',
+          'Vendored'
+        ]
+
+        if conflicting_targets.include?(target.name)
           target.build_configurations.each do |config|
-            config.build_settings['DEFINES_MODULE'] = 'NO'
+            config.build_settings.delete('DEFINES_MODULE')
           end
         end
       end
