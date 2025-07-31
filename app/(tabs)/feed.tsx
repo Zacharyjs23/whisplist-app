@@ -501,7 +501,9 @@ export default function Page() {
             ) : error ? (
               <Text style={styles.errorText}>{error}</Text>
             ) : (
-              <Text style={styles.noResults}>No matching wishes 💭</Text>
+              <Text style={styles.noResults}>
+                No wishes yet in this category. Be the first to post ✨
+              </Text>
             )
           }
           renderItem={renderWish}

@@ -7,7 +7,7 @@ import { useSavedWishes } from '@/contexts/SavedWishesContext';
 import type { Wish } from '../types/Wish';
 import { updateWishReaction } from '../helpers/firestore';
 import { db } from '../firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, onSnapshot } from 'firebase/firestore';
 import { formatTimeLeft } from '../helpers/time';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -41,6 +41,13 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void; followed?: 
   const [giftCount, setGiftCount] = useState(0);
   const [hasGiftMsg, setHasGiftMsg] = useState(false);
   const [timeLeft, setTimeLeft] = useState('');
+  const [userReaction, setUserReaction] = useState<ReactionKey | null>(null);
+  const reactionScales = useRef(
+    (Object.keys(reactionMap) as ReactionKey[]).reduce((acc, k) => {
+      acc[k] = new Animated.Value(1);
+      return acc;
+    }, {} as Record<ReactionKey, Animated.Value>)
+  ).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
 
   const isBoosted =
@@ -66,6 +73,15 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void; followed?: 
     };
     load();
   }, [wish.id]);
+
+  useEffect(() => {
+    if (!user?.uid || !wish.id) return;
+    const ref = doc(db, 'reactions', wish.id, 'users', user.uid);
+    const unsub = onSnapshot(ref, (snap) => {
+      setUserReaction(snap.exists() ? (snap.data().emoji as ReactionKey) : null);
+    });
+    return unsub;
+  }, [user?.uid, wish.id]);
 
   useEffect(() => {
     if (!isBoosted || !wish.boostedUntil?.toDate) {
@@ -94,14 +110,14 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void; followed?: 
 
   const handleReact = useCallback(
     async (key: ReactionKey) => {
-      if (!wish.id) return;
+      if (!wish.id || !user?.uid) return;
       try {
-        await updateWishReaction(wish.id, key);
+        await updateWishReaction(wish.id, key, user.uid);
       } catch (err) {
         console.warn('Failed to react', err);
       }
     },
-    [wish.id]
+    [wish.id, user?.uid]
   );
 
   return (
@@ -136,11 +152,34 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void; followed?: 
       </TouchableOpacity>
       <View style={styles.reactionBar}>
         {(Object.keys(reactionMap) as ReactionKey[]).map((key) => (
-          <TouchableOpacity key={key} onPress={() => handleReact(key)} style={styles.reactionButton}>
-            <Text style={styles.reactionText}>
-              {reactionMap[key]} {wish.reactions?.[key] || 0}
-            </Text>
-          </TouchableOpacity>
+          <Animated.View
+            key={key}
+            style={{ transform: [{ scale: reactionScales[key] }] }}
+          >
+            <TouchableOpacity
+              onPressIn={() =>
+                Animated.spring(reactionScales[key], {
+                  toValue: 1.2,
+                  useNativeDriver: true,
+                }).start()
+              }
+              onPressOut={() =>
+                Animated.spring(reactionScales[key], {
+                  toValue: 1,
+                  useNativeDriver: true,
+                }).start()
+              }
+              onPress={() => handleReact(key)}
+              style={[
+                styles.reactionButton,
+                userReaction === key && { backgroundColor: theme.input },
+              ]}
+            >
+              <Text style={styles.reactionText}>
+                {reactionMap[key]} {wish.reactions?.[key] || 0}
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
         ))}
         <TouchableOpacity
           onPress={() => wish.id && toggleSave(wish.id)}
@@ -209,7 +248,8 @@ const styles = StyleSheet.create({
   },
   reactionButton: {
     marginRight: 12,
-    padding: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     borderRadius: 6,
   },
   reactionText: {
