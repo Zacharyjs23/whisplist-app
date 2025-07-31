@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Share, Alert, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Share, Alert, Animated, Modal } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import ConfettiCannon from 'react-native-confetti-cannon';
@@ -21,6 +21,7 @@ export default function BoostPage() {
   const [boostedUntil, setBoostedUntil] = useState<Date | null>(null);
   const [timeLeft, setTimeLeft] = useState('');
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const handleFreeBoost = async () => {
     if (alreadyBoosted) {
@@ -33,6 +34,8 @@ export default function BoostPage() {
       await updateProfile({ boostCredits: (profile.boostCredits || 1) - 1 });
       setBoostedUntil(new Date(Date.now() + 24 * 60 * 60 * 1000));
       setDone(true);
+      setShowConfirm(true);
+      setTimeout(() => setShowConfirm(false), 3000);
     } catch (err) {
       console.error('Failed to apply free boost', err);
     }
@@ -84,6 +87,8 @@ export default function BoostPage() {
         await WebBrowser.openBrowserAsync(data.url);
         setBoostedUntil(new Date(Date.now() + 24 * 60 * 60 * 1000));
         setDone(true);
+        setShowConfirm(true);
+        setTimeout(() => setShowConfirm(false), 3000);
       }
     } catch (err) {
       console.error('Failed to create checkout session', err);
@@ -106,6 +111,24 @@ export default function BoostPage() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <Modal
+        visible={showConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowConfirm(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowConfirm(false)}
+        >
+          <View style={[styles.modalContent, { backgroundColor: theme.input }]}>
+            <Text style={{ color: theme.text, textAlign: 'center' }}>
+              🚀 Your wish has been boosted for 24 hours.
+            </Text>
+          </View>
+        </TouchableOpacity>
+      </Modal>
       {done ? (
         <>
           <ConfettiCannon count={120} origin={{ x: 0, y: 0 }} fadeOut />
@@ -181,5 +204,16 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#000',
     fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    padding: 20,
+  },
+  modalContent: {
+    padding: 20,
+    borderRadius: 10,
   },
 });
