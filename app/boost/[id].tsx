@@ -172,9 +172,9 @@ export default function BoostPage() {
           )}
           <TouchableOpacity onPress={handleBoost} style={styles.button} disabled={loading || alreadyBoosted}>
             {loading ? (
-              <ActivityIndicator color="#000" />
+              <ActivityIndicator color={theme.text} />
             ) : (
-              <Text style={styles.buttonText}>Boost 🚀</Text>
+              <Text style={[styles.buttonText, { color: theme.text }]}>Boost 🚀</Text>
             )}
           </TouchableOpacity>
           {alreadyBoosted && (
@@ -202,7 +202,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   buttonText: {
-    color: '#000',
     fontWeight: '600',
   },
   modalOverlay: {

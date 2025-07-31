@@ -28,7 +28,7 @@ export default function ReferralNameDialog({ visible, defaultName = '', onClose,
           <TextInput
             style={styles.input}
             placeholder="Name or handle"
-            placeholderTextColor="#888"
+            placeholderTextColor={c.text + '99'} // theme fix
             value={name}
             onChangeText={setName}
           />

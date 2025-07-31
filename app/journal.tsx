@@ -244,7 +244,7 @@ export default function JournalPage() {
         ref={inputRef}
         style={[styles.input, { backgroundColor: theme.input, color: theme.text }]}
         placeholder="Write your thoughts"
-        placeholderTextColor="#888"
+        placeholderTextColor={theme.text + '99'} // theme fix
         value={entry}
         onChangeText={setEntry}
         multiline
@@ -268,7 +268,7 @@ export default function JournalPage() {
                   ? item.text.slice(0, 80) + '...'
                   : item.text}
             </Text>
-            <Text style={styles.entryDate}>
+            <Text style={[styles.entryDate, { color: theme.text + '99' }]}> // theme fix
               {item.timestamp?.seconds
                 ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), { addSuffix: true })
                 : 'Just now'}
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
   buttonText: { fontWeight: '600' },
   entryItem: { marginBottom: 12 },
   entryText: { fontSize: 14 },
-  entryDate: { fontSize: 12, color: '#888' },
+  entryDate: { fontSize: 12 },
   row: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   summary: { textAlign: 'center', marginBottom: 10 },
 });
