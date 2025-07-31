@@ -7,6 +7,7 @@ import {
 } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -22,29 +23,31 @@ if (!firebaseConfig.apiKey) {
   console.error('Firebase config appears to be missing. Check environment variables.');
 }
 
-let app;
-try {
-  app = initializeApp(firebaseConfig);
-} catch (err) {
-  console.error('Failed to initialize Firebase app', err);
-}
+const app = initializeApp(firebaseConfig);
 
 let auth;
 if (Platform.OS === 'web') {
   auth = getAuth(app);
 } else {
-  // ✅ Use AsyncStorage for persistent login on native
   const AsyncStorage = require('@react-native-async-storage/async-storage').default;
   auth = initializeAuth(app, {
     persistence: getReactNativePersistence(AsyncStorage),
   });
 }
 
-if (!auth) {
-  console.error('Firebase auth not initialized');
-}
-
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-export { auth, db, storage };
+let analytics: Analytics | undefined;
+
+isSupported()
+  .then((supported) => {
+    if (supported) {
+      analytics = getAnalytics(app);
+    }
+  })
+  .catch((err) => {
+    console.warn('Analytics not supported', err);
+  });
+
+export { auth, db, storage, analytics };

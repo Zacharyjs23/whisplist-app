@@ -1,5 +1,10 @@
-import * as Analytics from 'expo-firebase-analytics';
+import { logEvent } from 'firebase/analytics';
+import { analytics } from '../firebase';
 
 export function trackEvent(name: string, params?: Record<string, any>) {
-  Analytics.logEvent(name, params);
+  if (analytics) {
+    logEvent(analytics, name, params);
+  } else {
+    console.warn('Analytics not ready');
+  }
 }
