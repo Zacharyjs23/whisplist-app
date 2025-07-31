@@ -25,7 +25,7 @@ service cloud.firestore {
       }
 
       match /followers/{followerId} {
-        allow read, write: if request.auth.uid == followerId;
+        allow read, write: if request.auth.uid == followerId || request.auth.uid == uid;
       }
 
       match /following/{targetUserId} {
@@ -65,6 +65,7 @@ service cloud.firestore {
 
     match /gifts/{giftId} {
       allow write: if signedIn();
+      allow read: if signedIn();
     }
 
     // Referral records for tracking invites
