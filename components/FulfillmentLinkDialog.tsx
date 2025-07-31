@@ -43,9 +43,9 @@ export default function FulfillmentLinkDialog({ visible, onClose, onSubmit, exis
           <TextInput
             style={styles.input}
             placeholder="Paste fulfillment link"
-            placeholderTextColor="#888"
-          value={link}
-          onChangeText={setLink}
+            placeholderTextColor={theme.text + '99'} // theme fix
+            value={link}
+            onChangeText={setLink}
         />
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <View style={styles.buttons}>

@@ -61,8 +61,8 @@ import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
 import { trackEvent } from '@/helpers/analytics';
 
-const typeInfo: Record<string, { emoji: string; color: string }> = {
-  wish: { emoji: '💭', color: '#1e1e1e' },
+const baseTypeInfo = {
+  wish: { emoji: '💭', color: '#333333' },
   confession: { emoji: '😶\u200d🌫️', color: '#374151' },
   advice: { emoji: '🧠', color: '#064e3b' },
   dream: { emoji: '🌙', color: '#312e81' },
@@ -91,6 +91,10 @@ export default function Page() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { theme } = useTheme();
+  const typeInfo = React.useMemo(() => ({
+    ...baseTypeInfo,
+    wish: { emoji: '💭', color: theme.input },
+  }), [theme]);
   const [wish, setWish] = useState<Wish | null>(null);
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
@@ -484,19 +488,19 @@ try {
                 onPress={() => router.push(`/profile/${item.displayName}`)}
                 hitSlop={HIT_SLOP}
               >
-                <Text style={styles.nickname}>
+                <Text style={[styles.nickname, { color: theme.text + '99' }]}> // theme fix
                   {item.displayName}
                   {verifiedStatus[item.userId || ''] ? ' \u2705 Verified' : ''}
                 </Text>
               </TouchableOpacity>
             ) : (
-              <Text style={styles.nickname}>{item.nickname || 'Anonymous'}</Text>
+              <Text style={[styles.nickname, { color: theme.text + '99' }]}>{item.nickname || 'Anonymous'}</Text>
             )}
             {item.userId === wish?.userId && (
-              <Text style={[styles.nickname, { color: '#a78bfa' }]}> (author)</Text>
+              <Text style={[styles.nickname, { color: theme.tint }]}> (author)</Text>
             )}
-            <Text style={styles.comment}>{item.text}</Text>
-            <Text style={styles.timestamp}>
+            <Text style={[styles.comment, { color: theme.text }]}>{item.text}</Text>
+            <Text style={[styles.timestamp, { color: theme.text + '99' }]}> // theme fix
               {item.timestamp?.seconds
                 ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), { addSuffix: true })
                 : 'Just now'}
@@ -559,7 +563,7 @@ try {
         </TouchableOpacity>
 
 {loading ? (
-  <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
+  <ActivityIndicator size="large" color={theme.tint} style={{ marginTop: 20 }} /> // theme fix
 ) : error ? (
   <Text style={styles.errorText}>{error}</Text>
 ) : (
@@ -582,9 +586,7 @@ try {
         </Text>
         <Text style={[styles.wishText, { color: theme.text }]}>{wish.text}</Text>
         {wish.fulfillmentLink && (
-          <Text style={{ color: '#34d399', marginTop: 4 }}>
-            💝 Fulfilled
-          </Text>
+          <Text style={{ color: theme.tint, marginTop: 4 }}>💝 Fulfilled</Text>
         )}
         {wish.imageUrl && (
           <Image source={{ uri: wish.imageUrl }} style={styles.preview} />
@@ -637,11 +639,11 @@ try {
               yAxisSuffix=""
               fromZero
               chartConfig={{
-                backgroundColor: '#1e1e1e',
-                backgroundGradientFrom: '#1e1e1e',
-                backgroundGradientTo: '#1e1e1e',
-                color: () => '#a78bfa',
-                labelColor: () => '#ccc',
+                backgroundColor: theme.input,
+                backgroundGradientFrom: theme.input,
+                backgroundGradientTo: theme.input,
+                color: () => theme.tint,
+                labelColor: () => theme.text + '99',
               }}
               style={{ marginTop: 10 }}
             />
@@ -774,44 +776,44 @@ try {
               })()}
             </Text>
             <TouchableOpacity onPress={() => setReplyTo(null)} style={{ marginLeft: 8 }}>
-              <Text style={{ color: '#fff' }}>Cancel</Text>
+              <Text style={{ color: theme.text }}>Cancel</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        <Text style={styles.label}>Comment</Text>
+        <Text style={[styles.label, { color: theme.text + '99' }]}>Comment</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: theme.input, color: theme.text }]}
           placeholder="Your comment"
-          placeholderTextColor="#aaa"
+          placeholderTextColor={theme.text + '99'} // theme fix
           value={comment}
           onChangeText={setComment}
         />
         {!useProfileComment && (
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: theme.input, color: theme.text }]}
             placeholder="Nickname or emoji"
-            placeholderTextColor="#aaa"
+            placeholderTextColor={theme.text + '99'} // theme fix
             value={nickname}
             onChangeText={setNickname}
           />
         )}
 
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-          <Text style={{ color: '#fff', marginRight: 8 }}>Comment with profile</Text>
+          <Text style={{ color: theme.text, marginRight: 8 }}>Comment with profile</Text>
           <Switch value={useProfileComment} onValueChange={setUseProfileComment} />
         </View>
 
         <TouchableOpacity
-          style={styles.button}
+          style={[styles.button, { backgroundColor: theme.tint }]}
           onPress={handlePostComment}
           disabled={postingComment}
           hitSlop={HIT_SLOP}
         >
           {postingComment ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={theme.text} />
           ) : (
-            <Text style={styles.buttonText}>Send Comment</Text>
+            <Text style={[styles.buttonText, { color: theme.text }]}>Send Comment</Text>
           )}
         </TouchableOpacity>
         <ReportDialog
@@ -831,15 +833,15 @@ try {
             }}
             style={{ marginTop: 8 }}
           >
-            <Text style={{ color: '#34d399' }}>View Fulfillment Link</Text>
+            <Text style={{ color: theme.tint }}>View Fulfillment Link</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            style={styles.button}
+            style={[styles.button, { backgroundColor: theme.tint }]}
             onPress={() => setFulfillmentVisible(true)}
             hitSlop={HIT_SLOP}
           >
-            <Text style={styles.buttonText}>Fulfill this Wish</Text>
+            <Text style={[styles.buttonText, { color: theme.text }]}>Fulfill this Wish</Text>
           </TouchableOpacity>
         )}
 
@@ -874,13 +876,13 @@ try {
                       }
                       setConfirmGift(null);
                     }}
-                    style={[styles.button, { marginRight: 8 }]}
+                    style={[styles.button, { backgroundColor: theme.tint, marginRight: 8 }]}
                     hitSlop={HIT_SLOP}
                   >
                     <Text style={styles.buttonText}>Send</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setConfirmGift(null)} style={[styles.button, { backgroundColor: '#ccc' }]} hitSlop={HIT_SLOP}>
-                    <Text style={[styles.buttonText, { color: '#000' }]}>Cancel</Text>
+                  <TouchableOpacity onPress={() => setConfirmGift(null)} style={[styles.button, { backgroundColor: theme.input }]} hitSlop={HIT_SLOP}>
+                    <Text style={[styles.buttonText, { color: theme.text }]}>Cancel</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -893,9 +895,9 @@ try {
               <View style={[styles.modalCard, { backgroundColor: theme.input }]}>
                 <Text style={[styles.modalText, { color: theme.text }]}>💝 Thanks for supporting this wish!</Text>
                 <TextInput
-                  style={[styles.input, { marginTop: 10 }]}
+                  style={[styles.input, { marginTop: 10, backgroundColor: theme.input, color: theme.text }]}
                   placeholder="Add a message (optional)"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.text + '99'} // theme fix
                   value={thanksMessage}
                   onChangeText={setThanksMessage}
                 />
@@ -914,14 +916,14 @@ try {
                       setThanksMessage('');
                       setShowThanks(false);
                     }}
-                    style={[styles.button, { marginTop: 10 }]}
+                    style={[styles.button, { backgroundColor: theme.tint, marginTop: 10 }]}
                     hitSlop={HIT_SLOP}
                   >
-                    <Text style={styles.buttonText}>Send</Text>
+                    <Text style={[styles.buttonText, { color: theme.text }]}>Send</Text>
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity onPress={() => setShowThanks(false)} style={[styles.button, { marginTop: 10 }]} hitSlop={HIT_SLOP}>
-                  <Text style={styles.buttonText}>Close</Text>
+                <TouchableOpacity onPress={() => setShowThanks(false)} style={[styles.button, { backgroundColor: theme.tint, marginTop: 10 }]} hitSlop={HIT_SLOP}>
+                  <Text style={[styles.buttonText, { color: theme.text }]}>Close</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1003,26 +1005,20 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   nickname: {
-    color: '#ccc',
     fontSize: 12,
     marginBottom: 2,
   },
   comment: {
-    color: '#fff',
     fontSize: 14,
   },
   timestamp: {
-    color: '#666',
     fontSize: 10,
     marginTop: 4,
   },
   label: {
-    color: '#ccc',
     marginBottom: 4,
   },
   input: {
-    backgroundColor: '#1e1e1e',
-    color: '#fff',
     padding: 12,
     borderRadius: 10,
     marginBottom: 10,
@@ -1033,14 +1029,12 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   button: {
-    backgroundColor: '#8b5cf6',
     padding: 14,
     borderRadius: 10,
     alignItems: 'center',
     marginTop: 10,
   },
   buttonText: {
-    color: '#fff',
     fontWeight: '600',
   },
   modalBackdrop: {

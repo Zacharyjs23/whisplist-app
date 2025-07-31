@@ -27,7 +27,7 @@ export default function ReportDialog({ visible, onClose, onSubmit }: ReportDialo
           <TextInput
             style={styles.input}
             placeholder="Reason for report"
-            placeholderTextColor="#888"
+            placeholderTextColor={c.text + '99'} // theme fix
             value={reason}
             onChangeText={setReason}
           />

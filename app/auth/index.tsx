@@ -67,14 +67,14 @@ export default function Page() {
       <TextInput
         style={[styles.input, { backgroundColor: theme.input, color: theme.text }]}
         placeholder="Email"
-        placeholderTextColor="#888"
+        placeholderTextColor={theme.text + '99'} // theme fix
         value={email}
         onChangeText={setEmail}
       />
       <TextInput
         style={[styles.input, { backgroundColor: theme.input, color: theme.text }]}
         placeholder="Password"
-        placeholderTextColor="#888"
+        placeholderTextColor={theme.text + '99'} // theme fix
         secureTextEntry
         value={password}
         onChangeText={setPassword}

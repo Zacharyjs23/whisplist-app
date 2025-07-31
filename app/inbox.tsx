@@ -14,8 +14,8 @@ export default function InboxPage() {
 
   const renderItem = ({ item }: any) => (
     <View style={[styles.item, { backgroundColor: theme.input }]}>
-      <Text style={styles.text}>{item.message}</Text>
-      <Text style={styles.time}>
+      <Text style={[styles.text, { color: theme.text }]}>{item.message}</Text>
+      <Text style={[styles.time, { color: theme.text + '99' }]}> // theme fix
         {item.timestamp?.seconds
           ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), { addSuffix: true })
           : 'just now'}
@@ -36,6 +36,6 @@ export default function InboxPage() {
 
 const styles = StyleSheet.create({
   item: { padding: 12, borderRadius: 10, marginBottom: 10 },
-  text: { fontSize: 14, color: '#fff' },
-  time: { fontSize: 12, color: '#888', marginTop: 4 },
+  text: { fontSize: 14 },
+  time: { fontSize: 12, marginTop: 4 },
 });
