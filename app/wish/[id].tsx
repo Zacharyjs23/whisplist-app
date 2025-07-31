@@ -3,7 +3,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
-import { Audio } from 'expo-audio';
+import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import {
   getWish,
   listenWishComments,
@@ -100,7 +100,7 @@ export default function Page() {
   const [fulfillmentVisible, setFulfillmentVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [player, setPlayer] = useState<AudioPlayer | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [postingComment, setPostingComment] = useState(false);
   const [useProfileComment, setUseProfileComment] = useState(true);
@@ -286,36 +286,36 @@ try {
     fetchVerified();
   }, [comments]);
 
-  const toggleAudio = useCallback(async () => {
+  const toggleAudio = useCallback(() => {
     try {
-      if (sound) {
+      if (player) {
         if (isPlaying) {
-          await sound.pauseAsync();
+          player.pause();
           setIsPlaying(false);
         } else {
-          await sound.playAsync();
+          player.play();
           setIsPlaying(true);
         }
         return;
       }
       if (!wish?.audioUrl) return;
-      const { sound: s } = await Audio.Sound.createAsync({ uri: wish.audioUrl });
-      setSound(s);
-      await s.playAsync();
+      const p = createAudioPlayer(wish.audioUrl);
+      setPlayer(p);
+      p.play();
       setIsPlaying(true);
     } catch (err) {
       console.error('❌ Failed to play audio:', err);
     }
-  }, [sound, isPlaying, wish]);
+  }, [player, isPlaying, wish]);
 
   useEffect(() => {
     return () => {
-      if (sound) {
-        sound.unloadAsync();
+      if (player) {
+        player.remove();
       }
       setIsPlaying(false);
     };
-  }, [sound]);
+  }, [player]);
 
   const handlePostComment = useCallback(async () => {
     if (!comment.trim()) return;
