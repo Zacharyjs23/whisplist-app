@@ -12,6 +12,7 @@ import {
   createUserWithEmailAndPassword,
   signInAnonymously,
   signOut as fbSignOut,
+  sendPasswordResetEmail,
   User,
   updateProfile as fbUpdateProfile,
   GoogleAuthProvider,
@@ -67,6 +68,7 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signInAnonymously: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (data: Partial<Profile>) => Promise<void>;
   pickImage: () => Promise<string | undefined>;
@@ -80,6 +82,7 @@ const AuthContext = createContext<AuthContextValue>({
   signIn: async () => {},
   signInWithGoogle: async () => {},
   signInAnonymously: async () => {},
+  resetPassword: async () => {},
   signOut: async () => {},
   updateProfile: async () => {},
   pickImage: async () => undefined,
@@ -219,6 +222,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
     }
   };
 
+  const resetPassword = async (email: string) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (err) {
+      console.error('Failed to reset password', err);
+      throw err;
+    }
+  };
+
   const signOut = async () => {
     try {
       await fbSignOut(auth);
@@ -281,6 +293,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
         signIn,
         signInWithGoogle,
         signInAnonymously: signInAnonymouslyFn,
+        resetPassword,
         signOut,
         updateProfile: updateProfileInfo,
         pickImage,
