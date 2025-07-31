@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { collection, getDocs, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, doc, getDoc, limit, startAfter } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -17,6 +17,7 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [privateProfile, setPrivateProfile] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [lastDoc, setLastDoc] = useState<any | null>(null);
   const { theme } = useTheme();
   const { user } = useAuth();
 
@@ -55,9 +56,11 @@ export default function Page() {
           collection(db, 'wishes'),
           where('displayName', '==', username),
           where('isAnonymous', '==', false),
-          orderBy('timestamp', 'desc')
+          orderBy('timestamp', 'desc'),
+          limit(20)
         );
         const snap = await getDocs(q);
+        setLastDoc(snap.docs[snap.docs.length - 1] || null);
         const list = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Wish,'id'>) })) as Wish[];
         setWishes(list);
       } catch (err) {
@@ -69,6 +72,22 @@ export default function Page() {
     };
     load();
   }, [username]);
+
+  const loadMore = async () => {
+    if (!lastDoc) return;
+    const q = query(
+      collection(db, 'wishes'),
+      where('displayName', '==', username),
+      where('isAnonymous', '==', false),
+      orderBy('timestamp', 'desc'),
+      startAfter(lastDoc),
+      limit(20)
+    );
+    const snap = await getDocs(q);
+    setLastDoc(snap.docs[snap.docs.length - 1] || lastDoc);
+    const more = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Wish,'id'>) })) as Wish[];
+    setWishes(prev => [...prev, ...more]);
+  };
 
   if (loading) {
     return (
@@ -116,6 +135,7 @@ export default function Page() {
       <FlatList
         data={wishes}
         keyExtractor={(item) => item.id}
+        onEndReached={loadMore}
         renderItem={({ item }) => (
           <TouchableOpacity
             onPress={() => router.push(`/wish/${item.id}`)}

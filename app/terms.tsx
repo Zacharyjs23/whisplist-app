@@ -9,7 +9,11 @@ export default function TermsScreen() {
         Terms of Service
       </Text>
       <Text style={{ color: theme.text }}>
-        This is placeholder terms of service text for WhispList.
+        By using WhispList you agree to post only content you have the right to
+        share. You may remain anonymous; however, abusive or illegal activity may
+        result in removal. Boosts and gifts are handled through third‑party
+        providers and are non‑refundable. We do not sell your personal data and
+        you can delete your account at any time.
       </Text>
     </ScrollView>
   );

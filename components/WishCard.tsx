@@ -209,6 +209,8 @@ const styles = StyleSheet.create({
   },
   reactionButton: {
     marginRight: 12,
+    padding: 6,
+    borderRadius: 6,
   },
   reactionText: {
     fontSize: 18,

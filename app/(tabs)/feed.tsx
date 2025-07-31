@@ -26,7 +26,7 @@ import {
   getTopBoostedCreators,
   getWhispOfTheDay,
 } from '../../helpers/firestore';
-import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, limit, startAfter } from 'firebase/firestore';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
@@ -60,6 +60,8 @@ export default function Page() {
   const [reportVisible, setReportVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastVisible, setLastVisible] = useState<any | null>(null);
+  const [lastDoc, setLastDoc] = useState<any | null>(null);
 
   const loadPersonalPrefs = useCallback(async () => {
     if (!user) return { categories: [], type: undefined as string | undefined };
@@ -198,8 +200,17 @@ export default function Page() {
               setLoading(false);
             }
           })
-        : listenWishes(user?.uid ?? null, (all: Wish[]) => {
+        : (async () => {
             try {
+              const snap = await getDocs(
+                query(
+                  collection(db, 'wishes'),
+                  orderBy('timestamp', 'desc'),
+                  limit(20)
+                )
+              );
+              setLastVisible(snap.docs[snap.docs.length - 1] || null);
+              const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
               const filtered = all.filter((wish) => {
                 const inCategory =
                   activeTab === 'trending' || !selectedCategory || wish.category === selectedCategory;
@@ -208,13 +219,13 @@ export default function Page() {
               });
               setFilteredWishes(filtered);
             } catch (err) {
-              console.error('❌ Failed to filter wishes:', err);
+              console.error('❌ Failed to load wishes:', err);
               setError('Failed to load wishes');
             } finally {
               setLoading(false);
             }
-          });
-      return unsubscribe;
+          })();
+      return () => {};
     } catch (err) {
       console.error('❌ Failed to load wishes:', err);
       setError('Failed to load wishes');
@@ -312,6 +323,20 @@ export default function Page() {
     }
   }, [activeTab, selectedCategory, searchTerm, user, followingIds]);
 
+  const loadMore = useCallback(async () => {
+    if (!lastVisible) return;
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'wishes'), orderBy('timestamp', 'desc'), startAfter(lastVisible), limit(20))
+      );
+      setLastVisible(snap.docs[snap.docs.length - 1] || lastVisible);
+      const more = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
+      setFilteredWishes((prev) => [...prev, ...more]);
+    } catch (err) {
+      console.error('Failed to load more wishes', err);
+    }
+  }, [lastVisible, selectedCategory, searchTerm]);
+
   const Skeleton: React.FC = () => (
     <View style={styles.skeletonContainer}>
       {[0, 1, 2].map((i) => (
@@ -363,6 +388,7 @@ export default function Page() {
         <FlatList
           data={filteredWishes}
           keyExtractor={(item) => item.id}
+          onEndReached={loadMore}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }

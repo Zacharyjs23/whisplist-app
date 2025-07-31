@@ -425,6 +425,9 @@ export default function Page() {
       <ThemedButton title="Permissions" onPress={permissionsInfo} />
       <ThemedButton title="Delete My Content" onPress={handleDeleteContent} />
       <ThemedButton title="Reset App Data" onPress={handleReset} />
+      <Text style={{ color: theme.text, marginBottom: 10, textAlign: 'center' }}>
+        WhispList promises a safe, anonymous place to share your dreams.
+      </Text>
       <ThemedButton title="Terms of Service" onPress={() => router.push('/terms')} />
       <ThemedButton title="Privacy Policy" onPress={() => router.push('/privacy')} />
       {profile?.developerMode && (

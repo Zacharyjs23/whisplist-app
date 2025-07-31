@@ -19,6 +19,13 @@ const slides = [
   { key: '1', title: 'Post anonymously', emoji: '🤫' },
   { key: '2', title: 'Hear others', emoji: '👂' },
   { key: '3', title: 'Be fulfilled', emoji: '✨' },
+  {
+    key: '4',
+    title: 'Why It Matters',
+    emoji: '❤️',
+    subtitle:
+      'WhispList promises a caring space to share dreams and worries without judgement.',
+  },
 ];
 
 export default function Page() {
@@ -87,6 +94,9 @@ export default function Page() {
             >
               {item.title}
             </Text>
+            {item.subtitle && (
+              <Text style={[styles.subtitle, { color: theme.text }]}> {item.subtitle}</Text>
+            )}
           </View>
         )}
       />
@@ -148,6 +158,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+  },
+  subtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 10,
   },
   dotsContainer: {
     flexDirection: 'row',
