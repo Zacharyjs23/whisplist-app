@@ -25,7 +25,6 @@ if (!firebaseConfig.apiKey) {
 let app;
 try {
   app = initializeApp(firebaseConfig);
-  console.log('Firebase app initialized');
 } catch (err) {
   console.error('Failed to initialize Firebase app', err);
 }
@@ -43,8 +42,6 @@ if (Platform.OS === 'web') {
 
 if (!auth) {
   console.error('Firebase auth not initialized');
-} else {
-  console.log('Firebase Auth initialized');
 }
 
 const db = getFirestore(app);
