@@ -20,7 +20,8 @@ service cloud.firestore {
       }
 
       match /journalEntries/{entryId} {
-        allow read, write: if request.auth.uid == uid;
+        // Allow signed-in (including anonymous) users to read/write their own journal entries
+        allow read, write: if signedIn() && request.auth.uid == uid;
       }
 
       match /followers/{followerId} {
