@@ -60,6 +60,10 @@ Join our community of developers creating universal apps.
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
 
+## Legal
+
+New users must accept our [Terms of Service](TERMS.md) and [Privacy Policy](PRIVACY.md) during onboarding.
+
 ## Audio support
 
 `expo-av` has been deprecated in favor of the new [`expo-audio`](https://docs.expo.dev/versions/latest/sdk/audio/) library.
