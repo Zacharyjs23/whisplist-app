@@ -33,7 +33,7 @@ const reactionMap = {
 
 type ReactionKey = keyof typeof reactionMap;
 
-export const WishCard: React.FC<{ wish: Wish; onReport?: () => void }> = ({ wish, onReport }) => {
+export const WishCard: React.FC<{ wish: Wish; onReport?: () => void; followed?: boolean }> = ({ wish, onReport, followed }) => {
   const { theme } = useTheme();
   const router = useRouter();
   const { saved, toggleSave } = useSavedWishes();
@@ -120,6 +120,17 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void }> = ({ wish
       ]}
     >
       <TouchableOpacity activeOpacity={0.8} onPress={() => router.push(`/wish/${wish.id}`)}>
+        {!wish.isAnonymous && wish.displayName && (
+          <TouchableOpacity
+            onPress={() => router.push(`/profile/${wish.displayName}`)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={[styles.author, { color: theme.text }]}>@{wish.displayName}</Text>
+          </TouchableOpacity>
+        )}
+        {followed && (
+          <Text style={[styles.followTag, { color: theme.tint }]}>👥 You follow this person</Text>
+        )}
         <Text style={[styles.category, { color: theme.tint }]}>#{wish.category}</Text>
         <Text style={[styles.text, { color: theme.text }]}>{wish.text}</Text>
         {wish.imageUrl && <Image source={{ uri: wish.imageUrl }} style={styles.preview} />}
@@ -206,6 +217,15 @@ const styles = StyleSheet.create({
   boostLabel: {
     marginTop: 4,
     fontSize: 12,
+  },
+  author: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  followTag: {
+    fontSize: 12,
+    marginBottom: 4,
   },
   giftInfo: {
     marginTop: 4,

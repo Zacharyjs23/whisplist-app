@@ -46,15 +46,6 @@ export default function Layout() {
         }}
       />
       <Tabs.Screen
-        name="following"
-        options={{
-          title: 'Following',
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-            <Ionicons name="people-outline" color={color} size={size} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="journal"
         options={{
           title: 'Journal',
