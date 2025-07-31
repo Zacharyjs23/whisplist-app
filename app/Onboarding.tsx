@@ -33,6 +33,7 @@ export default function Page() {
   const { theme } = useTheme();
   const [index, setIndex] = useState(0);
   const [completed, setCompleted] = useState(false);
+  const [accepted, setAccepted] = useState(false);
   const viewConfigRef = useRef({ viewAreaCoveragePercentThreshold: 50 });
   const scrollX = useRef(new Animated.Value(0)).current;
 
@@ -52,6 +53,7 @@ export default function Page() {
     if (completed) return;
     setCompleted(true);
     await AsyncStorage.setItem('hasSeenOnboarding', 'true');
+    await AsyncStorage.setItem('acceptedTerms', 'true');
     trackEvent('complete_onboarding');
     router.replace('/');
   };
@@ -120,12 +122,48 @@ export default function Page() {
         })}
       </View>
       {index === slides.length - 1 && (
-        <ThemedButton
-          title="Get Started"
-          onPress={handleDone}
-          accessibilityLabel="Get Started"
-          accessibilityRole="button"
-        />
+        <>
+          <View style={styles.acceptRow}>
+            <TouchableOpacity
+              onPress={() => setAccepted(!accepted)}
+              style={[
+                styles.checkbox,
+                {
+                  backgroundColor: accepted ? theme.tint : 'transparent',
+                  borderColor: theme.text,
+                },
+              ]}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: accepted }}
+            />
+            <Text
+              onPress={() => setAccepted(!accepted)}
+              style={[styles.acceptText, { color: theme.text }]}
+            >
+              I agree to the
+              <Text
+                onPress={() => router.push('/terms')}
+                style={{ textDecorationLine: 'underline' }}
+              >
+                {' Terms of Service '}
+              </Text>
+              and
+              <Text
+                onPress={() => router.push('/privacy')}
+                style={{ textDecorationLine: 'underline' }}
+              >
+                {' Privacy Policy'}
+              </Text>
+            </Text>
+          </View>
+          <ThemedButton
+            title="Get Started"
+            onPress={handleDone}
+            disabled={!accepted}
+            accessibilityLabel="Get Started"
+            accessibilityRole="button"
+          />
+        </>
       )}
     </View>
   );
@@ -173,6 +211,25 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     marginHorizontal: 4,
+  },
+  acceptRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 10,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderRadius: 4,
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  acceptText: {
+    flex: 1,
+    fontSize: 14,
   },
 });
 

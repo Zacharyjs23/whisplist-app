@@ -58,6 +58,7 @@ interface Profile {
   giftsReceived?: number;
   referralDisplayName?: string;
   developerMode?: boolean;
+  acceptedTermsAt?: any;
 }
 
 interface AuthContextValue {
@@ -138,8 +139,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
           }
           if (data.boostCredits === undefined) data.boostCredits = 0;
           if (data.developerMode === undefined) data.developerMode = false;
+          if (!data.acceptedTermsAt) {
+            const accepted = await AsyncStorage.getItem('acceptedTerms');
+            if (accepted) {
+              const ts = serverTimestamp();
+              await updateDoc(ref, { acceptedTermsAt: ts });
+              data.acceptedTermsAt = ts as any;
+            }
+          }
           setProfile(data);
         } else {
+          const accepted = await AsyncStorage.getItem('acceptedTerms');
+          const ts = serverTimestamp();
           const data: Profile = {
             displayName: u.displayName,
             email: u.email,
@@ -150,6 +161,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
             boostCredits: 0,
             createdAt: serverTimestamp(),
             developerMode: false,
+            acceptedTermsAt: accepted ? ts : undefined,
           };
           await setDoc(ref, data);
           try {

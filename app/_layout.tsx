@@ -18,7 +18,8 @@ function LayoutInner() {
   useEffect(() => {
     const check = async () => {
       const seen = await AsyncStorage.getItem('hasSeenOnboarding');
-      if (!seen && pathname !== '/Onboarding') {
+      const accepted = await AsyncStorage.getItem('acceptedTerms');
+      if ((!seen || !accepted) && pathname !== '/Onboarding') {
         router.replace('/Onboarding');
       }
     };
