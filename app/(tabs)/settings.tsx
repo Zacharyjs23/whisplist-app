@@ -3,6 +3,8 @@ import ThemedButton from '@/components/ThemedButton';
 import { useTheme, ThemeName } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
+// Ionicons is used for the collapsible section chevrons
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ScrollView,
