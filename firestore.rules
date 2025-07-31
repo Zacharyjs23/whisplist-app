@@ -17,7 +17,8 @@ service cloud.firestore {
       }
 
       match /referrals/{referralId} {
-        allow write: if request.auth.uid == uid;
+        // Allow only the owning user to read/write their referrals
+        allow read, write: if request.auth != null && request.auth.uid == uid;
       }
 
       match /journalEntries/{entryId} {
@@ -26,11 +27,15 @@ service cloud.firestore {
       }
 
       match /followers/{followerId} {
-        allow read, write: if request.auth.uid == followerId || request.auth.uid == uid;
+        // Followers count is public; writes restricted to follower or owner
+        allow read: if true;
+        allow write: if request.auth != null && (request.auth.uid == followerId || request.auth.uid == uid);
       }
 
       match /following/{targetUserId} {
-        allow read, write: if request.auth.uid == uid;
+        // Following count is public; writes restricted to owner
+        allow read: if true;
+        allow write: if request.auth != null && request.auth.uid == uid;
       }
     }
 
@@ -71,8 +76,8 @@ service cloud.firestore {
 
     // Referral records for tracking invites
     match /referrals/{referralId} {
-      allow read: if true;
-      allow write: if signedIn() && request.auth.uid == referralId;
+      // Restrict access so only the referred user may read/write
+      allow read, write: if signedIn() && request.auth.uid == referralId;
     }
 
     // Allow reading reactions stored at /reactions/{wishId}/users/{userId}
