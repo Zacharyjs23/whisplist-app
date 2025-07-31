@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Share, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Share, Alert, Animated } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import ConfettiCannon from 'react-native-confetti-cannon';
@@ -20,6 +20,7 @@ export default function BoostPage() {
   const [alreadyBoosted, setAlreadyBoosted] = useState(false);
   const [boostedUntil, setBoostedUntil] = useState<Date | null>(null);
   const [timeLeft, setTimeLeft] = useState('');
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const handleFreeBoost = async () => {
     if (alreadyBoosted) {
@@ -91,14 +92,33 @@ export default function BoostPage() {
     }
   };
 
+  useEffect(() => {
+    if (!done) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.1, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [done]);
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {done ? (
         <>
           <ConfettiCannon count={120} origin={{ x: 0, y: 0 }} fadeOut />
-          <Text style={{ color: theme.text, marginBottom: 20, fontSize: 18 }}>
-            Your wish is now boosted for 24 hours!
-          </Text>
+          <Animated.Text
+            style={{
+              color: theme.text,
+              marginBottom: 20,
+              fontSize: 18,
+              transform: [{ scale: pulseAnim }],
+            }}
+          >
+            ✨ Wish Boosted!
+          </Animated.Text>
           {timeLeft && (
             <Text style={{ color: theme.tint, marginBottom: 20 }}>
               ⏳ {timeLeft}

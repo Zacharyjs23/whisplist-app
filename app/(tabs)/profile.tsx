@@ -42,9 +42,13 @@ export default function Page() {
   const [giftStats, setGiftStats] = useState({ count: 0, total: 0 });
   const [giftMessages, setGiftMessages] = useState<{ text: string; ts: any }[]>([]);
   const [savedList, setSavedList] = useState<Wish[]>([]);
+  const [postedList, setPostedList] = useState<Wish[]>([]);
+  const [giftedList, setGiftedList] = useState<Wish[]>([]);
   const [dailyReminder, setDailyReminder] = useState(false);
   const [showSparkle, setShowSparkle] = useState(false);
   const [referralCount, setReferralCount] = useState(0);
+  const [followCounts, setFollowCounts] = useState({ following: 0, followers: 0 });
+  const [activeTab, setActiveTab] = useState<'posted' | 'saved' | 'gifts'>('posted');
   const prevCredits = useRef<number | null>(profile?.boostCredits ?? null);
   const boostAnim = useRef(new Animated.Value(1)).current;
   const { theme } = useTheme();
@@ -92,6 +96,7 @@ export default function Page() {
       const list = snap.docs
         .map(d => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) }))
         .filter(w => !w.expiresAt || (w.expiresAt.toDate ? w.expiresAt.toDate() : w.expiresAt) > new Date()) as Wish[];
+      setPostedList(list);
       const active = list.filter(
         w => w.boostedUntil && w.boostedUntil.toDate && w.boostedUntil.toDate() > new Date()
       );
@@ -167,21 +172,45 @@ export default function Page() {
 
   useEffect(() => {
     if (!user?.uid) return;
+    const loadFollows = async () => {
+      const [folSnap, ingSnap] = await Promise.all([
+        getDocs(collection(db, 'users', user.uid, 'followers')),
+        getDocs(collection(db, 'users', user.uid, 'following')),
+      ]);
+      setFollowCounts({ followers: folSnap.size, following: ingSnap.size });
+    };
+    loadFollows();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
     const loadGifts = async () => {
       const snap = await getDocs(query(collectionGroup(db, 'gifts'), where('recipientId', '==', user.uid)));
       let count = 0;
       let total = 0;
       const msgs: { text: string; ts: any }[] = [];
+      const ids = new Set<string>();
       snap.forEach(d => {
         count += 1;
         total += d.data().amount || 0;
         if (d.data().message) {
           msgs.push({ text: d.data().message, ts: d.data().timestamp });
         }
+        const parts = d.ref.path.split('/');
+        if (parts.length >= 2) ids.add(parts[1]);
       });
       setGiftStats({ count, total });
       msgs.sort((a, b) => (b.ts?.seconds || 0) - (a.ts?.seconds || 0));
       setGiftMessages(msgs);
+      if (ids.size > 0) {
+        const wishes: Wish[] = [];
+        for (const id of Array.from(ids)) {
+          const wSnap = await getDocs(query(collection(db, 'wishes'), where('__name__', '==', id)));
+          wSnap.forEach(d => wishes.push({ id: d.id, ...(d.data() as Omit<Wish,'id'>) }));
+        }
+        wishes.sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0));
+        setGiftedList(wishes);
+      }
     };
     loadGifts();
   }, [user]);
@@ -221,10 +250,39 @@ export default function Page() {
           <View style={[styles.avatar, { backgroundColor: '#444' }]} />
         )}
       </View>
+
+      {activeTab === 'posted' && postedList.length > 0 && (
+        <View style={styles.section}>
+          {postedList.map(w => (
+            <TouchableOpacity key={w.id} onPress={() => router.push(`/wish/${w.id}`)} style={{ marginBottom: 6 }}>
+              <Text style={styles.info}>{w.text}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+      {activeTab === 'saved' && savedList.length > 0 && (
+        <View style={styles.section}>
+          {savedList.map(w => (
+            <TouchableOpacity key={w.id} onPress={() => router.push(`/wish/${w.id}`)} style={{ marginBottom: 6 }}>
+              <Text style={styles.info}>{w.text}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+      {activeTab === 'gifts' && giftedList.length > 0 && (
+        <View style={styles.section}>
+          {giftedList.map(w => (
+            <TouchableOpacity key={w.id} onPress={() => router.push(`/wish/${w.id}`)} style={{ marginBottom: 6 }}>
+              <Text style={styles.info}>{w.text}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
       {showSparkle && <ConfettiCannon count={30} origin={{ x: 0, y: 0 }} fadeOut />}
       <TouchableOpacity onPress={handleImage} style={styles.imageButton}>
         <Text style={styles.imageButtonText}>Change Photo</Text>
       </TouchableOpacity>
+      <Text style={[styles.info, { marginBottom: 10 }]}>You follow {followCounts.following} people · Followed by {followCounts.followers}</Text>
 
       <Text style={styles.label}>Display Name</Text>
       <TextInput
@@ -253,6 +311,20 @@ export default function Page() {
       >
         <Text style={styles.buttonText}>Open Journal</Text>
       </TouchableOpacity>
+
+      <View style={styles.tabs}>
+        {(['posted','saved','gifts'] as const).map(t => (
+          <TouchableOpacity
+            key={t}
+            onPress={() => setActiveTab(t)}
+            style={[styles.tabItem, activeTab === t && styles.activeTabItem]}
+          >
+            <Text style={[styles.tabText, activeTab === t && styles.activeTabText]}>
+              {t === 'posted' ? '📝 Posted' : t === 'saved' ? '💾 Saved' : '💝 Gifts Received'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>🔥 Boosts</Text>
@@ -352,20 +424,6 @@ export default function Page() {
         </View>
       )}
 
-      {savedList.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔖 Saved</Text>
-          {savedList.map((w) => (
-            <TouchableOpacity
-              key={w.id}
-              onPress={() => router.push(`/wish/${w.id}`)}
-              style={{ marginBottom: 6 }}
-            >
-              <Text style={styles.info}>{w.text}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>⏰ Daily Prompt Reminder</Text>
@@ -476,6 +534,28 @@ const createStyles = (c: (typeof Colors)['light'] & { name: string }) =>
       fontSize: 14,
       color: c.text,
       textAlign: 'center',
+    },
+    tabs: {
+      flexDirection: 'row',
+      marginBottom: 20,
+      borderBottomWidth: 1,
+      borderColor: c.tint,
+    },
+    tabItem: {
+      flex: 1,
+      paddingVertical: 8,
+      alignItems: 'center',
+    },
+    activeTabItem: {
+      borderBottomWidth: 2,
+      borderColor: c.tint,
+    },
+    tabText: {
+      color: c.text,
+    },
+    activeTabText: {
+      color: c.tint,
+      fontWeight: '600',
     },
   });
 

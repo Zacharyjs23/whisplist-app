@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
+import { Image, StyleSheet, Text, TouchableOpacity, View, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -41,6 +41,7 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void }> = ({ wish
   const [giftCount, setGiftCount] = useState(0);
   const [hasGiftMsg, setHasGiftMsg] = useState(false);
   const [timeLeft, setTimeLeft] = useState('');
+  const glowAnim = useRef(new Animated.Value(0)).current;
 
   const isBoosted =
     wish.boostedUntil &&
@@ -69,12 +70,24 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void }> = ({ wish
   useEffect(() => {
     if (!isBoosted || !wish.boostedUntil?.toDate) {
       setTimeLeft('');
+      glowAnim.setValue(0);
       return;
     }
     const update = () => setTimeLeft(formatTimeLeft(wish.boostedUntil.toDate()));
     update();
     const id = setInterval(update, 60000);
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 1, duration: 1000, useNativeDriver: false }),
+        Animated.timing(glowAnim, { toValue: 0, duration: 1000, useNativeDriver: false }),
+      ])
+    );
+    loop.start();
     return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      loop.stop();
+    };
   }, [isBoosted, wish.boostedUntil]);
 
   const borderColor = moodColors[wish.mood || ''] || typeColors[wish.type || ''] || theme.tint;
@@ -93,7 +106,19 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void }> = ({ wish
   );
 
   return (
-    <View style={[styles.card, { backgroundColor: bgTint, borderLeftColor: borderColor }]}>
+    <Animated.View
+      style={[
+        styles.card,
+        { backgroundColor: bgTint, borderLeftColor: borderColor },
+        isBoosted && {
+          shadowColor: theme.tint,
+          shadowOpacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.8] }),
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 0 },
+          elevation: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [2, 8] }),
+        },
+      ]}
+    >
       <TouchableOpacity activeOpacity={0.8} onPress={() => router.push(`/wish/${wish.id}`)}>
         <Text style={[styles.category, { color: theme.tint }]}>#{wish.category}</Text>
         <Text style={[styles.text, { color: theme.text }]}>{wish.text}</Text>
@@ -143,7 +168,7 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void }> = ({ wish
           <Text style={[styles.reactionText, { color: '#f87171' }]}>Report</Text>
         </TouchableOpacity>
       )}
-    </View>
+    </Animated.View>
   );
 };
 
