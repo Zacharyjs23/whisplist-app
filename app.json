@@ -16,6 +16,7 @@
     "jsEngine": "jsc",
     "newArchEnabled": false,
     "ios": {
+      "icon": "./assets/images/icon.png",
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.whisplist",
       "infoPlist": {
@@ -23,13 +24,14 @@
       }
     },
     "android": {
+      "icon": "./assets/images/icon.png",
+      "package": "com.anonymous.whisplist",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#0e0e0e"
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "compileSdkVersion": 34,
-      "package": "com.anonymous.whisplist"
+      "compileSdkVersion": 34
     },
     "web": {
       "bundler": "metro",
