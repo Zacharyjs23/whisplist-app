@@ -1,12 +1,12 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'expo-router';
+import { useRouter, Link } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 
 export default function Page() {
   const router = useRouter();
-  const { user, signIn, signUp, signInWithGoogle, signInAnonymously } = useAuth();
+  const { user, signIn, signUp, signInWithGoogle, signInAnonymously, resetPassword } = useAuth();
   const { theme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -41,6 +41,19 @@ export default function Page() {
     }
   };
 
+  const handleResetPassword = async () => {
+    try {
+      if (!email) {
+        setError('Enter your email first');
+        return;
+      }
+      await resetPassword(email);
+      alert('Password reset email sent');
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
   useEffect(() => {
     if (user) {
       router.replace('/');
@@ -66,6 +79,11 @@ export default function Page() {
         value={password}
         onChangeText={setPassword}
       />
+      {mode === 'login' && (
+        <TouchableOpacity onPress={handleResetPassword} style={styles.link}>
+          <Text style={[styles.linkText, { color: theme.tint }]}>Forgot Password?</Text>
+        </TouchableOpacity>
+      )}
       <TouchableOpacity style={[styles.button, { backgroundColor: theme.tint }]} onPress={handleSubmit}>
         <Text style={[styles.buttonText, { color: theme.text }]}>{mode === 'login' ? 'Login' : 'Sign Up'}</Text>
       </TouchableOpacity>
@@ -83,6 +101,11 @@ export default function Page() {
       <TouchableOpacity style={[styles.altButton, { backgroundColor: theme.input }]} onPress={handleGuest}>
         <Text style={[styles.buttonText, { color: theme.text }]}>Continue as Guest</Text>
       </TouchableOpacity>
+
+      <View style={{ flexDirection: 'row', marginTop: 10 }}>
+        <Link href="/terms" style={[styles.linkText, { color: theme.tint, marginRight: 16 }]}>Terms</Link>
+        <Link href="/privacy" style={[styles.linkText, { color: theme.tint }]}>Privacy</Link>
+      </View>
     </View>
   );
 }

@@ -3,7 +3,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
-import { Audio } from 'expo-av';
+import { Audio } from 'expo-audio';
 import {
   getWish,
   listenWishComments,
@@ -26,6 +26,7 @@ import {
   where,
   collectionGroup,
   updateDoc,
+  setDoc,
 } from 'firebase/firestore'; // ✅ Keep only if used directly in this file
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -190,12 +191,16 @@ export default function Page() {
 
   useEffect(() => {
     const checkVote = async () => {
-      const voted = await AsyncStorage.getItem('votedPolls');
-      const list = voted ? JSON.parse(voted) : [];
-      if (list.includes(id)) setHasVoted(true);
+      if (!user?.uid) return;
+      try {
+        const snap = await getDoc(doc(db, 'votes', id as string, 'users', user.uid));
+        if (snap.exists()) setHasVoted(true);
+      } catch (err) {
+        console.warn('Failed to check vote', err);
+      }
     };
     checkVote();
-  }, [id]);
+  }, [id, user]);
 
   const subscribeToComments = useCallback(() => {
 setLoading(true);
@@ -384,23 +389,26 @@ try {
 
   const handleVote = useCallback(
     async (option: 'A' | 'B') => {
-      if (!wish || hasVoted) return;
+      if (!wish || hasVoted || !user?.uid) return;
       try {
+        const voteRef = doc(db, 'votes', wish.id, 'users', user.uid);
+        const existing = await getDoc(voteRef);
+        if (existing.exists()) {
+          setHasVoted(true);
+          return;
+        }
+        await setDoc(voteRef, { option, timestamp: serverTimestamp() });
         const ref = doc(db, 'wishes', wish.id);
         await updateDoc(ref, {
           [option === 'A' ? 'votesA' : 'votesB']: increment(1),
         });
-        const voted = await AsyncStorage.getItem('votedPolls');
-        const list = voted ? JSON.parse(voted) : [];
-        list.push(wish.id);
-        await AsyncStorage.setItem('votedPolls', JSON.stringify(list));
         setHasVoted(true);
         await fetchWish();
       } catch (err) {
         console.error('❌ Failed to vote:', err);
       }
     },
-    [fetchWish, hasVoted, wish]
+    [fetchWish, hasVoted, wish, user]
   );
 
   const handleFulfillWish = useCallback(
