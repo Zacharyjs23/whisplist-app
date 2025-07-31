@@ -5,9 +5,11 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    match /users/{uid} {
-      allow read: if resource.data.publicProfileEnabled == true || request.auth.uid == uid;
-      allow create, update, delete: if request.auth.uid == uid;
+  // User profile documents
+  // Anyone can read a public profile. Writes remain restricted to the owner
+  match /users/{uid} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null && request.auth.uid == uid;
 
       match /notifications/{notificationId} {
         allow write: if request.auth.uid == uid;
@@ -30,13 +32,16 @@ service cloud.firestore {
       }
     }
 
+    // Public wish documents
     match /wishes/{wishId} {
-      allow read: if !resource.data.hidden;
+      // Everyone (including anonymous) can read wishes
+      allow read: if true;
       allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if signedIn() && request.auth.uid == resource.data.userId;
 
       match /comments/{commentId} {
-        allow read: if !resource.data.hidden;
+        // Allow anyone to read comments
+        allow read: if true;
         allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
         allow update, delete: if signedIn() && request.auth.uid == resource.data.userId;
       }
@@ -44,6 +49,11 @@ service cloud.firestore {
       match /gifts/{giftId} {
         allow read: if true;
         allow write: if signedIn();
+      }
+
+      // Reactions stored under each wish
+      match /reactions/{reactionId} {
+        allow read: if true;
       }
 
       match /commentReports/{reportId} {
@@ -54,6 +64,20 @@ service cloud.firestore {
 
     match /gifts/{giftId} {
       allow write: if signedIn();
+    }
+
+    // Referral records for tracking invites
+    match /referrals/{referralId} {
+      allow read: if true;
+      allow write: if signedIn() && request.auth.uid == referralId;
+    }
+
+    // Allow reading reactions stored at /reactions/{wishId}/users/{userId}
+    match /reactions/{wishId} {
+      match /users/{userId} {
+        allow read: if true;
+        allow write: if signedIn() && request.auth.uid == userId;
+      }
     }
 
     match /{document=**} {
