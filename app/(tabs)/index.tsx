@@ -9,7 +9,6 @@ import {
 } from 'expo-audio';
 import * as Audio from 'expo-audio';
 import {
-  listenWishes,
   addWish,
   getFollowingIds,
   followUser,
@@ -20,7 +19,7 @@ import { formatTimeLeft } from '../../helpers/time';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as WebBrowser from 'expo-web-browser';
-import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, doc, getDoc, collectionGroup } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, doc, getDoc, collectionGroup, limit, startAfter } from 'firebase/firestore';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -98,6 +97,7 @@ export default function Page() {
   const [giftType, setGiftType] = useState('');
   const [giftLabel, setGiftLabel] = useState('');
   const [posting, setPosting] = useState(false);
+  const [postConfirm, setPostConfirm] = useState(false);
   const [autoDelete, setAutoDelete] = useState(false);
   const [rephrasing, setRephrasing] = useState(false);
   const { theme } = useTheme();
@@ -114,6 +114,8 @@ export default function Page() {
   const { user, profile } = useAuth();
   const stripeEnabled = profile?.giftingEnabled && profile?.stripeAccountId;
   const [enableExternalGift, setEnableExternalGift] = useState(!stripeEnabled);
+  const [lastDoc, setLastDoc] = useState<any | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   if (!db || !storage) {
     console.error('Firebase modules undefined in index page', { db, storage });
@@ -130,12 +132,44 @@ useEffect(() => {
 }, []);
 
 useEffect(() => {
-  const unsubscribe = listenWishes(user?.uid ?? null, (w) => {
-    setWishList(w);
-    setLoading(false);
-  });
-
-  return () => unsubscribe();
+  const load = async () => {
+    setLoading(true);
+    try {
+      const following = user ? await getFollowingIds(user.uid) : [];
+      const now = new Date();
+      const boostedSnap = await getDocs(
+        query(
+          collection(db, 'wishes'),
+          where('boostedUntil', '>', now),
+          orderBy('boostedUntil', 'desc')
+        )
+      );
+      const boosted = boostedSnap.docs.map(d => ({
+        id: d.id,
+        ...(d.data() as Omit<Wish, 'id'>),
+      })) as Wish[];
+      let normal: Wish[] = [];
+      if (following.length) {
+        const q = query(
+          collection(db, 'wishes'),
+          where('userId', 'in', following),
+          orderBy('timestamp', 'desc'),
+          limit(20)
+        );
+        const snap = await getDocs(q);
+        setLastDoc(snap.docs[snap.docs.length - 1] || null);
+        normal = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Wish,'id'>) })) as Wish[];
+      }
+      setWishList([...boosted, ...normal]);
+      setError(null);
+    } catch (err) {
+      console.warn('Failed to load wishes', err);
+      setError("Couldn't load data. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  load();
 }, [user]);
 
 useEffect(() => {
@@ -494,7 +528,7 @@ useEffect(() => {
       setGiftLabel('');
       setEnableExternalGift(!stripeEnabled);
       setPostType('wish');
-      Alert.alert('Wish posted!');
+      setPostConfirm(true);
       await updateStreak();
     } catch (error) {
       console.error('❌ Failed to post wish:', error);
@@ -542,18 +576,45 @@ useEffect(() => {
           query(
             collection(db, 'wishes'),
             where('userId', 'in', followingIds),
-            orderBy('timestamp', 'desc')
+            orderBy('timestamp', 'desc'),
+            limit(20)
           )
         );
+        setLastDoc(normalSnap.docs[normalSnap.docs.length - 1] || null);
         normal = normalSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
       }
       setWishList([...boosted, ...normal]);
+      setError(null);
     } catch (err) {
       console.error('❌ Failed to refresh wishes:', err);
+      setError("Couldn't load data. Check your connection and try again.");
     } finally {
       setRefreshing(false);
     }
   }, [user]);
+
+  const loadMore = useCallback(async () => {
+    if (!lastDoc) return;
+    try {
+      const followingIds = user ? await getFollowingIds(user.uid) : [];
+      if (!followingIds.length) return;
+      const snap = await getDocs(
+        query(
+          collection(db, 'wishes'),
+          where('userId', 'in', followingIds),
+          orderBy('timestamp', 'desc'),
+          startAfter(lastDoc),
+          limit(20)
+        )
+      );
+      setLastDoc(snap.docs[snap.docs.length - 1] || lastDoc);
+      const more = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Wish,'id'>) })) as Wish[];
+      setWishList(prev => [...prev, ...more]);
+    } catch (err) {
+      console.warn('Failed to load more wishes', err);
+      setError("Couldn't load data. Check your connection and try again.");
+    }
+  }, [lastDoc, user]);
 
   const filteredWishes = wishList.filter(
     (wish) =>
@@ -722,7 +783,10 @@ useEffect(() => {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() =>
-                  Alert.alert('Gift Info', 'Gifting is anonymous support using Stripe or a link.')
+                  Alert.alert(
+                    'Gift Info',
+                    'Gifting is anonymous and optional. You can attach a support link like Venmo or Stripe.'
+                  )
                 }
                 style={{ marginLeft: 6 }}
                 hitSlop={HIT_SLOP}
@@ -813,6 +877,30 @@ useEffect(() => {
   try {
     return (
       <SafeAreaView style={styles.safeArea}>
+      <Modal
+        visible={postConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPostConfirm(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setPostConfirm(false)}
+        >
+          <View style={[styles.modalContent, { backgroundColor: theme.input }]}>
+            <Text style={{ color: theme.text, marginBottom: 10, textAlign: 'center' }}>
+              💭 Your wish has been sent into the world.
+            </Text>
+            <TouchableOpacity onPress={() => { setPostConfirm(false); router.push('/feed'); }} style={{ marginBottom: 10 }}>
+              <Text style={{ color: theme.tint, textAlign: 'center' }}>View in Feed</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setPostConfirm(false)}>
+              <Text style={{ color: theme.tint, textAlign: 'center' }}>Post another wish</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
       <RNStatusBar
         barStyle={theme.name === 'dark' ? 'light-content' : 'dark-content'}
         backgroundColor={theme.background}
@@ -824,6 +912,7 @@ useEffect(() => {
         <FlatList
           data={filteredWishes}
           keyExtractor={(item) => item.id}
+          onEndReached={loadMore}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
@@ -831,6 +920,11 @@ useEffect(() => {
           ListHeaderComponent={
             <>
               <Text style={styles.title}>WhispList ✨</Text>
+              {error && (
+                <Text style={{ color: theme.tint, textAlign: 'center', marginBottom: 8 }}>
+                  {error}
+                </Text>
+              )}
               <Text style={styles.subtitle}>Post a wish and see what dreams grow 🌱</Text>
               {streakCount > 0 && (
                 <Text style={styles.streak}>
@@ -1061,6 +1155,13 @@ useEffect(() => {
               </Text>
             )
           }
+          ListFooterComponent={
+            lastDoc ? (
+              <TouchableOpacity onPress={loadMore} style={{ marginVertical: 20 }}>
+                <Text style={{ color: theme.tint, textAlign: 'center' }}>Load More</Text>
+              </TouchableOpacity>
+            ) : null
+          }
           renderItem={({ item }) => <WishCard item={item} />}
         />
         <ReportDialog
@@ -1254,6 +1355,17 @@ const createStyles = (c: (typeof Colors)['light'] & { name: string }) =>
     modalText: {
       fontSize: 16,
       textAlign: 'center',
+    },
+    modalOverlay: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      padding: 20,
+    },
+    modalContent: {
+      padding: 20,
+      borderRadius: 10,
     },
   });
 

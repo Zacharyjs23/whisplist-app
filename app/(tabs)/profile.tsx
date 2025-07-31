@@ -19,7 +19,7 @@ import * as Notifications from 'expo-notifications';
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { collection, getDocs, query, where, orderBy, collectionGroup } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, collectionGroup, limit, startAfter } from 'firebase/firestore';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useSavedWishes } from '@/contexts/SavedWishesContext';
@@ -44,6 +44,8 @@ export default function Page() {
   const [savedList, setSavedList] = useState<Wish[]>([]);
   const [postedList, setPostedList] = useState<Wish[]>([]);
   const [giftedList, setGiftedList] = useState<Wish[]>([]);
+  const [postLastDoc, setPostLastDoc] = useState<any | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [dailyReminder, setDailyReminder] = useState(false);
   const [showSparkle, setShowSparkle] = useState(false);
   const [referralCount, setReferralCount] = useState(0);
@@ -87,50 +89,85 @@ export default function Page() {
     }
   };
 
+  const loadMorePosted = async () => {
+    if (!postLastDoc || !user?.uid) return;
+    try {
+      const snap = await getDocs(
+        query(
+          collection(db, 'wishes'),
+          where('userId', '==', user.uid),
+          orderBy('timestamp', 'desc'),
+          startAfter(postLastDoc),
+          limit(20)
+        )
+      );
+      setPostLastDoc(snap.docs[snap.docs.length - 1] || postLastDoc);
+      const more = snap.docs
+        .map(d => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) }))
+        .filter(w => !w.expiresAt || (w.expiresAt.toDate ? w.expiresAt.toDate() : w.expiresAt) > new Date()) as Wish[];
+      setPostedList(prev => [...prev, ...more]);
+      setError(null);
+    } catch (err) {
+      console.warn('Failed to load more posts', err);
+      setError("Couldn't load data. Check your connection and try again.");
+    }
+  };
+
   useEffect(() => {
     const load = async () => {
       if (!user?.uid) return;
-      const snap = await getDocs(
-        query(collection(db, 'wishes'), where('userId', '==', user.uid), orderBy('timestamp', 'desc'))
-      );
-      const list = snap.docs
-        .map(d => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) }))
-        .filter(w => !w.expiresAt || (w.expiresAt.toDate ? w.expiresAt.toDate() : w.expiresAt) > new Date()) as Wish[];
-      setPostedList(list);
-      const active = list.filter(
-        w => w.boostedUntil && w.boostedUntil.toDate && w.boostedUntil.toDate() > new Date()
-      );
-      setBoostCount(active.length);
-      if (active.length > 0) {
-        active.sort((a, b) =>
-          a.boostedUntil.toDate() < b.boostedUntil.toDate() ? 1 : -1
+      try {
+        const snap = await getDocs(
+          query(
+            collection(db, 'wishes'),
+            where('userId', '==', user.uid),
+            orderBy('timestamp', 'desc'),
+            limit(20)
+          )
         );
-        setLatestBoost(active[0]);
-      } else {
-        setLatestBoost(null);
-      }
-      if (list.length > 0) {
-        setLatestWish(list[0]);
-      }
-
-      const boosted = list.filter(w => w.boosted != null);
-      const totalBoosts = boosted.length;
-      if ([5, 10, 20].includes(totalBoosts)) {
-        setShowSparkle(true);
-        setTimeout(() => setShowSparkle(false), 3000);
-      }
-      let likes = 0;
-      let comments = 0;
-      for (const w of boosted) {
-        likes += w.likes || 0;
-        try {
-          const cSnap = await getDocs(collection(db, 'wishes', w.id, 'comments'));
-          comments += cSnap.size;
-        } catch (err) {
-          console.error('Failed to count comments', err);
+        setPostLastDoc(snap.docs[snap.docs.length - 1] || null);
+        const list = snap.docs
+          .map(d => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) }))
+          .filter(w => !w.expiresAt || (w.expiresAt.toDate ? w.expiresAt.toDate() : w.expiresAt) > new Date()) as Wish[];
+        setPostedList(list);
+        setError(null);
+        const active = list.filter(
+          w => w.boostedUntil && w.boostedUntil.toDate && w.boostedUntil.toDate() > new Date()
+        );
+        setBoostCount(active.length);
+        if (active.length > 0) {
+          active.sort((a, b) =>
+            a.boostedUntil.toDate() < b.boostedUntil.toDate() ? 1 : -1
+          );
+          setLatestBoost(active[0]);
+        } else {
+          setLatestBoost(null);
         }
+        if (list.length > 0) {
+          setLatestWish(list[0]);
+        }
+        const boosted = list.filter(w => w.boosted != null);
+        const totalBoosts = boosted.length;
+        if ([5, 10, 20].includes(totalBoosts)) {
+          setShowSparkle(true);
+          setTimeout(() => setShowSparkle(false), 3000);
+        }
+        let likes = 0;
+        let comments = 0;
+        for (const w of boosted) {
+          likes += w.likes || 0;
+          try {
+            const cSnap = await getDocs(collection(db, 'wishes', w.id, 'comments'));
+            comments += cSnap.size;
+          } catch (err) {
+            console.error('Failed to count comments', err);
+          }
+        }
+        setBoostImpact({ likes, comments });
+      } catch (err) {
+        console.warn('Failed to load profile wishes', err);
+        setError("Couldn't load data. Check your connection and try again.");
       }
-      setBoostImpact({ likes, comments });
     };
     load();
   }, [user]);
@@ -250,6 +287,11 @@ export default function Page() {
           <View style={[styles.avatar, { backgroundColor: '#444' }]} />
         )}
       </View>
+      {error && (
+        <Text style={{ color: theme.tint, textAlign: 'center', marginBottom: 8 }}>
+          {error}
+        </Text>
+      )}
 
       {activeTab === 'posted' && postedList.length > 0 && (
         <View style={styles.section}>
@@ -258,6 +300,11 @@ export default function Page() {
               <Text style={styles.info}>{w.text}</Text>
             </TouchableOpacity>
           ))}
+          {postLastDoc && (
+            <TouchableOpacity onPress={loadMorePosted} style={{ marginTop: 10 }}>
+              <Text style={{ color: theme.tint, textAlign: 'center' }}>Load More</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
       {activeTab === 'saved' && savedList.length > 0 && (

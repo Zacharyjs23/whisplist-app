@@ -681,7 +681,10 @@ try {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() =>
-                Alert.alert('Gift Info', 'Gifting is anonymous support using Stripe or a link.')
+                Alert.alert(
+                  'Gift Info',
+                  'Gifting is anonymous and optional. You can attach a support link like Venmo or Stripe.'
+                )
               }
               style={{ marginLeft: 6 }}
               hitSlop={HIT_SLOP}
