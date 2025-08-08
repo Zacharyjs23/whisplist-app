@@ -6,9 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import * as Linking from 'expo-linking';
-import { getWish } from '../../helpers/firestore';
+import { getWish, boostWish } from '../../helpers/firestore';
 import { formatTimeLeft } from '../../helpers/time';
-import { boostWish } from '../../helpers/firestore';
 
 export default function BoostPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -107,7 +106,7 @@ export default function BoostPage() {
     );
     loop.start();
     return () => loop.stop();
-  }, [done]);
+  }, [done, pulseAnim]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>

@@ -20,7 +20,7 @@ exports.rephraseWish = functions.https.onRequest(async (req, res) => {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-5',
         messages: [
           { role: 'system', content: 'You are a wish clarity assistant.' },
           { role: 'user', content: text },

@@ -402,7 +402,7 @@ try {
         setReportTarget(null);
       }
     },
-    [reportTarget]
+    [id, reportTarget]
   );
 
   const handleVote = useCallback(
@@ -463,7 +463,7 @@ try {
     setRefreshing(true);
     await fetchWish();
     setRefreshing(false);
-  }, [fetchWish, id]);
+  }, [fetchWish]);
 
 
   const renderCommentItem = useCallback(

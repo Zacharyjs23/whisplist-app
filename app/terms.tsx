@@ -33,11 +33,11 @@ export default function TermsScreen() {
         suspend or terminate accounts that violate these terms or applicable
         law.
       </Text>
-      <Text style={{ color: theme.text, marginBottom: 10 }}>
-        6. <Text style={{ fontWeight: 'bold' }}>Disclaimer</Text> – The service
-        is provided "as is" without warranties of any kind. We are not liable
-        for any damages arising from your use of WhispList.
-      </Text>
+        <Text style={{ color: theme.text, marginBottom: 10 }}>
+          6. <Text style={{ fontWeight: 'bold' }}>Disclaimer</Text> – The service
+          is provided &quot;as is&quot; without warranties of any kind. We are not liable
+          for any damages arising from your use of WhispList.
+        </Text>
       <Text style={{ color: theme.text }}>
         7. <Text style={{ fontWeight: 'bold' }}>Changes to Terms</Text> – We may
         update these Terms from time to time. Continued use of the service after

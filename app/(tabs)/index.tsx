@@ -8,8 +8,9 @@ import {
   getFollowingIds,
   followUser,
   unfollowUser,
+  createGiftCheckout,
+  cleanupExpiredWishes,
 } from '../../helpers/firestore';
-import { createGiftCheckout } from '../../helpers/firestore';
 import { formatTimeLeft } from '../../helpers/time';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -46,7 +47,6 @@ import ReportDialog from '../../components/ReportDialog';
 import { db, storage } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
-import { cleanupExpiredWishes } from '../../helpers/firestore';
 import { DAILY_PROMPTS } from '../../constants/prompts';
 
 const typeInfo: Record<string, { emoji: string; color: string }> = {
@@ -234,7 +234,7 @@ useEffect(() => {
     }
   };
   fetchStatus();
-}, [wishList]);
+}, [wishList, publicStatus, stripeAccounts]);
 
 useEffect(() => {
   const fetchFollow = async () => {
@@ -265,7 +265,7 @@ useEffect(() => {
     }
   };
   fetchFollow();
-}, [wishList, user]);
+}, [wishList, user, followStatus]);
 
 useEffect(() => {
   const showWelcome = async () => {
@@ -664,7 +664,7 @@ useEffect(() => {
       } else {
         setTimeLeft('');
       }
-    }, [isBoosted, item.boostedUntil]);
+    }, [glowAnim, isBoosted, item.boostedUntil]);
 
     const borderColor = isBoosted
       ? glowAnim.interpolate({ inputRange: [0, 1], outputRange: ['#facc15', '#fde68a'] })

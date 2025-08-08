@@ -31,20 +31,15 @@ function LayoutInner() {
 }
 
 export default function Layout() {
-  try {
-    return (
-      <AuthProvider>
-        <ThemeProvider>
-          <SavedWishesProvider>
-            <AppContainer>
-              <LayoutInner />
-            </AppContainer>
-          </SavedWishesProvider>
-        </ThemeProvider>
-      </AuthProvider>
-    );
-  } catch (err) {
-    console.error('Error rendering root layout', err);
-    return null;
-  }
+  return (
+    <AuthProvider>
+      <ThemeProvider>
+        <SavedWishesProvider>
+          <AppContainer>
+            <LayoutInner />
+          </AppContainer>
+        </SavedWishesProvider>
+      </ThemeProvider>
+    </AuthProvider>
+  );
 }

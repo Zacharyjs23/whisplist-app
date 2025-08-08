@@ -71,7 +71,7 @@ export default function Page() {
       }
     };
     load();
-  }, [username]);
+    }, [username, user]);
 
   const loadMore = async () => {
     if (!lastDoc) return;

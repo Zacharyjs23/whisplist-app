@@ -53,7 +53,7 @@ export default function Page() {
     boostCredits?: number;
     isDev?: boolean;
   };
-  const { user, profile: profileData, updateProfile, pickImage, signOut } = useAuth();
+  const { user, profile: profileData, updateProfile } = useAuth();
   const profile = profileData as Profile | null;
   const router = useRouter();
 
