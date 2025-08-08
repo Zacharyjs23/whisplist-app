@@ -2,7 +2,9 @@ import type { Timestamp } from 'firebase/firestore';
 
 export type ReactionType = 'heart' | 'lightbulb' | 'hug' | 'pray';
 
-export type Wish<Extra extends Record<string, unknown> = {}> = {
+export type Wish<
+  Extra extends Record<string, unknown> = Record<string, unknown>,
+> = {
   id: string;
   text: string;
   category: string;

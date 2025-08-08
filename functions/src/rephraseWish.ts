@@ -1,78 +1,60 @@
-import * as functions from 'firebase-functions';
-import * as logger from '../../helpers/logger';
+import * as functions from 'firebase-functions/v2/https';
+import fetch from 'node-fetch';
 
 interface RephraseRequest {
   text: string;
+  tone?: 'gentle' | 'concise' | 'uplifting';
 }
 
-interface OpenAIChatCompletionResponse {
-  choices?: Array<{
-    message?: {
-      content?: string;
-    };
-  }>;
-}
-
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const hasValidApiKey = typeof OPENAI_API_KEY === 'string' && OPENAI_API_KEY.startsWith('sk-');
-
-if (!hasValidApiKey) {
-  logger.error('Invalid or missing OPENAI_API_KEY');
-}
-
-export const rephraseWish = functions.https.onRequest(async (req, res) => {
-  if (req.method !== 'POST') {
-    res.status(405).send('Method not allowed');
-    return;
-  }
-
-  const { text } = (req.body || {}) as Partial<RephraseRequest>;
-  if (!text) {
-    res.status(400).send('Missing text');
-    return;
-  }
-
-  if (!hasValidApiKey) {
-    res.status(500).send('Server configuration error');
-    return;
-  }
-
+export const rephraseWish = functions.onRequest(async (req, res) => {
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-5',
-        messages: [
-          { role: 'system', content: 'You are a wish clarity assistant.' },
-          { role: 'user', content: text },
-        ],
-        temperature: 0.7,
-      }),
-    });
-
-    if (response.status === 401) {
-      logger.error('Invalid OpenAI API key');
-      res.status(500).send('Invalid OpenAI API key');
-      return;
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
+    const { text, tone = 'gentle' } = body as RephraseRequest;
+    if (
+      !text ||
+      typeof text !== 'string' ||
+      text.length > 1000 ||
+      !['gentle', 'concise', 'uplifting'].includes(tone)
+    ) {
+      return res.status(400).json({ error: 'invalid_input' });
     }
 
+    const openAiPayload = {
+      model: 'gpt-4o-mini',
+      temperature: 0.4,
+      messages: [
+        {
+          role: 'user',
+          content: `Rephrase empathetically (${tone}). Keep meaning, <=200 chars:\n${text}`,
+        },
+      ],
+    };
+
+    let attempt = 0;
+    let response: any;
+    while (attempt < 3) {
+      response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY ?? ''}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(openAiPayload),
+      });
+      if (response.status !== 429) break;
+      await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt++)));
+    }
+
+    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const errorText = await response.text();
-      logger.error('OpenAI API error', response.status, errorText);
-      res.status(response.status).send('OpenAI API error');
-      return;
+      return res
+        .status(response.status)
+        .json({ error: data?.error?.message || 'openai_failed' });
     }
 
-    const data: OpenAIChatCompletionResponse = await response.json();
-    const suggestion = data.choices?.[0]?.message?.content?.trim() || null;
-    res.json({ suggestion });
-  } catch (err) {
-    logger.error('rephraseWish error', err);
-    res.status(500).send('error');
+    const out = data?.choices?.[0]?.message?.content?.trim() || '';
+    return res.json({ text: out });
+  } catch {
+    return res.status(500).json({ error: 'internal' });
   }
 });
-

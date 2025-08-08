@@ -148,7 +148,7 @@ export const AuthProvider = ({
       setLoading(false);
     });
     return unsub;
-  }, []);
+  }, [processReferral]);
 
   const signUp = async (email: string, password: string) => {
     try {

@@ -1,8 +1,8 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
-import ReactionBar, { ReactionKey } from '@/components/ReactionBar';
+import { ReactionBar, ReactionKey } from '@/components/ReactionBar';
 import type { Wish } from '@/types/Wish';
-import { Text, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 jest.mock('@expo/vector-icons', () => {
   const React = require('react');
