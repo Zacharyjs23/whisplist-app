@@ -442,7 +442,7 @@ export default function Page() {
           />
           <ThemedButton title="Submit Feedback" onPress={handleSendFeedback} />
           <ThemedButton title="Export History" onPress={handleExport} />
-          <ThemedButton title="Rate this App" onPress={() => Linking.openURL('https://example.com')} />
+          <ThemedButton title="Rate this App" onPress={() => { Linking.openURL('https://example.com'); }} />
           <ThemedButton title="Permissions" onPress={permissionsInfo} />
           <ThemedButton title="Delete My Content" onPress={handleDeleteContent} />
           <ThemedButton title="Reset App Data" onPress={handleReset} />
