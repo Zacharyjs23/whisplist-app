@@ -5,6 +5,7 @@ import { Platform } from 'react-native';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '../firebase';
+import * as logger from '@/helpers/logger';
 
 export default function usePushNotifications() {
   const { user } = useAuth();
@@ -38,7 +39,7 @@ export default function usePushNotifications() {
       try {
         await updateDoc(doc(db, 'users', user.uid), { fcmToken: data });
       } catch (err) {
-        console.error('Failed to save push token', err);
+        logger.error('Failed to save push token', err);
       }
 
       if (Platform.OS === 'android') {

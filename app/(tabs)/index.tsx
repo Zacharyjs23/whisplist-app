@@ -64,6 +64,7 @@ import { db, storage } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
 import { DAILY_PROMPTS } from '../../constants/prompts';
+import * as logger from '@/helpers/logger';
 
 const typeInfo: Record<string, { emoji: string; color: string }> = {
   wish: { emoji: '💭', color: '#1e1e1e' },
@@ -141,10 +142,10 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
 
   if (!db || !storage) {
-    console.error('Firebase modules undefined in index page', { db, storage });
+    logger.error('Firebase modules undefined in index page', { db, storage });
   }
   if (user === undefined) {
-    console.error('AuthContext returned undefined user');
+    logger.error('AuthContext returned undefined user');
   }
 
   const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
@@ -188,7 +189,7 @@ export default function Page() {
         setWishList([...boosted, ...normal]);
         setError(null);
       } catch (err) {
-        console.warn('Failed to load wishes', err);
+        logger.warn('Failed to load wishes', err);
         setError("Couldn't load data. Check your connection and try again.");
       } finally {
         setLoading(false);
@@ -221,7 +222,7 @@ export default function Page() {
         });
         setImpact({ wishes, boosts, gifts, giftTotal });
       } catch (err) {
-        console.error('Failed to load impact', err);
+        logger.error('Failed to load impact', err);
       }
     };
     loadImpact();
@@ -264,7 +265,7 @@ export default function Page() {
                   }));
                 }
               } catch (err) {
-                console.warn('Failed to fetch user', err);
+                logger.warn('Failed to fetch user', err);
                 if (publicStatus[id] === undefined) {
                   setPublicStatus((prev) => ({ ...prev, [id]: false }));
                 }
@@ -276,7 +277,7 @@ export default function Page() {
           }),
         );
       } catch (err) {
-        console.error('Failed to fetch public status', err);
+        logger.error('Failed to fetch public status', err);
       }
     };
     fetchStatus();
@@ -304,14 +305,14 @@ export default function Page() {
                 );
                 setFollowStatus((prev) => ({ ...prev, [id]: snap.exists() }));
               } catch (err) {
-                console.warn('Failed to fetch follow status for', id, err);
+                logger.warn('Failed to fetch follow status for', id, err);
                 setFollowStatus((prev) => ({ ...prev, [id]: false }));
               }
             }
           }),
         );
       } catch (err) {
-        console.error('Failed to fetch follow status', err);
+        logger.error('Failed to fetch follow status', err);
       }
     };
     fetchFollow();
@@ -329,7 +330,7 @@ export default function Page() {
           await AsyncStorage.setItem('seenWelcome', 'true');
         }
       } catch (err) {
-        console.error('Failed in showWelcome', err);
+        logger.error('Failed in showWelcome', err);
       }
     };
     showWelcome();
@@ -366,7 +367,7 @@ export default function Page() {
         const streak = await AsyncStorage.getItem('streakCount');
         if (streak) setStreakCount(parseInt(streak, 10));
       } catch (err) {
-        console.error('Failed to load prompt or streak', err);
+        logger.error('Failed to load prompt or streak', err);
       }
     };
 
@@ -399,7 +400,7 @@ export default function Page() {
       setRecording(rec);
       setIsRecording(true);
     } catch (err) {
-      console.error('❌ Failed to start recording:', err);
+      logger.error('❌ Failed to start recording:', err);
     }
   };
 
@@ -409,7 +410,7 @@ export default function Page() {
       const { uri } = await recording.stop();
       setRecordedUri(uri);
     } catch (err) {
-      console.error('❌ Failed to stop recording:', err);
+      logger.error('❌ Failed to stop recording:', err);
     } finally {
       setIsRecording(false);
       setRecording(null);
@@ -506,7 +507,7 @@ export default function Page() {
         }
       }
     } catch (err) {
-      console.error('AI rephrase failed', err);
+      logger.error('AI rephrase failed', err);
       Alert.alert('Failed to rephrase wish', 'Please try again later.');
     } finally {
       setRephrasing(false);
@@ -582,7 +583,7 @@ export default function Page() {
           JSON.stringify(history),
         );
       } catch (err) {
-        console.error('Failed to save reflection history', err);
+        logger.error('Failed to save reflection history', err);
       }
 
       setWish('');
@@ -600,7 +601,7 @@ export default function Page() {
       setPostConfirm(true);
       await updateStreak();
     } catch (error) {
-      console.error('❌ Failed to post wish:', error);
+      logger.error('❌ Failed to post wish:', error);
     } finally {
       setPosting(false);
     }
@@ -616,7 +617,7 @@ export default function Page() {
         timestamp: serverTimestamp(),
       });
     } catch (err) {
-      console.error('❌ Failed to submit report:', err);
+      logger.error('❌ Failed to submit report:', err);
     } finally {
       setReportVisible(false);
       setReportTarget(null);
@@ -660,7 +661,7 @@ export default function Page() {
       setWishList([...boosted, ...normal]);
       setError(null);
     } catch (err) {
-      console.error('❌ Failed to refresh wishes:', err);
+      logger.error('❌ Failed to refresh wishes:', err);
       setError("Couldn't load data. Check your connection and try again.");
     } finally {
       setRefreshing(false);
@@ -688,7 +689,7 @@ export default function Page() {
       })) as Wish[];
       setWishList((prev) => [...prev, ...more]);
     } catch (err) {
-      console.warn('Failed to load more wishes', err);
+      logger.warn('Failed to load more wishes', err);
       setError("Couldn't load data. Check your connection and try again.");
     }
   }, [lastDoc, user]);
@@ -725,7 +726,7 @@ export default function Page() {
           setGiftCount(snaps[0].size + snaps[1].size);
           setHasGiftMsg(msg);
         } catch (err) {
-          console.warn('Failed to fetch gifts', err);
+          logger.warn('Failed to fetch gifts', err);
         }
       };
       load();
@@ -803,7 +804,7 @@ export default function Page() {
               );
               if (res.url) await WebBrowser.openBrowserAsync(res.url);
             } catch (err) {
-              console.error('Failed to checkout', err);
+              logger.error('Failed to checkout', err);
             }
           },
         },
@@ -1427,7 +1428,7 @@ export default function Page() {
       </SafeAreaView>
     );
   } catch (err) {
-    console.error('Error rendering index page', err);
+    logger.error('Error rendering index page', err);
     return null;
   }
 }

@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '../firebase';
+import * as logger from '@/helpers/logger';
 
 export interface NotificationDoc {
   type: string;
@@ -48,12 +49,12 @@ export default function useNotifications() {
             })),
           );
         } catch (err) {
-          console.error('Error processing notifications snapshot', err);
+          logger.error('Error processing notifications snapshot', err);
           setError(err as Error);
         }
       },
       (err) => {
-        console.error('Error listening to notifications', err);
+        logger.error('Error listening to notifications', err);
         setError(err);
       },
     );
@@ -73,7 +74,7 @@ export default function useNotifications() {
           ),
       );
     } catch (err) {
-      console.error('Error marking notifications read', err);
+      logger.error('Error marking notifications read', err);
       throw err;
     }
   };

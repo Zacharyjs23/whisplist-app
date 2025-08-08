@@ -1,6 +1,7 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { Expo } from 'expo-server-sdk';
+import * as logger from '../../helpers/logger';
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -30,7 +31,7 @@ async function sendPush(
         lastSent: admin.firestore.FieldValue.serverTimestamp(),
       });
     } catch (err) {
-      console.error('Error sending Expo push notification', err);
+      logger.error('Error sending Expo push notification', err);
       if (fcmToken) {
         try {
           await admin
@@ -40,7 +41,7 @@ async function sendPush(
             lastSent: admin.firestore.FieldValue.serverTimestamp(),
           });
         } catch (err2) {
-          console.error('Error sending fallback FCM notification', err2);
+          logger.error('Error sending fallback FCM notification', err2);
         }
       }
     }
@@ -53,7 +54,7 @@ async function sendPush(
         lastSent: admin.firestore.FieldValue.serverTimestamp(),
       });
     } catch (err) {
-      console.error('Error sending FCM notification', err);
+      logger.error('Error sending FCM notification', err);
     }
   }
   return null;

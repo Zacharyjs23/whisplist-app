@@ -2,6 +2,7 @@ import { AppContainer } from '@/components/AppContainer';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { SavedWishesProvider } from '@/contexts/SavedWishesContext';
+import * as logger from '@/helpers/logger';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import React, { useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -12,7 +13,7 @@ function LayoutInner() {
   const pathname = usePathname();
 
   if (loading === undefined) {
-    console.error('AuthContext loading value undefined');
+    logger.error('AuthContext loading value undefined');
   }
 
   useEffect(() => {

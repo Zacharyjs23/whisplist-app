@@ -17,6 +17,7 @@ import { collection, getDocs, doc, onSnapshot } from 'firebase/firestore';
 import { formatTimeLeft } from '../helpers/time';
 import { useAuth } from '@/contexts/AuthContext';
 import ReactionBar, { ReactionKey } from './ReactionBar';
+import * as logger from '@/helpers/logger';
 
 const typeColors: Record<string, string> = {
   dream: '#312e81',
@@ -67,7 +68,7 @@ export const WishCard: React.FC<{
         setGiftCount(snaps[0].size + snaps[1].size);
         setHasGiftMsg(msg);
       } catch (err) {
-        console.warn('Failed to fetch gifts', err);
+        logger.warn('Failed to fetch gifts', err);
       }
     };
     load();
@@ -125,7 +126,7 @@ export const WishCard: React.FC<{
       try {
         await updateWishReaction(wish.id, key, user.uid);
       } catch (err) {
-        console.warn('Failed to react', err);
+        logger.warn('Failed to react', err);
       }
     },
     [wish.id, user?.uid],

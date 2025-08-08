@@ -12,6 +12,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import * as logger from '@/helpers/logger';
 
 export const useReferral = () => {
   const checkInvite = async () => {
@@ -25,7 +26,7 @@ export const useReferral = () => {
         }
       }
     } catch (err) {
-      console.error('Failed to parse initial URL', err);
+      logger.error('Failed to parse initial URL', err);
     }
   };
 
@@ -55,7 +56,7 @@ export const useReferral = () => {
         await AsyncStorage.removeItem('inviteRef');
       }
     } catch (err) {
-      console.error('Failed to process referral', err);
+      logger.error('Failed to process referral', err);
     }
   };
 

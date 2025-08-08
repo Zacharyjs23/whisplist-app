@@ -47,6 +47,7 @@ import { db, storage } from '../../firebase';
 import { getAllWishes, getWishesByNickname } from '../../helpers/wishes';
 import { getWishComments } from '../../helpers/comments';
 import type { Profile } from '../../types/Profile';
+import * as logger from '@/helpers/logger';
 
 export default function Page() {
   const { theme, setTheme } = useTheme();
@@ -183,7 +184,7 @@ export default function Page() {
           });
         }
       } catch (err) {
-        console.warn('Failed to load analytics', err);
+        logger.warn('Failed to load analytics', err);
       }
     };
     fetchStats();
@@ -226,7 +227,7 @@ export default function Page() {
     for (const w of wishes) {
       try {
         const list = await getWishComments(w.id, (err) => {
-          console.error('Failed to fetch comments for export', err);
+          logger.error('Failed to fetch comments for export', err);
         });
         list.forEach((c) => {
           if (c.nickname === localUser?.nickname) comments.push(c);
@@ -266,7 +267,7 @@ export default function Page() {
     for (const wish of all) {
       try {
         const list = await getWishComments(wish.id, (err) => {
-          console.error('Failed to fetch comments for deletion', err);
+          logger.error('Failed to fetch comments for deletion', err);
         });
         for (const c of list) {
           if (c.nickname === localUser?.nickname) {
@@ -340,7 +341,7 @@ export default function Page() {
           await updateProfile({ stripeAccountId: data.accountId });
         if (data.url) await WebBrowser.openBrowserAsync(data.url);
       } catch (err) {
-        console.error('Failed to start Stripe onboarding', err);
+        logger.error('Failed to start Stripe onboarding', err);
       }
     }
   };

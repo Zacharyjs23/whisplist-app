@@ -25,6 +25,7 @@ import { addWish } from '../helpers/wishes';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { db } from '../firebase';
+import * as logger from '@/helpers/logger';
 
 const prompts = [
   '💭 What\u2019s your biggest wish this week?',
@@ -105,7 +106,7 @@ export default function JournalPage() {
             }
             await AsyncStorage.removeItem('offlineJournalEntries');
           } catch (err) {
-            console.warn('Failed to sync offline journal entries', err);
+            logger.warn('Failed to sync offline journal entries', err);
           }
         }
         setEntries(loaded);
@@ -152,7 +153,7 @@ export default function JournalPage() {
         timestamp: serverTimestamp(),
       });
     } catch (err) {
-      console.warn('Failed to save entry online', err);
+      logger.warn('Failed to save entry online', err);
       const offlineRaw = await AsyncStorage.getItem('offlineJournalEntries');
       const offline = offlineRaw ? JSON.parse(offlineRaw) : [];
       offline.push({ ...data, timestamp: Date.now() });
@@ -192,7 +193,7 @@ export default function JournalPage() {
       });
       Alert.alert('Wish posted!');
     } catch (err) {
-      console.error('Failed to share as wish', err);
+      logger.error('Failed to share as wish', err);
     }
   };
 

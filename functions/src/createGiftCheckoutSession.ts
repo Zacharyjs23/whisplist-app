@@ -1,6 +1,7 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
+import * as logger from '../../helpers/logger';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: '2022-11-15',
@@ -60,7 +61,7 @@ export const createGiftCheckoutSession = functions.https.onRequest(
 
       res.json({ url: session.url });
     } catch (err) {
-      console.error('Error creating gift checkout session', err);
+      logger.error('Error creating gift checkout session', err);
       res.status(500).send('Internal error');
     }
   },

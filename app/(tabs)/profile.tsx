@@ -34,6 +34,7 @@ import {
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useSavedWishes } from '@/contexts/SavedWishesContext';
+import * as logger from '@/helpers/logger';
 
 export default function Page() {
   const { user, profile, signOut } = useAuth();
@@ -136,7 +137,7 @@ export default function Page() {
       setPostedList((prev) => [...prev, ...more]);
       setError(null);
     } catch (err) {
-      console.warn('Failed to load more posts', err);
+      logger.warn('Failed to load more posts', err);
       setError("Couldn't load data. Check your connection and try again.");
     }
   };
@@ -197,12 +198,12 @@ export default function Page() {
             );
             comments += cSnap.size;
           } catch (err) {
-            console.error('Failed to count comments', err);
+            logger.error('Failed to count comments', err);
           }
         }
         setBoostImpact({ likes, comments });
       } catch (err) {
-        console.warn('Failed to load profile wishes', err);
+        logger.warn('Failed to load profile wishes', err);
         setError("Couldn't load data. Check your connection and try again.");
       }
     };

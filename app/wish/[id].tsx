@@ -63,6 +63,7 @@ import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
 import { trackEvent } from '@/helpers/analytics';
+import * as logger from '@/helpers/logger';
 
 const baseTypeInfo = {
   wish: { emoji: '💭', color: '#333333' },
@@ -203,13 +204,13 @@ export default function Page() {
             const snap = await getDoc(doc(db, 'users', data.userId));
             setOwner(snap.exists() ? snap.data() : null);
           } catch (err) {
-            console.warn('Failed to fetch wish owner', err);
+            logger.warn('Failed to fetch wish owner', err);
             setOwner(null);
           }
         }
       }
     } catch (err) {
-      console.error('❌ Failed to load wish:', err);
+      logger.error('❌ Failed to load wish:', err);
       setError('Failed to load wish');
     } finally {
       setLoading(false);
@@ -225,7 +226,7 @@ export default function Page() {
         );
         if (snap.exists()) setHasVoted(true);
       } catch (err) {
-        console.warn('Failed to check vote', err);
+        logger.warn('Failed to check vote', err);
       }
     };
     checkVote();
@@ -262,7 +263,7 @@ export default function Page() {
         setLoading(false);
       },
       (err) => {
-        console.error('❌ Failed to load comments:', err);
+        logger.error('❌ Failed to load comments:', err);
         setError('Failed to load comments');
         setLoading(false);
       },
@@ -293,7 +294,7 @@ export default function Page() {
                   : false,
               }));
             } catch (err) {
-              console.warn('Failed to fetch user status', err);
+              logger.warn('Failed to fetch user status', err);
               setPublicStatus((prev) => ({ ...prev, [uid]: false }));
             }
           }
@@ -347,7 +348,7 @@ export default function Page() {
       setPlayer(p);
       setIsPlaying(true);
     } catch (err) {
-      console.error('❌ Failed to play audio:', err);
+      logger.error('❌ Failed to play audio:', err);
     }
   }, [player, isPlaying, wish]);
 
@@ -378,7 +379,7 @@ export default function Page() {
           userReactions: {},
         },
         (err) => {
-          console.error('❌ Failed to post comment:', err);
+          logger.error('❌ Failed to post comment:', err);
         },
       );
       setComment('');
@@ -409,7 +410,7 @@ export default function Page() {
           prevEmoji,
           currentUser,
           (err) => {
-            console.error('❌ Failed to update reaction:', err);
+            logger.error('❌ Failed to update reaction:', err);
           },
         );
       } catch {
@@ -441,7 +442,7 @@ export default function Page() {
           });
         }
       } catch (err) {
-        console.error('❌ Failed to submit report:', err);
+        logger.error('❌ Failed to submit report:', err);
       } finally {
         setReportVisible(false);
         setReportTarget(null);
@@ -468,7 +469,7 @@ export default function Page() {
         setHasVoted(true);
         await fetchWish();
       } catch (err) {
-        console.error('❌ Failed to vote:', err);
+        logger.error('❌ Failed to vote:', err);
       }
     },
     [fetchWish, hasVoted, wish, user],
@@ -481,7 +482,7 @@ export default function Page() {
         await setFulfillmentLink(id as string, link.trim());
         await fetchWish();
       } catch (err) {
-        console.error('❌ Failed to fulfill wish:', err);
+        logger.error('❌ Failed to fulfill wish:', err);
       }
     },
     [fetchWish, id],
@@ -1092,7 +1093,7 @@ export default function Page() {
                               await WebBrowser.openBrowserAsync(res.url);
                             setShowThanks(true);
                           } catch (err) {
-                            console.error('Failed to checkout', err);
+                            logger.error('Failed to checkout', err);
                           }
                         }
                         setConfirmGift(null);
@@ -1165,7 +1166,7 @@ export default function Page() {
                             },
                           );
                         } catch (err) {
-                          console.error('Failed to save message', err);
+                          logger.error('Failed to save message', err);
                         }
                         setThanksMessage('');
                         setShowThanks(false);

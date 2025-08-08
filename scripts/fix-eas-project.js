@@ -6,6 +6,7 @@
  */
 const fs = require('fs');
 const { execSync } = require('child_process');
+const logger = require('../helpers/logger');
 
 const APP_JSON = 'app.json';
 
@@ -25,7 +26,7 @@ function cleanProjectId() {
       delete appJson.expo.extra.eas;
     }
     fs.writeFileSync(APP_JSON, JSON.stringify(appJson, null, 2));
-    console.log('Removed invalid eas.projectId from app.json');
+    logger.log('Removed invalid eas.projectId from app.json');
   }
 }
 
@@ -33,7 +34,7 @@ function runEasInit() {
   try {
     execSync('eas init', { stdio: 'inherit' });
   } catch (err) {
-    console.error('`eas init` failed:', err.message);
+    logger.error('`eas init` failed:', err.message);
   }
 }
 
