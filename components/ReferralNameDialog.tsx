@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
+import { useTranslation } from '@/contexts/I18nContext';
 
 interface ReferralNameDialogProps {
   visible: boolean;
@@ -27,6 +28,7 @@ export default function ReferralNameDialog({
   const { theme } = useTheme();
   const c = theme;
   const styles = React.useMemo(() => createStyles(c), [c]);
+  const { t } = useTranslation();
 
   const handleSubmit = () => {
     onSubmit(name.trim());
@@ -44,7 +46,7 @@ export default function ReferralNameDialog({
         <View style={styles.box}>
           <TextInput
             style={styles.input}
-            placeholder="Name or handle"
+            placeholder={t('referral.namePlaceholder')}
             placeholderTextColor={c.text + '99'} // theme fix
             value={name}
             onChangeText={setName}
@@ -55,14 +57,14 @@ export default function ReferralNameDialog({
               style={[styles.button, styles.cancel]}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={styles.buttonText}>Cancel</Text>
+              <Text style={styles.buttonText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleSubmit}
               style={styles.button}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={styles.buttonText}>Share</Text>
+              <Text style={styles.buttonText}>{t('referral.share')}</Text>
             </TouchableOpacity>
           </View>
         </View>

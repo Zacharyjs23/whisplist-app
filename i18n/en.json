@@ -1,0 +1,58 @@
+{
+  "report": {
+    "reasonPlaceholder": "Reason for report",
+    "send": "Send Report"
+  },
+  "referral": {
+    "namePlaceholder": "Name or handle",
+    "share": "Share"
+  },
+  "fulfillment": {
+    "linkPlaceholder": "Paste fulfillment link",
+    "invalidLink": "Please enter a valid HTTPS link",
+    "save": "Save"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "ok": "OK"
+  },
+  "auth": {
+    "errorTitle": "Authentication Error"
+  },
+  "wish": {
+    "followed": "You follow this person",
+    "boostExpires": "Boost expires in {{timeLeft}}",
+    "supportedBy": "Supported by {{count}} people",
+    "giftMessageReceived": "You received a gift message",
+    "hoursLeft": "{{hours}}h left",
+    "report": "Report"
+  },
+  "onboarding": {
+    "slide1Title": "Post anonymously",
+    "slide2Title": "Hear others",
+    "slide3Title": "Be fulfilled",
+    "slide4Title": "Why It Matters",
+    "slide4Subtitle": "WhispList promises a caring space to share dreams and worries without judgement.",
+    "skip": "Skip",
+    "skipOnboarding": "Skip Onboarding",
+    "agree1": "I agree to the",
+    "terms": " Terms of Service ",
+    "and": "and",
+    "privacy": " Privacy Policy",
+    "getStarted": "Get Started"
+  },
+  "tabs": {
+    "home": "Home",
+    "feed": "Feed",
+    "journal": "Journal",
+    "profile": "Profile",
+    "inbox": "Inbox",
+    "settings": "Settings"
+  },
+  "notFound": {
+    "title": "404 - Not Found"
+  },
+  "inbox": {
+    "justNow": "just now"
+  }
+}

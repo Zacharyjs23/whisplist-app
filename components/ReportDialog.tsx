@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
+import { useTranslation } from '@/contexts/I18nContext';
 
 interface ReportDialogProps {
   visible: boolean;
@@ -25,6 +26,7 @@ export default function ReportDialog({
   const { theme } = useTheme();
   const c = theme;
   const styles = React.useMemo(() => createStyles(c), [c]);
+  const { t } = useTranslation();
 
   const handleSubmit = () => {
     onSubmit(reason.trim());
@@ -42,7 +44,7 @@ export default function ReportDialog({
         <View style={styles.box}>
           <TextInput
             style={styles.input}
-            placeholder="Reason for report"
+            placeholder={t('report.reasonPlaceholder')}
             placeholderTextColor={c.text + '99'} // theme fix
             value={reason}
             onChangeText={setReason}
@@ -53,14 +55,14 @@ export default function ReportDialog({
               style={[styles.button, styles.cancel]}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={styles.buttonText}>Cancel</Text>
+              <Text style={styles.buttonText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleSubmit}
               style={styles.button}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={styles.buttonText}>Send Report</Text>
+              <Text style={styles.buttonText}>{t('report.send')}</Text>
             </TouchableOpacity>
           </View>
         </View>

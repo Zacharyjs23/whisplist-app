@@ -11,6 +11,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
 import { normalizeAndValidateUrl } from '@/helpers/url';
 import { trackEvent } from '@/helpers/analytics';
+import { useTranslation } from '@/contexts/I18nContext';
 
 interface FulfillmentLinkDialogProps {
   visible: boolean;
@@ -29,6 +30,7 @@ export default function FulfillmentLinkDialog({
   const [error, setError] = useState('');
   const { theme } = useTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (visible) {
@@ -39,7 +41,7 @@ export default function FulfillmentLinkDialog({
   const handleSubmit = () => {
     const cleaned = normalizeAndValidateUrl(link);
     if (!cleaned) {
-      setError('Please enter a valid HTTPS link');
+      setError(t('fulfillment.invalidLink'));
       return;
     }
     setError('');
@@ -59,7 +61,7 @@ export default function FulfillmentLinkDialog({
         <View style={styles.box}>
           <TextInput
             style={styles.input}
-            placeholder="Paste fulfillment link"
+            placeholder={t('fulfillment.linkPlaceholder')}
             placeholderTextColor={theme.text + '99'} // theme fix
             value={link}
             onChangeText={setLink}
@@ -71,14 +73,14 @@ export default function FulfillmentLinkDialog({
               style={[styles.button, styles.cancel]}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={styles.buttonText}>Cancel</Text>
+              <Text style={styles.buttonText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleSubmit}
               style={styles.button}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={styles.buttonText}>Save</Text>
+              <Text style={styles.buttonText}>{t('fulfillment.save')}</Text>
             </TouchableOpacity>
           </View>
         </View>

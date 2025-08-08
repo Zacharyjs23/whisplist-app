@@ -3,6 +3,7 @@ import { Alert, SafeAreaView, StatusBar, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTranslation } from '@/contexts/I18nContext';
 import usePushNotifications from '@/hooks/usePushNotifications';
 import useDailyQuote from '@/hooks/useDailyQuote';
 
@@ -11,6 +12,7 @@ export const AppContainer: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const { theme } = useTheme();
   const { authError, setAuthError } = useAuth();
+  const { t } = useTranslation();
   const backgroundColor = theme.background;
   const barStyle =
     theme.name === 'dark' || theme.name === 'neon'
@@ -21,11 +23,11 @@ export const AppContainer: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     if (authError) {
-      Alert.alert('Authentication Error', authError, [
-        { text: 'OK', onPress: () => setAuthError(null) },
+      Alert.alert(t('auth.errorTitle'), authError, [
+        { text: t('common.ok'), onPress: () => setAuthError(null) },
       ]);
     }
-  }, [authError, setAuthError]);
+  }, [authError, setAuthError, t]);
 
   return (
     <SafeAreaProvider>

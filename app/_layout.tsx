@@ -2,6 +2,7 @@ import { AppContainer } from '@/components/AppContainer';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { SavedWishesProvider } from '@/contexts/SavedWishesContext';
+import { I18nProvider } from '@/contexts/I18nContext';
 import * as logger from '@/helpers/logger';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import React, { useEffect } from 'react';
@@ -34,13 +35,15 @@ function LayoutInner() {
 export default function Layout() {
   return (
     <AuthProvider>
-      <ThemeProvider>
-        <SavedWishesProvider>
-          <AppContainer>
-            <LayoutInner />
-          </AppContainer>
-        </SavedWishesProvider>
-      </ThemeProvider>
+      <I18nProvider>
+        <ThemeProvider>
+          <SavedWishesProvider>
+            <AppContainer>
+              <LayoutInner />
+            </AppContainer>
+          </SavedWishesProvider>
+        </ThemeProvider>
+      </I18nProvider>
     </AuthProvider>
   );
 }

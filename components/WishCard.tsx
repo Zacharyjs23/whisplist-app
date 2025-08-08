@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Animated,
   Share,
+  View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
@@ -20,6 +21,7 @@ import { formatTimeLeft } from '../helpers/time';
 import { useAuth } from '@/contexts/AuthContext';
 import { ReactionBar, ReactionKey } from './ReactionBar';
 import * as logger from '@/helpers/logger';
+import { useTranslation } from '@/contexts/I18nContext';
 
 const typeColors: Record<string, string> = {
   dream: '#312e81',
@@ -49,6 +51,7 @@ export const WishCard: React.FC<{
   const [timeLeft, setTimeLeft] = useState('');
   const [userReaction, setUserReaction] = useState<ReactionKey | null>(null);
   const glowAnim = useRef(new Animated.Value(0)).current;
+  const { t } = useTranslation();
 
   const isBoosted =
     wish.boostedUntil &&
@@ -179,9 +182,7 @@ export const WishCard: React.FC<{
           </TouchableOpacity>
         )}
         {followed && (
-          <Text style={[styles.followTag, { color: theme.tint }]}>
-            👥 You follow this person
-          </Text>
+          <Text style={[styles.followTag, { color: theme.tint }]}>👥 {t('wish.followed')}</Text>
         )}
         <Text style={[styles.category, { color: theme.tint }]}>
           #{wish.category}
@@ -209,17 +210,17 @@ export const WishCard: React.FC<{
       </View>
       {isBoosted && (
         <Text style={[styles.boostLabel, { color: theme.tint }]}>
-          ⏳ Boost expires in {timeLeft}
+          ⏳ {t('wish.boostExpires', { timeLeft })}
         </Text>
       )}
       {(wish.giftLink || giftCount > 0) && (
         <Text style={[styles.giftInfo, { color: theme.tint }]}>
-          🎁 Supported by {giftCount} people
+          🎁 {t('wish.supportedBy', { count: giftCount })}
         </Text>
       )}
       {user?.uid === wish.userId && hasGiftMsg && (
         <Text style={[styles.giftInfo, { color: theme.tint }]}>
-          💬 You received a gift message
+          💬 {t('wish.giftMessageReceived')}
         </Text>
       )}
       {wish.expiresAt && (
@@ -229,14 +230,14 @@ export const WishCard: React.FC<{
             const ts = wish.expiresAt.toDate();
             const diff = ts.getTime() - Date.now();
             const hrs = Math.max(0, Math.ceil(diff / 3600000));
-            return `${hrs}h left`;
+            return t('wish.hoursLeft', { hours: hrs });
           })()}
         </Text>
       )}
       {onReport && (
         <TouchableOpacity onPress={onReport} style={styles.reportButton}>
           <Text style={[styles.reactionText, { color: '#f87171' }]}>
-            Report
+            {t('wish.report')}
           </Text>
         </TouchableOpacity>
       )}
