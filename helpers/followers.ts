@@ -29,16 +29,26 @@ function chunkArray<T>(items: T[], size: number): T[][] {
 export async function followUser(currentUser: string, targetUser: string) {
   const followerRef = doc(db, 'users', targetUser, 'followers', currentUser);
   const followingRef = doc(db, 'users', currentUser, 'following', targetUser);
-  await Promise.all([
-    setDoc(followerRef, { createdAt: serverTimestamp() }),
-    setDoc(followingRef, { createdAt: serverTimestamp() }),
-  ]);
+  try {
+    await Promise.all([
+      setDoc(followerRef, { createdAt: serverTimestamp() }),
+      setDoc(followingRef, { createdAt: serverTimestamp() }),
+    ]);
+  } catch (error) {
+    console.error('Error following user', error);
+    throw error;
+  }
 }
 
 export async function unfollowUser(currentUser: string, targetUser: string) {
   const followerRef = doc(db, 'users', targetUser, 'followers', currentUser);
   const followingRef = doc(db, 'users', currentUser, 'following', targetUser);
-  await Promise.all([deleteDoc(followerRef), deleteDoc(followingRef)]);
+  try {
+    await Promise.all([deleteDoc(followerRef), deleteDoc(followingRef)]);
+  } catch (error) {
+    console.error('Error unfollowing user', error);
+    throw error;
+  }
 }
 
 export async function getFollowingIds(userId: string): Promise<string[]> {
@@ -50,65 +60,89 @@ export async function getFollowingIds(userId: string): Promise<string[]> {
 export function listenFollowingWishes(
   userId: string,
   cb: (wishes: Wish[]) => void,
+  onError?: (err: unknown) => void,
 ) {
   const unsubs: (() => void)[] = [];
-  getFollowingIds(userId).then((ids) => {
-    if (ids.length === 0) {
-      cb([]);
-      return;
-    }
-    // Firestore `in` queries can include at most 10 IDs, so we query each chunk separately.
-    const chunks = chunkArray(ids, 10);
-    const chunkResults: Wish[][] = chunks.map(() => []);
-    chunks.forEach((chunk, index) => {
-      const q = query(
-        collection(db, 'wishes'),
-        where('userId', 'in', chunk),
-        orderBy('timestamp', 'desc'),
-      );
-      const unsub = onSnapshot(q, (snap) => {
-        chunkResults[index] = snap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as Omit<Wish, 'id'>),
-        })) as Wish[];
-        const merged = chunkResults
-          .flat()
-          .sort((a, b) => (b as any).timestamp - (a as any).timestamp);
-        cb(merged as Wish[]);
+  (async () => {
+    try {
+      const ids = await getFollowingIds(userId);
+      if (ids.length === 0) {
+        cb([]);
+        return;
+      }
+      // Firestore `in` queries can include at most 10 IDs, so we query each chunk separately.
+      const chunks = chunkArray(ids, 10);
+      const chunkResults: Wish[][] = chunks.map(() => []);
+      chunks.forEach((chunk, index) => {
+        const q = query(
+          collection(db, 'wishes'),
+          where('userId', 'in', chunk),
+          orderBy('timestamp', 'desc'),
+        );
+        const unsub = onSnapshot(
+          q,
+          (snap) => {
+            try {
+              chunkResults[index] = snap.docs.map((d) => ({
+                id: d.id,
+                ...(d.data() as Omit<Wish, 'id'>),
+              })) as Wish[];
+              const merged = chunkResults
+                .flat()
+                .sort((a, b) => (b as any).timestamp - (a as any).timestamp);
+              cb(merged as Wish[]);
+            } catch (err) {
+              console.error('Error processing following wishes snapshot', err);
+              onError?.(err);
+            }
+          },
+          (err) => {
+            console.error('Error listening to following wishes', err);
+            onError?.(err);
+          },
+        );
+        unsubs.push(unsub);
       });
-      unsubs.push(unsub);
-    });
-  });
+    } catch (err) {
+      console.error('Error fetching following ids', err);
+      onError?.(err);
+    }
+  })();
   return () => {
     unsubs.forEach((u) => u());
   };
 }
 
 export async function getFollowingWishes(userId: string): Promise<Wish[]> {
-  const ids = await getFollowingIds(userId);
-  if (ids.length === 0) return [];
-  // Firestore `in` queries are limited to 10 IDs; fetch each chunk and merge results.
-  const chunks = chunkArray(ids, 10);
-  const snaps = await Promise.all(
-    chunks.map((chunk) =>
-      getDocs(
-        query(
-          collection(db, 'wishes'),
-          where('userId', 'in', chunk),
-          orderBy('timestamp', 'desc'),
-          limit(20),
+  try {
+    const ids = await getFollowingIds(userId);
+    if (ids.length === 0) return [];
+    // Firestore `in` queries are limited to 10 IDs; fetch each chunk and merge results.
+    const chunks = chunkArray(ids, 10);
+    const snaps = await Promise.all(
+      chunks.map((chunk) =>
+        getDocs(
+          query(
+            collection(db, 'wishes'),
+            where('userId', 'in', chunk),
+            orderBy('timestamp', 'desc'),
+            limit(20),
+          ),
         ),
       ),
-    ),
-  );
-  const wishes = snaps.flatMap((snap) =>
-    snap.docs.map((d) => ({
-      id: d.id,
-      ...(d.data() as Omit<Wish, 'id'>),
-    })),
-  ) as Wish[];
-  return wishes
-    .sort((a, b) => (b as any).timestamp - (a as any).timestamp)
-    .slice(0, 20);
+    );
+    const wishes = snaps.flatMap((snap) =>
+      snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<Wish, 'id'>),
+      })),
+    ) as Wish[];
+    return wishes
+      .sort((a, b) => (b as any).timestamp - (a as any).timestamp)
+      .slice(0, 20);
+  } catch (error) {
+    console.error('Error getting following wishes', error);
+    throw error;
+  }
 }
 
