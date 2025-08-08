@@ -1,14 +1,22 @@
 {
   "name": "whisplist-functions",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "lib/index.js",
   "engines": {
     "node": "18"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node lib/index.js"
   },
   "dependencies": {
     "firebase-admin": "^11.10.1",
     "firebase-functions": "^4.4.1",
     "expo-server-sdk": "^4.2.0",
     "stripe": "^11.17.0"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
   }
 }
