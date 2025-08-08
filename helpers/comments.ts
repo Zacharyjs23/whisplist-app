@@ -9,6 +9,7 @@ import {
   getDoc,
   updateDoc,
   getDocs,
+  deleteDoc,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -82,6 +83,39 @@ export async function addComment<
     });
   } catch (err) {
     logger.error('Error adding comment', err);
+    onError?.(err);
+    throw err;
+  }
+}
+
+export async function updateComment<
+  Extra extends Record<string, unknown> = Record<string, unknown>,
+>(
+  wishId: string,
+  commentId: string,
+  data: Partial<Omit<Comment<Extra>, 'id'>>,
+  onError?: (err: unknown) => void,
+) {
+  try {
+    const ref = doc(db, 'wishes', wishId, 'comments', commentId);
+    return await updateDoc(ref, data);
+  } catch (err) {
+    logger.error('Error updating comment', err);
+    onError?.(err);
+    throw err;
+  }
+}
+
+export async function deleteComment(
+  wishId: string,
+  commentId: string,
+  onError?: (err: unknown) => void,
+) {
+  try {
+    const ref = doc(db, 'wishes', wishId, 'comments', commentId);
+    return await deleteDoc(ref);
+  } catch (err) {
+    logger.error('Error deleting comment', err);
     onError?.(err);
     throw err;
   }

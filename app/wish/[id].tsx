@@ -14,6 +14,8 @@ import {
 import {
   listenWishComments,
   addComment,
+  updateComment,
+  deleteComment,
   updateCommentReaction,
   type Comment,
 } from '../../helpers/comments';
@@ -104,6 +106,8 @@ export default function Page() {
   const t: WishType = (wish?.type as WishType) || 'wish';
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [reportTarget, setReportTarget] = useState<{
     type: 'wish' | 'comment';
@@ -425,6 +429,39 @@ export default function Page() {
     [comments, id, user],
   );
 
+  const handleSaveComment = useCallback(async () => {
+    if (!editingCommentId) return;
+    try {
+      await updateComment(id as string, editingCommentId, {
+        text: editingCommentText,
+      });
+      setEditingCommentId(null);
+      setEditingCommentText('');
+    } catch (err) {
+      logger.error('❌ Failed to update comment:', err);
+    }
+  }, [editingCommentId, editingCommentText, id]);
+
+  const handleDeleteComment = useCallback(
+    (commentId: string) => {
+      Alert.alert('Delete Comment', 'Are you sure?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteComment(id as string, commentId);
+            } catch (err) {
+              logger.error('❌ Failed to delete comment:', err);
+            }
+          },
+        },
+      ]);
+    },
+    [id],
+  );
+
   const handleReport = useCallback(
     async (reason: string) => {
       if (!reportTarget) return;
@@ -559,6 +596,7 @@ export default function Page() {
       const replies = isActiveWish
         ? comments.filter((c) => c.parentId === item.id)
         : [];
+      const isEditing = editingCommentId === item.id;
 
       return (
         <View key={item.id}>
@@ -600,61 +638,123 @@ export default function Page() {
                 (author)
               </Text>
             )}
-            <Text style={[styles.comment, { color: theme.text }]}>
-              {item.text}
-            </Text>
-            <Text style={[styles.timestamp, { color: theme.text + '99' }]}>
-              {' '}
-              {/* theme fix */}
-              {item.timestamp?.seconds
-                ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), {
-                    addSuffix: true,
-                  })
-                : 'Just now'}
-            </Text>
-
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginTop: 6,
-              }}
-            >
-              {emojiOptions.map((emoji) => (
-                <TouchableOpacity
-                  key={emoji}
-                  onPress={() => handleReact(item.id, emoji)}
+            {isEditing ? (
+              <>
+                <TextInput
+                  value={editingCommentText}
+                  onChangeText={setEditingCommentText}
+                  style={[
+                    styles.comment,
+                    {
+                      color: theme.text,
+                      borderWidth: 1,
+                      borderColor: theme.text + '33',
+                      borderRadius: 6,
+                      padding: 4,
+                    },
+                  ]}
+                  multiline
+                />
+                <View
                   style={{
-                    marginRight: 8,
-                    padding: 6,
-                    borderRadius: 6,
-                    opacity: userReaction === emoji ? 1 : 0.4,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginTop: 6,
                   }}
                 >
-                  <Text style={{ fontSize: 20 }}>
-                    {emoji} {item.reactions?.[emoji] || 0}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-              {isActiveWish && (
-                <TouchableOpacity
-                  onPress={() => setReplyTo(item.id)}
-                  style={{ marginLeft: 8 }}
+                  <TouchableOpacity onPress={handleSaveComment}>
+                    <Text style={{ color: theme.tint }}>Save</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setEditingCommentId(null);
+                      setEditingCommentText('');
+                    }}
+                    style={{ marginLeft: 8 }}
+                  >
+                    <Text style={{ color: '#f87171' }}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={[styles.comment, { color: theme.text }]}> 
+                  {item.text}
+                </Text>
+                <Text style={[styles.timestamp, { color: theme.text + '99' }]}> 
+                  {' '}
+                  {/* theme fix */}
+                  {item.timestamp?.seconds
+                    ? formatDistanceToNow(
+                        new Date(item.timestamp.seconds * 1000),
+                        { addSuffix: true },
+                      )
+                    : 'Just now'}
+                </Text>
+
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginTop: 6,
+                  }}
                 >
-                  <Text style={{ color: '#a78bfa' }}>Reply</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                onLongPress={() => {
-                  setReportTarget({ type: 'comment', id: item.id });
-                  setReportVisible(true);
-                }}
-                style={{ marginLeft: 8 }}
-                hitSlop={HIT_SLOP}
-              >
-                <Text style={{ color: '#f87171' }}>🚩</Text>
-              </TouchableOpacity>
-            </View>
+                  {emojiOptions.map((emoji) => (
+                    <TouchableOpacity
+                      key={emoji}
+                      onPress={() => handleReact(item.id, emoji)}
+                      style={{
+                        marginRight: 8,
+                        padding: 6,
+                        borderRadius: 6,
+                        opacity: userReaction === emoji ? 1 : 0.4,
+                      }}
+                    >
+                      <Text style={{ fontSize: 20 }}>
+                        {emoji} {item.reactions?.[emoji] || 0}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                  {isActiveWish && (
+                    <TouchableOpacity
+                      onPress={() => setReplyTo(item.id)}
+                      style={{ marginLeft: 8 }}
+                    >
+                      <Text style={{ color: '#a78bfa' }}>Reply</Text>
+                    </TouchableOpacity>
+                  )}
+                  {item.userId === user?.uid && (
+                    <>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setEditingCommentId(item.id);
+                          setEditingCommentText(item.text);
+                        }}
+                        style={{ marginLeft: 8 }}
+                      >
+                        <Text style={{ color: theme.tint }}>Edit</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => handleDeleteComment(item.id)}
+                        style={{ marginLeft: 8 }}
+                      >
+                        <Text style={{ color: '#f87171' }}>Delete</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                  <TouchableOpacity
+                    onLongPress={() => {
+                      setReportTarget({ type: 'comment', id: item.id });
+                      setReportVisible(true);
+                    }}
+                    style={{ marginLeft: 8 }}
+                    hitSlop={HIT_SLOP}
+                  >
+                    <Text style={{ color: '#f87171' }}>🚩</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </Animated.View>
           {replies.map((r) => renderCommentItem(r, level + 1))}
         </View>
@@ -671,6 +771,10 @@ export default function Page() {
       theme.tint,
       verifiedStatus,
       wish?.userId,
+      editingCommentId,
+      editingCommentText,
+      handleSaveComment,
+      handleDeleteComment,
     ],
   );
 
