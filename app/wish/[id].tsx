@@ -7,12 +7,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { createPlayer, type AudioPlayer } from 'expo-audio';
 import {
   getWish,
+  setFulfillmentLink,
+  createGiftCheckout,
+} from '../../helpers/wishes';
+import {
   listenWishComments,
   addComment,
   updateCommentReaction,
-  setFulfillmentLink,
-  createGiftCheckout,
-} from '../../helpers/firestore';
+  type Comment,
+} from '../../helpers/comments';
 
 import {
   addDoc,
@@ -77,20 +80,6 @@ const formatTimeLeft = (d: Date) => {
   const m = Math.floor((ms % 3_600_000) / 60_000);
   return `${h}h ${m}m`;
 };
-
-interface Comment {
-  id: string;
-  text: string;
-  userId?: string;
-  displayName?: string;
-  photoURL?: string;
-  isAnonymous?: boolean;
-  timestamp?: any;
-  parentId?: string;
-  reactions?: Record<string, number>;
-  userReactions?: Record<string, string>;
-  nickname?: string;
-}
 
 const emojiOptions = ['❤️', '😂', '😢', '👍'];
 // Approximate height of a single comment item including margins

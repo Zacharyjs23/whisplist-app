@@ -12,7 +12,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useSavedWishes } from '@/contexts/SavedWishesContext';
 import type { Wish } from '../types/Wish';
-import { updateWishReaction } from '../helpers/firestore';
+import { updateWishReaction } from '../helpers/wishes';
 import { db } from '../firebase';
 import { collection, getDocs, doc, onSnapshot } from 'firebase/firestore';
 import { formatTimeLeft } from '../helpers/time';

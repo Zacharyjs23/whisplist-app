@@ -16,7 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import * as Linking from 'expo-linking';
-import { getWish, boostWish } from '../../helpers/firestore';
+import { getWish, boostWish } from '../../helpers/wishes';
 import { formatTimeLeft } from '../../helpers/time';
 
 export default function BoostPage() {

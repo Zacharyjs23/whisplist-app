@@ -20,11 +20,11 @@ import ReportDialog from '../../components/ReportDialog';
 import WishCardComponent from '../../components/WishCard';
 import {
   listenTrendingWishes,
-  getFollowingIds,
   listenBoostedWishes,
   getTopBoostedCreators,
   getWhispOfTheDay,
-} from '../../helpers/firestore';
+} from '../../helpers/wishes';
+import { getFollowingIds } from '../../helpers/followers';
 import {
   addDoc,
   collection,

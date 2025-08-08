@@ -25,7 +25,7 @@ import * as Linking from 'expo-linking';
 import { formatDistanceToNow } from 'date-fns';
 import { formatTimeLeft } from '../../helpers/time';
 import { db } from '../../firebase';
-import { followUser, unfollowUser } from '../../helpers/firestore';
+import { followUser, unfollowUser } from '../../helpers/followers';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
