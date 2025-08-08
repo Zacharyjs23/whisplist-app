@@ -50,6 +50,8 @@ interface AuthContextValue {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
+  authError: string | null;
+  setAuthError: (err: string | null) => void;
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -64,6 +66,8 @@ const AuthContext = createContext<AuthContextValue>({
   user: null,
   profile: null,
   loading: true,
+  authError: null,
+  setAuthError: () => {},
   signUp: async () => {},
   signIn: async () => {},
   signInWithGoogle: async () => {},
@@ -82,6 +86,7 @@ export const AuthProvider = ({
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const [, , promptAsync] = Google.useIdTokenAuthRequest({
     clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
@@ -150,7 +155,9 @@ export const AuthProvider = ({
             boostCredits: 0,
             createdAt: serverTimestamp() as unknown as Timestamp,
             developerMode: false,
-            acceptedTermsAt: accepted ? (ts as unknown as Timestamp) : undefined,
+            acceptedTermsAt: accepted
+              ? (ts as unknown as Timestamp)
+              : undefined,
           };
           await setDoc(ref, data);
           try {
@@ -194,7 +201,8 @@ export const AuthProvider = ({
     try {
       await createUserWithEmailAndPassword(auth, email, password);
     } catch (err) {
-      console.error('Failed to sign up', err);
+      const message = err instanceof Error ? err.message : String(err);
+      setAuthError(message);
       throw err;
     }
   };
@@ -203,7 +211,8 @@ export const AuthProvider = ({
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (err) {
-      console.error('Failed to sign in', err);
+      const message = err instanceof Error ? err.message : String(err);
+      setAuthError(message);
       throw err;
     }
   };
@@ -212,7 +221,8 @@ export const AuthProvider = ({
     try {
       await signInAnonymously(auth);
     } catch (err) {
-      console.error('Failed to sign in anonymously', err);
+      const message = err instanceof Error ? err.message : String(err);
+      setAuthError(message);
     }
   };
 
@@ -226,7 +236,8 @@ export const AuthProvider = ({
         await signInWithCredential(auth, credential);
       }
     } catch (err) {
-      console.error('Failed to sign in with Google', err);
+      const message = err instanceof Error ? err.message : String(err);
+      setAuthError(message);
     }
   };
 
@@ -234,7 +245,8 @@ export const AuthProvider = ({
     try {
       await sendPasswordResetEmail(auth, email);
     } catch (err) {
-      console.error('Failed to reset password', err);
+      const message = err instanceof Error ? err.message : String(err);
+      setAuthError(message);
       throw err;
     }
   };
@@ -243,7 +255,8 @@ export const AuthProvider = ({
     try {
       await fbSignOut(auth);
     } catch (err) {
-      console.error('Failed to sign out', err);
+      const message = err instanceof Error ? err.message : String(err);
+      setAuthError(message);
     }
   };
 
@@ -265,7 +278,8 @@ export const AuthProvider = ({
       if (newData.developerMode === undefined) newData.developerMode = false;
       setProfile(newData);
     } catch (err) {
-      console.error('Failed to update profile', err);
+      const message = err instanceof Error ? err.message : String(err);
+      setAuthError(message);
     }
   };
 
@@ -291,7 +305,8 @@ export const AuthProvider = ({
       }
       return undefined;
     } catch (err) {
-      console.error('Failed to pick image', err);
+      const message = err instanceof Error ? err.message : String(err);
+      setAuthError(message);
       return undefined;
     }
   };
@@ -302,6 +317,8 @@ export const AuthProvider = ({
         user,
         profile,
         loading,
+        authError,
+        setAuthError,
         signUp,
         signIn,
         signInWithGoogle,

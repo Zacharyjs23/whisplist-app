@@ -19,52 +19,48 @@ export default function Page() {
     signInWithGoogle,
     signInAnonymously,
     resetPassword,
+    authError,
+    setAuthError,
   } = useAuth();
   const { theme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'login' | 'signup'>('login');
-  const [error, setError] = useState<string | null>(null);
-
   const handleSubmit = async () => {
+    setAuthError(null);
     try {
       if (mode === 'login') {
         await signIn(email, password);
       } else {
         await signUp(email, password);
       }
-    } catch (err: any) {
-      setError(err.message);
-    }
+    } catch {}
   };
 
   const handleGoogle = async () => {
+    setAuthError(null);
     try {
       await signInWithGoogle();
-    } catch (err: any) {
-      setError(err.message);
-    }
+    } catch {}
   };
 
   const handleGuest = async () => {
+    setAuthError(null);
     try {
       await signInAnonymously();
-    } catch (err: any) {
-      setError(err.message);
-    }
+    } catch {}
   };
 
   const handleResetPassword = async () => {
+    setAuthError(null);
     try {
       if (!email) {
-        setError('Enter your email first');
+        setAuthError('Enter your email first');
         return;
       }
       await resetPassword(email);
       alert('Password reset email sent');
-    } catch (err: any) {
-      setError(err.message);
-    }
+    } catch {}
   };
 
   useEffect(() => {
@@ -78,8 +74,8 @@ export default function Page() {
       <Text style={[styles.title, { color: theme.text }]}>
         {mode === 'login' ? 'Login' : 'Sign Up'}
       </Text>
-      {error && (
-        <Text style={[styles.error, { color: '#f87171' }]}>{error}</Text>
+      {authError && (
+        <Text style={[styles.error, { color: '#f87171' }]}>{authError}</Text>
       )}
       <TextInput
         style={[
