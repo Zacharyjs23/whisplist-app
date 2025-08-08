@@ -181,6 +181,11 @@ export async function likeWish(id: string) {
   return updateDoc(ref, { likes: increment(1) });
 }
 
+export async function updateWish(id: string, data: Partial<Wish>) {
+  const ref = doc(db, 'wishes', id);
+  return updateDoc(ref, data);
+}
+
 export async function updateWishReaction(
   id: string,
   emoji: ReactionType,
