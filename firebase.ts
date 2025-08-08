@@ -55,6 +55,9 @@ isSupported()
       analytics = getAnalytics(app);
     }
   })
-  .catch(() => {});
+  .catch((error) => {
+    console.warn('Failed to initialize analytics:', error);
+    // TODO: optionally surface this via telemetry so failures are trackable
+  });
 
 export { analytics };
