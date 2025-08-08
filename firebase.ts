@@ -9,6 +9,7 @@ import {
 } from 'firebase/auth';
 import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
 import { Platform } from 'react-native';
+import { trackEvent } from '@/helpers/analytics';
 
 const requiredEnvVars = [
   'EXPO_PUBLIC_FIREBASE_API_KEY',
@@ -57,7 +58,18 @@ isSupported()
   })
   .catch((error) => {
     console.warn('Failed to initialize analytics:', error);
-    // TODO: optionally surface this via telemetry so failures are trackable
+    const env = requiredEnvVars.reduce<Record<string, string | undefined>>(
+      (acc, key) => {
+        acc[key] = process.env[key];
+        return acc;
+      },
+      {}
+    );
+    trackEvent('analytics_init_failed', {
+      error: error instanceof Error ? error.message : String(error),
+      platform: Platform.OS,
+      env,
+    });
   });
 
 export { analytics };
