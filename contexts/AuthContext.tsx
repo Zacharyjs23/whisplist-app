@@ -8,47 +8,41 @@ import React, {
 } from 'react';
 import {
   onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signInAnonymously,
-  signOut as fbSignOut,
-  sendPasswordResetEmail,
   User,
-  updateProfile as fbUpdateProfile,
-  GoogleAuthProvider,
-  signInWithCredential,
 } from 'firebase/auth';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
-import { auth, db, storage } from '../firebase';
+import { auth, db } from '../firebase';
 import {
-  collection,
   doc,
   getDoc,
   setDoc,
   serverTimestamp,
   updateDoc,
-  increment,
-  getDocs,
-  query,
-  where,
   Timestamp,
 } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import * as ImagePicker from 'expo-image-picker';
 import type { Profile } from '../types/Profile';
+import { useReferral } from '../hooks/useReferral';
+import {
+  signUp as signUpService,
+  signIn as signInService,
+  signInWithGoogle as signInWithGoogleService,
+  signInAnonymouslyService,
+  resetPassword as resetPasswordService,
+  signOut as signOutService,
+} from '../services/auth';
 
 WebBrowser.maybeCompleteAuthSession();
 
-if (!auth || !db || !storage) {
+if (!auth || !db) {
   console.error('Firebase modules are undefined in AuthContext');
 }
 
 interface AuthContextValue {
   user: User | null;
   profile: Profile | null;
+  setProfile: React.Dispatch<React.SetStateAction<Profile | null>>;
   loading: boolean;
   authError: string | null;
   setAuthError: (err: string | null) => void;
@@ -58,13 +52,12 @@ interface AuthContextValue {
   signInAnonymously: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
-  updateProfile: (data: Partial<Profile>) => Promise<void>;
-  pickImage: () => Promise<string | undefined>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   profile: null,
+  setProfile: () => {},
   loading: true,
   authError: null,
   setAuthError: () => {},
@@ -74,8 +67,6 @@ const AuthContext = createContext<AuthContextValue>({
   signInAnonymously: async () => {},
   resetPassword: async () => {},
   signOut: async () => {},
-  updateProfile: async () => {},
-  pickImage: async () => undefined,
 });
 
 export const AuthProvider = ({
@@ -92,30 +83,17 @@ export const AuthProvider = ({
     clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
   });
+  const { checkInvite, processReferral } = useReferral();
 
   useEffect(() => {
-    const checkInvite = async () => {
-      try {
-        const url = await Linking.getInitialURL();
-        if (url) {
-          const parsed = Linking.parse(url);
-          const ref = parsed.queryParams?.ref as string | undefined;
-          if (ref) {
-            await AsyncStorage.setItem('inviteRef', ref);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to parse initial URL', err);
-      }
-    };
-    checkInvite();
-  }, []);
+    void checkInvite();
+  }, [checkInvite]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (!u) {
         try {
-          await signInAnonymously(auth);
+          await signInAnonymouslyService();
         } catch (err) {
           console.error('Anonymous sign-in failed', err);
           setLoading(false);
@@ -160,33 +138,7 @@ export const AuthProvider = ({
               : undefined,
           };
           await setDoc(ref, data);
-          try {
-            const inviteRef = await AsyncStorage.getItem('inviteRef');
-            if (inviteRef) {
-              const q = query(
-                collection(db, 'users'),
-                where('displayName', '==', inviteRef),
-              );
-              const res = await getDocs(q);
-              if (!res.empty) {
-                const referrerId = res.docs[0].id;
-                await updateDoc(doc(db, 'users', referrerId), {
-                  boostCredits: increment(1),
-                });
-                await updateDoc(ref, { boostCredits: increment(1) });
-                await setDoc(doc(db, 'referrals', u.uid), {
-                  referrerId,
-                  referrerDisplayName:
-                    res.docs[0].data().referralDisplayName ||
-                    res.docs[0].data().displayName,
-                  timestamp: serverTimestamp(),
-                });
-              }
-              await AsyncStorage.removeItem('inviteRef');
-            }
-          } catch (err) {
-            console.error('Failed to process referral', err);
-          }
+          await processReferral(u.uid);
           setProfile(data);
         }
       } else {
@@ -199,7 +151,7 @@ export const AuthProvider = ({
 
   const signUp = async (email: string, password: string) => {
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      await signUpService(email, password);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setAuthError(message);
@@ -209,7 +161,7 @@ export const AuthProvider = ({
 
   const signIn = async (email: string, password: string) => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await signInService(email, password);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setAuthError(message);
@@ -219,7 +171,7 @@ export const AuthProvider = ({
 
   const signInAnonymouslyFn = async () => {
     try {
-      await signInAnonymously(auth);
+      await signInAnonymouslyService();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setAuthError(message);
@@ -228,13 +180,7 @@ export const AuthProvider = ({
 
   const signInWithGoogle = async () => {
     try {
-      const res = await promptAsync();
-      if (res?.type === 'success' && res.authentication?.idToken) {
-        const credential = GoogleAuthProvider.credential(
-          res.authentication.idToken,
-        );
-        await signInWithCredential(auth, credential);
-      }
+      await signInWithGoogleService(promptAsync);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setAuthError(message);
@@ -243,7 +189,7 @@ export const AuthProvider = ({
 
   const resetPassword = async (email: string) => {
     try {
-      await sendPasswordResetEmail(auth, email);
+      await resetPasswordService(email);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setAuthError(message);
@@ -253,61 +199,10 @@ export const AuthProvider = ({
 
   const signOut = async () => {
     try {
-      await fbSignOut(auth);
+      await signOutService();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setAuthError(message);
-    }
-  };
-
-  const updateProfileInfo = async (data: Partial<Profile>) => {
-    try {
-      if (!user) return;
-      const ref = doc(db, 'users', user.uid);
-      await updateDoc(ref, data);
-      if (data.displayName || data.photoURL) {
-        await fbUpdateProfile(user, {
-          displayName: data.displayName ?? user.displayName ?? undefined,
-          photoURL: data.photoURL ?? user.photoURL ?? undefined,
-        });
-      }
-      const snap = await getDoc(ref);
-      const newData = snap.data() as Profile;
-      if (newData.publicProfileEnabled === undefined)
-        newData.publicProfileEnabled = true;
-      if (newData.developerMode === undefined) newData.developerMode = false;
-      setProfile(newData);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setAuthError(message);
-    }
-  };
-
-  const pickImage = async () => {
-    try {
-      const { granted } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!granted) return;
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.7,
-      });
-      if (!result.canceled && result.assets.length > 0) {
-        const asset = result.assets[0];
-        if (!user) return;
-        const storageRef = ref(storage, `profiles/${user.uid}`);
-        const resp = await fetch(asset.uri);
-        const blob = await resp.blob();
-        await uploadBytes(storageRef, blob);
-        const url = await getDownloadURL(storageRef);
-        await updateProfileInfo({ photoURL: url });
-        return url;
-      }
-      return undefined;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setAuthError(message);
-      return undefined;
     }
   };
 
@@ -316,6 +211,7 @@ export const AuthProvider = ({
       value={{
         user,
         profile,
+        setProfile,
         loading,
         authError,
         setAuthError,
@@ -325,8 +221,6 @@ export const AuthProvider = ({
         signInAnonymously: signInAnonymouslyFn,
         resetPassword,
         signOut,
-        updateProfile: updateProfileInfo,
-        pickImage,
       }}
     >
       {children}

@@ -3,6 +3,7 @@ import ThemedButton from '@/components/ThemedButton';
 import { useTheme, ThemeName } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/useProfile';
 // Ionicons is used for the collapsible section chevrons
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -49,7 +50,8 @@ import type { Profile } from '../../types/Profile';
 
 export default function Page() {
   const { theme, setTheme } = useTheme();
-  const { user, profile: profileData, updateProfile } = useAuth();
+  const { user, profile: profileData } = useAuth();
+  const { updateProfile } = useProfile();
   const profile = profileData as (Profile & { isDev?: boolean }) | null;
   const router = useRouter();
 
