@@ -1,12 +1,25 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, Link } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 
 export default function Page() {
   const router = useRouter();
-  const { user, signIn, signUp, signInWithGoogle, signInAnonymously, resetPassword } = useAuth();
+  const {
+    user,
+    signIn,
+    signUp,
+    signInWithGoogle,
+    signInAnonymously,
+    resetPassword,
+  } = useAuth();
   const { theme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -62,17 +75,27 @@ export default function Page() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <Text style={[styles.title, { color: theme.text }]}>{mode === 'login' ? 'Login' : 'Sign Up'}</Text>
-      {error && <Text style={[styles.error, { color: '#f87171' }]}>{error}</Text>}
+      <Text style={[styles.title, { color: theme.text }]}>
+        {mode === 'login' ? 'Login' : 'Sign Up'}
+      </Text>
+      {error && (
+        <Text style={[styles.error, { color: '#f87171' }]}>{error}</Text>
+      )}
       <TextInput
-        style={[styles.input, { backgroundColor: theme.input, color: theme.text }]}
+        style={[
+          styles.input,
+          { backgroundColor: theme.input, color: theme.text },
+        ]}
         placeholder="Email"
         placeholderTextColor={theme.text + '99'} // theme fix
         value={email}
         onChangeText={setEmail}
       />
       <TextInput
-        style={[styles.input, { backgroundColor: theme.input, color: theme.text }]}
+        style={[
+          styles.input,
+          { backgroundColor: theme.input, color: theme.text },
+        ]}
         placeholder="Password"
         placeholderTextColor={theme.text + '99'} // theme fix
         secureTextEntry
@@ -81,35 +104,71 @@ export default function Page() {
       />
       {mode === 'login' && (
         <TouchableOpacity onPress={handleResetPassword} style={styles.link}>
-          <Text style={[styles.linkText, { color: theme.tint }]}>Forgot Password?</Text>
+          <Text style={[styles.linkText, { color: theme.tint }]}>
+            Forgot Password?
+          </Text>
         </TouchableOpacity>
       )}
-      <TouchableOpacity style={[styles.button, { backgroundColor: theme.tint }]} onPress={handleSubmit}>
-        <Text style={[styles.buttonText, { color: theme.text }]}>{mode === 'login' ? 'Login' : 'Sign Up'}</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity onPress={() => setMode(mode === 'login' ? 'signup' : 'login')} style={styles.link}>
-        <Text style={[styles.linkText, { color: theme.tint }]}>
-          {mode === 'login' ? "Don't have an account? Sign Up" : 'Already have an account? Login'}
+      <TouchableOpacity
+        style={[styles.button, { backgroundColor: theme.tint }]}
+        onPress={handleSubmit}
+      >
+        <Text style={[styles.buttonText, { color: theme.text }]}>
+          {mode === 'login' ? 'Login' : 'Sign Up'}
         </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={[styles.altButton, { backgroundColor: theme.input }]} onPress={handleGoogle}>
-        <Text style={[styles.buttonText, { color: theme.text }]}>Continue with Google</Text>
+      <TouchableOpacity
+        onPress={() => setMode(mode === 'login' ? 'signup' : 'login')}
+        style={styles.link}
+      >
+        <Text style={[styles.linkText, { color: theme.tint }]}>
+          {mode === 'login'
+            ? "Don't have an account? Sign Up"
+            : 'Already have an account? Login'}
+        </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={[styles.altButton, { backgroundColor: theme.input }]} onPress={handleGuest}>
-        <Text style={[styles.buttonText, { color: theme.text }]}>Continue as Guest</Text>
+      <TouchableOpacity
+        style={[styles.altButton, { backgroundColor: theme.input }]}
+        onPress={handleGoogle}
+      >
+        <Text style={[styles.buttonText, { color: theme.text }]}>
+          Continue with Google
+        </Text>
       </TouchableOpacity>
 
-      <Text style={{ color: theme.text, fontSize: 12, marginBottom: 10, textAlign: 'center' }}>
-        Google sign in shares your basic profile with WhispList. Guest mode keeps
-        data only on this device.
+      <TouchableOpacity
+        style={[styles.altButton, { backgroundColor: theme.input }]}
+        onPress={handleGuest}
+      >
+        <Text style={[styles.buttonText, { color: theme.text }]}>
+          Continue as Guest
+        </Text>
+      </TouchableOpacity>
+
+      <Text
+        style={{
+          color: theme.text,
+          fontSize: 12,
+          marginBottom: 10,
+          textAlign: 'center',
+        }}
+      >
+        Google sign in shares your basic profile with WhispList. Guest mode
+        keeps data only on this device.
       </Text>
 
       <View style={{ flexDirection: 'row', marginTop: 10 }}>
-        <Link href="/terms" style={[styles.linkText, { color: theme.tint, marginRight: 16 }]}>Terms</Link>
-        <Link href="/privacy" style={[styles.linkText, { color: theme.tint }]}>Privacy</Link>
+        <Link
+          href="/terms"
+          style={[styles.linkText, { color: theme.tint, marginRight: 16 }]}
+        >
+          Terms
+        </Link>
+        <Link href="/privacy" style={[styles.linkText, { color: theme.tint }]}>
+          Privacy
+        </Link>
       </View>
     </View>
   );

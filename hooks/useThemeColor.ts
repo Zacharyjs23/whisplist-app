@@ -8,7 +8,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 
 export function useThemeColor(
   props: Partial<Record<keyof typeof Colors, string>>,
-  colorName: keyof (typeof Colors)['light']
+  colorName: keyof (typeof Colors)['light'],
 ) {
   const { theme } = useTheme();
   const themeName = theme.name as keyof typeof Colors;

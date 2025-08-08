@@ -7,11 +7,16 @@ export type ThemedButtonProps = {
   onPress: () => void | Promise<void>;
   disabled?: boolean;
 } & React.ComponentProps<typeof import('react-native').TouchableOpacity> & {
-  accessibilityLabel?: string;
-  accessibilityRole?: string;
-};
+    accessibilityLabel?: string;
+    accessibilityRole?: string;
+  };
 
-export default function ThemedButton({ title, onPress, disabled, ...rest }: ThemedButtonProps) {
+export default function ThemedButton({
+  title,
+  onPress,
+  disabled,
+  ...rest
+}: ThemedButtonProps) {
   const { theme } = useTheme();
   return (
     <TouchableOpacity

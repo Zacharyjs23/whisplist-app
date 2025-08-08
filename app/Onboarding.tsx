@@ -78,7 +78,7 @@ export default function Page() {
         keyExtractor={(item) => item.key}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-          { useNativeDriver: false }
+          { useNativeDriver: false },
         )}
         renderItem={({ item }) => (
           <View style={[styles.slide, { width }]}>
@@ -97,7 +97,10 @@ export default function Page() {
               {item.title}
             </Text>
             {item.subtitle && (
-              <Text style={[styles.subtitle, { color: theme.text }]}> {item.subtitle}</Text>
+              <Text style={[styles.subtitle, { color: theme.text }]}>
+                {' '}
+                {item.subtitle}
+              </Text>
             )}
           </View>
         )}
@@ -105,11 +108,7 @@ export default function Page() {
       <View style={styles.dotsContainer} pointerEvents="none">
         {slides.map((_, i) => {
           const opacity = scrollX.interpolate({
-            inputRange: [
-              (i - 1) * width,
-              i * width,
-              (i + 1) * width,
-            ],
+            inputRange: [(i - 1) * width, i * width, (i + 1) * width],
             outputRange: [0.3, 1, 0.3],
             extrapolate: 'clamp',
           });
@@ -232,4 +231,3 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
-

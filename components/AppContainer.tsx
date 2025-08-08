@@ -5,10 +5,15 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
 import usePushNotifications from '@/hooks/usePushNotifications';
 
-export const AppContainer: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AppContainer: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const { theme } = useTheme();
   const backgroundColor = theme.background;
-  const barStyle = theme.name === 'dark' || theme.name === 'neon' ? 'light-content' : 'dark-content';
+  const barStyle =
+    theme.name === 'dark' || theme.name === 'neon'
+      ? 'light-content'
+      : 'dark-content';
   usePushNotifications();
 
   useEffect(() => {

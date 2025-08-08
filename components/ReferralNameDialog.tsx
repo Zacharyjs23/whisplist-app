@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { Modal, View, TextInput, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import {
+  Modal,
+  View,
+  TextInput,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+} from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
 
@@ -10,7 +17,12 @@ interface ReferralNameDialogProps {
   onSubmit: (name: string) => void;
 }
 
-export default function ReferralNameDialog({ visible, defaultName = '', onClose, onSubmit }: ReferralNameDialogProps) {
+export default function ReferralNameDialog({
+  visible,
+  defaultName = '',
+  onClose,
+  onSubmit,
+}: ReferralNameDialogProps) {
   const [name, setName] = useState(defaultName);
   const { theme } = useTheme();
   const c = theme;
@@ -22,7 +34,12 @@ export default function ReferralNameDialog({ visible, defaultName = '', onClose,
   };
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       <View style={styles.overlay}>
         <View style={styles.box}>
           <TextInput
@@ -33,10 +50,18 @@ export default function ReferralNameDialog({ visible, defaultName = '', onClose,
             onChangeText={setName}
           />
           <View style={styles.buttons}>
-            <TouchableOpacity onPress={onClose} style={[styles.button, styles.cancel]} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={[styles.button, styles.cancel]}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <Text style={styles.buttonText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleSubmit} style={styles.button} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity
+              onPress={handleSubmit}
+              style={styles.button}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <Text style={styles.buttonText}>Share</Text>
             </TouchableOpacity>
           </View>
@@ -48,11 +73,33 @@ export default function ReferralNameDialog({ visible, defaultName = '', onClose,
 
 const createStyles = (c: (typeof Colors)['light']) =>
   StyleSheet.create({
-    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
-    box: { width: '80%', backgroundColor: c.background, padding: 20, borderRadius: 12 },
-    input: { backgroundColor: c.input, color: c.text, padding: 10, borderRadius: 8, marginBottom: 12 },
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    box: {
+      width: '80%',
+      backgroundColor: c.background,
+      padding: 20,
+      borderRadius: 12,
+    },
+    input: {
+      backgroundColor: c.input,
+      color: c.text,
+      padding: 10,
+      borderRadius: 8,
+      marginBottom: 12,
+    },
     buttons: { flexDirection: 'row', justifyContent: 'flex-end' },
-    button: { paddingVertical: 8, paddingHorizontal: 12, backgroundColor: c.tint, borderRadius: 8, marginLeft: 8 },
+    button: {
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      backgroundColor: c.tint,
+      borderRadius: 8,
+      marginLeft: 8,
+    },
     cancel: { backgroundColor: c.input },
     buttonText: { color: c.text },
   });

@@ -19,14 +19,16 @@ const ThemeContext = createContext<ThemeContextValue>({
   toggleTheme: () => {},
 });
 
-export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const systemTheme = useRNColorScheme() as ThemeName;
   const [themeName, setThemeName] = useState<ThemeName>('light');
 
   useEffect(() => {
     const load = async () => {
       const stored = await AsyncStorage.getItem('appTheme');
-      if (stored && (stored in Colors)) {
+      if (stored && stored in Colors) {
         setThemeName(stored as ThemeName);
       } else if (systemTheme) {
         setThemeName(systemTheme);

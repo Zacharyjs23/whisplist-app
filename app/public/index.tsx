@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  Image,
+  StyleSheet,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -26,7 +33,10 @@ export default function Page() {
   useEffect(() => {
     const load = async () => {
       const snap = await getDocs(
-        query(collection(db, 'users'), where('publicProfileEnabled', '==', true))
+        query(
+          collection(db, 'users'),
+          where('publicProfileEnabled', '==', true),
+        ),
       );
       const list: PublicUser[] = [];
       for (const docSnap of snap.docs) {
@@ -36,8 +46,8 @@ export default function Page() {
             collection(db, 'wishes'),
             where('displayName', '==', data.displayName),
             where('isAnonymous', '==', false),
-            orderBy('timestamp', 'desc')
-          )
+            orderBy('timestamp', 'desc'),
+          ),
         );
         if (wishSnap.empty) continue;
         const lastWish = (wishSnap.docs[0].data() as Wish).text;
@@ -58,7 +68,9 @@ export default function Page() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <Text style={[styles.intro, { color: theme.text }]}>Meet the voices behind WhispList…</Text>
+      <Text style={[styles.intro, { color: theme.text }]}>
+        Meet the voices behind WhispList…
+      </Text>
       <FlatList
         data={users}
         keyExtractor={(item) => item.id}
@@ -74,13 +86,20 @@ export default function Page() {
               <View style={[styles.avatar, { backgroundColor: '#444' }]} />
             )}
             <View style={{ flex: 1 }}>
-              <Text style={[styles.name, { color: theme.text }]}>@{item.displayName}</Text>
+              <Text style={[styles.name, { color: theme.text }]}>
+                @{item.displayName}
+              </Text>
               {item.bio ? (
-                <Text style={[styles.bio, { color: theme.text }]} numberOfLines={2}>
+                <Text
+                  style={[styles.bio, { color: theme.text }]}
+                  numberOfLines={2}
+                >
                   {item.bio}
                 </Text>
               ) : null}
-              <Text style={[styles.wishInfo, { color: theme.text }]}>Last wish: {item.lastWish}</Text>
+              <Text style={[styles.wishInfo, { color: theme.text }]}>
+                Last wish: {item.lastWish}
+              </Text>
             </View>
           </TouchableOpacity>
         )}
@@ -94,7 +113,12 @@ const createStyles = (c: (typeof Colors)['light'] & { name: string }) =>
   StyleSheet.create({
     container: { flex: 1, padding: 20 },
     intro: { marginBottom: 20, fontSize: 16, textAlign: 'center' },
-    card: { flexDirection: 'row', padding: 12, borderRadius: 10, marginBottom: 10 },
+    card: {
+      flexDirection: 'row',
+      padding: 12,
+      borderRadius: 10,
+      marginBottom: 10,
+    },
     avatar: { width: 50, height: 50, borderRadius: 25, marginRight: 10 },
     name: { fontWeight: '600', marginBottom: 4 },
     bio: { fontSize: 12, marginBottom: 4 },

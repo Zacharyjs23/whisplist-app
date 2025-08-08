@@ -19,7 +19,16 @@ import * as Notifications from 'expo-notifications';
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { collection, getDocs, query, where, orderBy, collectionGroup, limit, startAfter } from 'firebase/firestore';
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  collectionGroup,
+  limit,
+  startAfter,
+} from 'firebase/firestore';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useSavedWishes } from '@/contexts/SavedWishesContext';
@@ -40,7 +49,9 @@ export default function Page() {
   >([]);
   const [boostImpact, setBoostImpact] = useState({ likes: 0, comments: 0 });
   const [giftStats, setGiftStats] = useState({ count: 0, total: 0 });
-  const [giftMessages, setGiftMessages] = useState<{ text: string; ts: any }[]>([]);
+  const [giftMessages, setGiftMessages] = useState<{ text: string; ts: any }[]>(
+    [],
+  );
   const [savedList, setSavedList] = useState<Wish[]>([]);
   const [postedList, setPostedList] = useState<Wish[]>([]);
   const [giftedList, setGiftedList] = useState<Wish[]>([]);
@@ -49,8 +60,13 @@ export default function Page() {
   const [dailyReminder, setDailyReminder] = useState(false);
   const [showSparkle, setShowSparkle] = useState(false);
   const [referralCount, setReferralCount] = useState(0);
-  const [followCounts, setFollowCounts] = useState({ following: 0, followers: 0 });
-  const [activeTab, setActiveTab] = useState<'posted' | 'saved' | 'gifts'>('posted');
+  const [followCounts, setFollowCounts] = useState({
+    following: 0,
+    followers: 0,
+  });
+  const [activeTab, setActiveTab] = useState<'posted' | 'saved' | 'gifts'>(
+    'posted',
+  );
   const prevCredits = useRef<number | null>(profile?.boostCredits ?? null);
   const boostAnim = useRef(new Animated.Value(1)).current;
   const { theme } = useTheme();
@@ -103,19 +119,22 @@ export default function Page() {
           where('userId', '==', user.uid),
           orderBy('timestamp', 'desc'),
           startAfter(postLastDoc),
-          limit(20)
-        )
+          limit(20),
+        ),
       );
       setPostLastDoc(snap.docs[snap.docs.length - 1] || postLastDoc);
-      const mapped = snap.docs.map(
-        d => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })
-      ) as Wish[];
+      const mapped = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<Wish, 'id'>),
+      })) as Wish[];
       const more = mapped.filter(
-        w =>
+        (w) =>
           !w.expiresAt ||
-          ((w.expiresAt as any).toDate ? (w.expiresAt as any).toDate() : w.expiresAt) > new Date()
+          ((w.expiresAt as any).toDate
+            ? (w.expiresAt as any).toDate()
+            : w.expiresAt) > new Date(),
       );
-      setPostedList(prev => [...prev, ...more]);
+      setPostedList((prev) => [...prev, ...more]);
       setError(null);
     } catch (err) {
       console.warn('Failed to load more posts', err);
@@ -132,27 +151,33 @@ export default function Page() {
             collection(db, 'wishes'),
             where('userId', '==', user.uid),
             orderBy('timestamp', 'desc'),
-            limit(20)
-          )
+            limit(20),
+          ),
         );
         setPostLastDoc(snap.docs[snap.docs.length - 1] || null);
-        const mapped = snap.docs.map(
-          d => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })
-        ) as Wish[];
+        const mapped = snap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as Omit<Wish, 'id'>),
+        })) as Wish[];
         const list = mapped.filter(
-          w =>
+          (w) =>
             !w.expiresAt ||
-            ((w.expiresAt as any).toDate ? (w.expiresAt as any).toDate() : w.expiresAt) > new Date()
+            ((w.expiresAt as any).toDate
+              ? (w.expiresAt as any).toDate()
+              : w.expiresAt) > new Date(),
         );
         setPostedList(list);
         setError(null);
         const active = list.filter(
-          w => w.boostedUntil && w.boostedUntil.toDate && w.boostedUntil.toDate() > new Date()
+          (w) =>
+            w.boostedUntil &&
+            w.boostedUntil.toDate &&
+            w.boostedUntil.toDate() > new Date(),
         );
         setBoostCount(active.length);
         if (active.length > 0) {
           active.sort((a, b) =>
-            a.boostedUntil.toDate() < b.boostedUntil.toDate() ? 1 : -1
+            a.boostedUntil.toDate() < b.boostedUntil.toDate() ? 1 : -1,
           );
           setLatestBoost(active[0]);
         } else {
@@ -161,7 +186,7 @@ export default function Page() {
         if (list.length > 0) {
           setLatestWish(list[0]);
         }
-        const boosted = list.filter(w => w.boosted != null);
+        const boosted = list.filter((w) => w.boosted != null);
         const totalBoosts = boosted.length;
         if ([5, 10, 20].includes(totalBoosts)) {
           setShowSparkle(true);
@@ -172,7 +197,9 @@ export default function Page() {
         for (const w of boosted) {
           likes += w.likes || 0;
           try {
-            const cSnap = await getDocs(collection(db, 'wishes', w.id, 'comments'));
+            const cSnap = await getDocs(
+              collection(db, 'wishes', w.id, 'comments'),
+            );
             comments += cSnap.size;
           } catch (err) {
             console.error('Failed to count comments', err);
@@ -191,9 +218,17 @@ export default function Page() {
     if (boostCount <= 0) return;
     const anim = Animated.loop(
       Animated.sequence([
-        Animated.timing(boostAnim, { toValue: 1.2, duration: 800, useNativeDriver: true }),
-        Animated.timing(boostAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-      ])
+        Animated.timing(boostAnim, {
+          toValue: 1.2,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(boostAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ]),
     );
     anim.start();
     return () => anim.stop();
@@ -216,7 +251,9 @@ export default function Page() {
   useEffect(() => {
     if (!user?.uid) return;
     const loadReferrals = async () => {
-      const snap = await getDocs(query(collection(db, 'referrals'), where('referrerId', '==', user.uid)));
+      const snap = await getDocs(
+        query(collection(db, 'referrals'), where('referrerId', '==', user.uid)),
+      );
       setReferralCount(snap.size);
     };
     loadReferrals();
@@ -237,12 +274,17 @@ export default function Page() {
   useEffect(() => {
     if (!user?.uid) return;
     const loadGifts = async () => {
-      const snap = await getDocs(query(collectionGroup(db, 'gifts'), where('recipientId', '==', user.uid)));
+      const snap = await getDocs(
+        query(
+          collectionGroup(db, 'gifts'),
+          where('recipientId', '==', user.uid),
+        ),
+      );
       let count = 0;
       let total = 0;
       const msgs: { text: string; ts: any }[] = [];
       const ids = new Set<string>();
-      snap.forEach(d => {
+      snap.forEach((d) => {
         count += 1;
         total += d.data().amount || 0;
         if (d.data().message) {
@@ -257,10 +299,19 @@ export default function Page() {
       if (ids.size > 0) {
         const wishes: Wish[] = [];
         for (const id of Array.from(ids)) {
-          const wSnap = await getDocs(query(collection(db, 'wishes'), where('__name__', '==', id)));
-          wSnap.forEach(d => wishes.push({ id: d.id, ...(d.data() as Omit<Wish,'id'>) } as Wish));
+          const wSnap = await getDocs(
+            query(collection(db, 'wishes'), where('__name__', '==', id)),
+          );
+          wSnap.forEach((d) =>
+            wishes.push({
+              id: d.id,
+              ...(d.data() as Omit<Wish, 'id'>),
+            } as Wish),
+          );
         }
-        wishes.sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0));
+        wishes.sort(
+          (a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0),
+        );
         setGiftedList(wishes);
       }
     };
@@ -274,19 +325,27 @@ export default function Page() {
       if (!user?.uid) return;
       const list: Wish[] = [];
       for (const id of Object.keys(saved)) {
-        const docSnap = await getDocs(query(collection(db, 'wishes'), where('__name__', '==', id)));
-        docSnap.forEach(d => {
+        const docSnap = await getDocs(
+          query(collection(db, 'wishes'), where('__name__', '==', id)),
+        );
+        docSnap.forEach((d) => {
           list.push({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) } as Wish);
         });
       }
-      list.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+      list.sort(
+        (a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0),
+      );
       setSavedList(list);
     };
     load();
   }, [saved, user]);
 
   useEffect(() => {
-    if (profile?.boostCredits != null && prevCredits.current != null && profile.boostCredits > prevCredits.current) {
+    if (
+      profile?.boostCredits != null &&
+      prevCredits.current != null &&
+      profile.boostCredits > prevCredits.current
+    ) {
       setShowSparkle(true);
       setTimeout(() => setShowSparkle(false), 3000);
     }
@@ -294,8 +353,14 @@ export default function Page() {
   }, [profile?.boostCredits]);
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={boostCount > 0 || streakCount >= 7 ? styles.avatarGlow : undefined}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: theme.background }]}
+    >
+      <View
+        style={
+          boostCount > 0 || streakCount >= 7 ? styles.avatarGlow : undefined
+        }
+      >
         {profile?.photoURL ? (
           <Image source={{ uri: profile.photoURL }} style={styles.avatar} />
         ) : (
@@ -303,29 +368,44 @@ export default function Page() {
         )}
       </View>
       {error && (
-        <Text style={{ color: theme.tint, textAlign: 'center', marginBottom: 8 }}>
+        <Text
+          style={{ color: theme.tint, textAlign: 'center', marginBottom: 8 }}
+        >
           {error}
         </Text>
       )}
 
       {activeTab === 'posted' && postedList.length > 0 && (
         <View style={styles.section}>
-          {postedList.map(w => (
-            <TouchableOpacity key={w.id} onPress={() => router.push(`/wish/${w.id}`)} style={{ marginBottom: 6 }}>
+          {postedList.map((w) => (
+            <TouchableOpacity
+              key={w.id}
+              onPress={() => router.push(`/wish/${w.id}`)}
+              style={{ marginBottom: 6 }}
+            >
               <Text style={styles.info}>{w.text}</Text>
             </TouchableOpacity>
           ))}
           {postLastDoc && (
-            <TouchableOpacity onPress={loadMorePosted} style={{ marginTop: 10 }}>
-              <Text style={{ color: theme.tint, textAlign: 'center' }}>Load More</Text>
+            <TouchableOpacity
+              onPress={loadMorePosted}
+              style={{ marginTop: 10 }}
+            >
+              <Text style={{ color: theme.tint, textAlign: 'center' }}>
+                Load More
+              </Text>
             </TouchableOpacity>
           )}
         </View>
       )}
       {activeTab === 'saved' && savedList.length > 0 && (
         <View style={styles.section}>
-          {savedList.map(w => (
-            <TouchableOpacity key={w.id} onPress={() => router.push(`/wish/${w.id}`)} style={{ marginBottom: 6 }}>
+          {savedList.map((w) => (
+            <TouchableOpacity
+              key={w.id}
+              onPress={() => router.push(`/wish/${w.id}`)}
+              style={{ marginBottom: 6 }}
+            >
               <Text style={styles.info}>{w.text}</Text>
             </TouchableOpacity>
           ))}
@@ -333,18 +413,27 @@ export default function Page() {
       )}
       {activeTab === 'gifts' && giftedList.length > 0 && (
         <View style={styles.section}>
-          {giftedList.map(w => (
-            <TouchableOpacity key={w.id} onPress={() => router.push(`/wish/${w.id}`)} style={{ marginBottom: 6 }}>
+          {giftedList.map((w) => (
+            <TouchableOpacity
+              key={w.id}
+              onPress={() => router.push(`/wish/${w.id}`)}
+              style={{ marginBottom: 6 }}
+            >
               <Text style={styles.info}>{w.text}</Text>
             </TouchableOpacity>
           ))}
         </View>
       )}
-      {showSparkle && <ConfettiCannon count={30} origin={{ x: 0, y: 0 }} fadeOut />}
+      {showSparkle && (
+        <ConfettiCannon count={30} origin={{ x: 0, y: 0 }} fadeOut />
+      )}
       <TouchableOpacity onPress={handleImage} style={styles.imageButton}>
         <Text style={styles.imageButtonText}>Change Photo</Text>
       </TouchableOpacity>
-      <Text style={[styles.info, { marginBottom: 10 }]}>You follow {followCounts.following} people · Followed by {followCounts.followers}</Text>
+      <Text style={[styles.info, { marginBottom: 10 }]}>
+        You follow {followCounts.following} people · Followed by{' '}
+        {followCounts.followers}
+      </Text>
 
       <Text style={styles.label}>Display Name</Text>
       <TextInput
@@ -364,8 +453,14 @@ export default function Page() {
         placeholderTextColor={theme.text}
         multiline
       />
-      <TouchableOpacity style={styles.button} onPress={handleSave} disabled={saving}>
-        <Text style={styles.buttonText}>{saving ? 'Saving...' : 'Save Profile'}</Text>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={handleSave}
+        disabled={saving}
+      >
+        <Text style={styles.buttonText}>
+          {saving ? 'Saving...' : 'Save Profile'}
+        </Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[styles.button, { marginBottom: 10 }]}
@@ -375,14 +470,20 @@ export default function Page() {
       </TouchableOpacity>
 
       <View style={styles.tabs}>
-        {(['posted','saved','gifts'] as const).map(t => (
+        {(['posted', 'saved', 'gifts'] as const).map((t) => (
           <TouchableOpacity
             key={t}
             onPress={() => setActiveTab(t)}
             style={[styles.tabItem, activeTab === t && styles.activeTabItem]}
           >
-            <Text style={[styles.tabText, activeTab === t && styles.activeTabText]}>
-              {t === 'posted' ? '📝 Posted' : t === 'saved' ? '💾 Saved' : '💝 Gifts Received'}
+            <Text
+              style={[styles.tabText, activeTab === t && styles.activeTabText]}
+            >
+              {t === 'posted'
+                ? '📝 Posted'
+                : t === 'saved'
+                  ? '💾 Saved'
+                  : '💝 Gifts Received'}
             </Text>
           </TouchableOpacity>
         ))}
@@ -396,14 +497,17 @@ export default function Page() {
           You&apos;ve boosted {boostCount} wishes 🌟
         </Animated.Text>
         <Text style={styles.info}>
-          Your boosts earned ❤️ {boostImpact.likes} likes, 💬 {boostImpact.comments} comments
+          Your boosts earned ❤️ {boostImpact.likes} likes, 💬{' '}
+          {boostImpact.comments} comments
         </Text>
         {latestBoost && (
           <View style={styles.boostPreview}>
             <Text style={styles.previewText} numberOfLines={2}>
               {latestBoost.text}
             </Text>
-            <Text style={[styles.previewText, { color: theme.tint }]}>❤️ {latestBoost.likes}</Text>
+            <Text style={[styles.previewText, { color: theme.tint }]}>
+              ❤️ {latestBoost.likes}
+            </Text>
           </View>
         )}
       </View>
@@ -411,15 +515,22 @@ export default function Page() {
       {streakCount > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📅 Streak</Text>
-          <Text style={styles.info}>🔥 {streakCount}-day streak — you&apos;re on fire!</Text>
-          {streakCount > 3 && <ConfettiCannon count={40} origin={{ x: 0, y: 0 }} fadeOut />}
+          <Text style={styles.info}>
+            🔥 {streakCount}-day streak — you&apos;re on fire!
+          </Text>
+          {streakCount > 3 && (
+            <ConfettiCannon count={40} origin={{ x: 0, y: 0 }} fadeOut />
+          )}
         </View>
       )}
 
       {giftStats.count > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>💝 Gifts</Text>
-          <Text style={styles.info}>You&apos;ve received {giftStats.count} gifts 🎁 (${giftStats.total} total)</Text>
+          <Text style={styles.info}>
+            You&apos;ve received {giftStats.count} gifts 🎁 (${giftStats.total}{' '}
+            total)
+          </Text>
         </View>
       )}
 
@@ -438,7 +549,8 @@ export default function Page() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🎁 Referrals</Text>
           <Text style={styles.info}>
-            You&apos;ve invited {referralCount} people — max {Math.max(0, 4 - referralCount)} more to unlock another reward
+            You&apos;ve invited {referralCount} people — max{' '}
+            {Math.max(0, 4 - referralCount)} more to unlock another reward
           </Text>
         </View>
       )}
@@ -453,8 +565,13 @@ export default function Page() {
               {latestWish.text}
             </Text>
           )}
-          <Text style={styles.info}>Your profile is public. This is what others see.</Text>
-          <TouchableOpacity onPress={handleCopyLink} style={[styles.button, { marginTop: 10 }]}>
+          <Text style={styles.info}>
+            Your profile is public. This is what others see.
+          </Text>
+          <TouchableOpacity
+            onPress={handleCopyLink}
+            style={[styles.button, { marginTop: 10 }]}
+          >
             <Text style={styles.buttonText}>Copy Link</Text>
           </TouchableOpacity>
           {profile.displayName && (
@@ -482,14 +599,21 @@ export default function Page() {
       {dailyPrompt && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🧠 Reflection</Text>
-            <Text style={styles.info}>Yesterday, you said: &apos;{dailyPrompt}&apos;</Text>
+          <Text style={styles.info}>
+            Yesterday, you said: &apos;{dailyPrompt}&apos;
+          </Text>
         </View>
       )}
 
-
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>⏰ Daily Prompt Reminder</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
           <Text style={styles.info}>Remind me to post a wish daily</Text>
           <Switch value={dailyReminder} onValueChange={toggleReminder} />
         </View>
@@ -499,7 +623,9 @@ export default function Page() {
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
       <Text style={styles.info}>Email: {user?.email || 'Anonymous'}</Text>
-      {profile?.isAnonymous && <Text style={styles.info}>Logged in anonymously</Text>}
+      {profile?.isAnonymous && (
+        <Text style={styles.info}>Logged in anonymously</Text>
+      )}
     </ScrollView>
   );
 }
@@ -620,4 +746,3 @@ const createStyles = (c: (typeof Colors)['light'] & { name: string }) =>
       fontWeight: '600',
     },
   });
-

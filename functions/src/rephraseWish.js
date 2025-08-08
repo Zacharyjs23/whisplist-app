@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+const fetch = (...args) =>
+  import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 exports.rephraseWish = functions.https.onRequest(async (req, res) => {
   if (req.method !== 'POST') {

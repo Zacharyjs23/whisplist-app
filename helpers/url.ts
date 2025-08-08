@@ -20,8 +20,8 @@ export function normalizeAndValidateUrl(input: string): string | null {
     const url = new URL(urlStr);
     if (url.protocol !== 'https:') return null;
 
-    const hostOk = allowedHosts.some(h =>
-      url.hostname === h || url.hostname.endsWith(`.${h}`)
+    const hostOk = allowedHosts.some(
+      (h) => url.hostname === h || url.hostname.endsWith(`.${h}`),
     );
     if (!hostOk) return null;
 
