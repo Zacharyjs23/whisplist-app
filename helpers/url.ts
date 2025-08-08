@@ -1,4 +1,4 @@
-const allowedHosts = ['amazon.com', 'gofundme.com', 'venmo.com'];
+import { DEFAULT_ALLOWED_HOSTS } from '../constants/url';
 
 /**
  * Normalize and validate a user-provided URL.
@@ -8,7 +8,10 @@ const allowedHosts = ['amazon.com', 'gofundme.com', 'venmo.com'];
  * @param input Raw user input
  * @returns Normalized URL string or null if invalid
  */
-export function normalizeAndValidateUrl(input: string): string | null {
+export function normalizeAndValidateUrl(
+  input: string,
+  allowedHosts: string[] = DEFAULT_ALLOWED_HOSTS,
+): string | null {
   let urlStr = input.trim();
   if (!urlStr) return null;
 
@@ -20,9 +23,11 @@ export function normalizeAndValidateUrl(input: string): string | null {
     const url = new URL(urlStr);
     if (url.protocol !== 'https:') return null;
 
-    const hostOk = allowedHosts.some(
-      (h) => url.hostname === h || url.hostname.endsWith(`.${h}`),
-    );
+    const hostOk =
+      allowedHosts.length === 0 ||
+      allowedHosts.some(
+        (h) => url.hostname === h || url.hostname.endsWith(`.${h}`),
+      );
     if (!hostOk) return null;
 
     if (url.pathname.length > 1 && url.pathname.endsWith('/')) {
@@ -39,14 +44,22 @@ export function normalizeAndValidateUrl(input: string): string | null {
 }
 
 // Backwards compatibility with older helpers
-export function normalizeLink(link: string): string {
-  return normalizeAndValidateUrl(link) ?? link.trim();
+export function normalizeLink(
+  link: string,
+  allowedHosts: string[] = DEFAULT_ALLOWED_HOSTS,
+): string {
+  return normalizeAndValidateUrl(link, allowedHosts) ?? link.trim();
 }
 
-export function isValidHttpsUrl(link: string, restrictHosts = true): boolean {
-  const normalized = normalizeAndValidateUrl(link);
+export function isValidHttpsUrl(
+  link: string,
+  restrictHosts = true,
+  allowedHosts: string[] = DEFAULT_ALLOWED_HOSTS,
+): boolean {
+  const normalized = normalizeAndValidateUrl(
+    link,
+    restrictHosts ? allowedHosts : [],
+  );
   if (!normalized) return false;
-  if (!restrictHosts) return true;
-  // allowed hosts are already enforced
   return true;
 }
