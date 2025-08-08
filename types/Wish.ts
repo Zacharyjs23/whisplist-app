@@ -1,6 +1,8 @@
 import type { Timestamp } from 'firebase/firestore';
 
-export interface Wish {
+export type ReactionType = 'heart' | 'lightbulb' | 'hug' | 'pray';
+
+export type Wish<Extra extends Record<string, unknown> = {}> = {
   id: string;
   text: string;
   category: string;
@@ -42,16 +44,18 @@ export interface Wish {
   /**
    * Emoji reaction counts
    */
-  reactions?: {
-    heart?: number;
-    lightbulb?: number;
-    hug?: number;
-    pray?: number;
-    [key: string]: number | undefined;
-  };
+  reactions?: Partial<Record<ReactionType, number>>;
   /**
    * Timestamp when this wish should disappear
    */
   expiresAt?: Timestamp | null;
-  [key: string]: any;
-}
+  /**
+   * Timestamp when this wish was created
+   */
+  timestamp?: Timestamp | null;
+  /**
+   * Whether this wish is marked as active
+   */
+  active?: boolean;
+} & Extra;
+

@@ -18,7 +18,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import type { Wish } from '../types/Wish';
+import type { Wish, ReactionType } from '../types/Wish';
 import { getFollowingIds } from './followers';
 
 export interface TopCreator {
@@ -160,7 +160,9 @@ export async function getWhispOfTheDay(): Promise<Wish | null> {
   return filtered[Math.floor(Math.random() * filtered.length)];
 }
 
-export async function addWish(data: Omit<Wish, 'id'>) {
+export async function addWish(
+  data: Omit<Wish, 'id' | 'likes' | 'reactions'>,
+) {
   return addDoc(collection(db, 'wishes'), {
     likes: 0,
     reactions: {
@@ -181,13 +183,13 @@ export async function likeWish(id: string) {
 
 export async function updateWishReaction(
   id: string,
-  emoji: string,
+  emoji: ReactionType,
   user: string,
 ) {
   const wishRef = doc(db, 'wishes', id);
   const reactRef = doc(db, 'reactions', id, 'users', user);
   const snap = await getDoc(reactRef);
-  const prev = snap.exists() ? snap.data().emoji : null;
+  const prev = snap.exists() ? (snap.data().emoji as ReactionType) : null;
   const updates: Record<string, any> = {};
   if (prev) updates[`reactions.${prev}`] = increment(-1);
   if (prev === emoji) {

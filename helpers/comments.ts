@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
-export interface Comment {
+export type Comment<Extra extends Record<string, unknown> = {}> = {
   id: string;
   text: string;
   userId?: string;
@@ -21,16 +21,15 @@ export interface Comment {
   photoURL?: string;
   isAnonymous?: boolean;
   timestamp?: Timestamp | null;
-  parentId?: string;
+  parentId?: string | null;
   reactions?: Record<string, number>;
   userReactions?: Record<string, string>;
   nickname?: string;
-  [key: string]: any;
-}
+} & Extra;
 
-export function listenWishComments(
+export function listenWishComments<Extra extends Record<string, unknown> = {}>(
   wishId: string,
-  cb: (comments: Comment[]) => void,
+  cb: (comments: Comment<Extra>[]) => void,
   onError?: (err: unknown) => void,
 ) {
   try {
@@ -44,9 +43,9 @@ export function listenWishComments(
         try {
           const data = snap.docs.map((d) => ({
             id: d.id,
-            ...(d.data() as Omit<Comment, 'id'>),
+            ...(d.data() as Omit<Comment<Extra>, 'id'>),
           }));
-          cb(data as Comment[]);
+          cb(data as Comment<Extra>[]);
         } catch (err) {
           console.error('Error processing wish comments snapshot', err);
           onError?.(err);
@@ -64,9 +63,9 @@ export function listenWishComments(
   }
 }
 
-export async function addComment(
+export async function addComment<Extra extends Record<string, unknown> = {}>(
   wishId: string,
-  data: Omit<Comment, 'id' | 'timestamp'>,
+  data: Omit<Comment<Extra>, 'id' | 'timestamp'>,
   onError?: (err: unknown) => void,
 ) {
   try {
@@ -81,7 +80,7 @@ export async function addComment(
   }
 }
 
-export async function updateCommentReaction(
+export async function updateCommentReaction<Extra extends Record<string, unknown> = {}>(
   wishId: string,
   commentId: string,
   emoji: string,
@@ -93,7 +92,7 @@ export async function updateCommentReaction(
     const ref = doc(db, 'wishes', wishId, 'comments', commentId);
     const snap = await getDoc(ref);
     if (!snap.exists()) return;
-    const data = snap.data() as Comment;
+    const data = snap.data() as Comment<Extra>;
     const reactions = { ...(data.reactions || {}) } as Record<string, number>;
     const userReactions = { ...(data.userReactions || {}) } as Record<
       string,
@@ -120,15 +119,15 @@ export async function updateCommentReaction(
   }
 }
 
-export async function getWishComments(
+export async function getWishComments<Extra extends Record<string, unknown> = {}>(
   wishId: string,
   onError?: (err: unknown) => void,
-): Promise<Comment[]> {
+): Promise<Comment<Extra>[]> {
   try {
     const snap = await getDocs(collection(db, 'wishes', wishId, 'comments'));
     return snap.docs.map((d) => {
       const data = d.data();
-      const comment: Comment = {
+      const comment = {
         id: d.id,
         text: data.text,
         nickname: data.nickname,
@@ -136,7 +135,7 @@ export async function getWishComments(
         parentId: data.parentId,
         reactions: data.reactions,
         userReactions: data.userReactions,
-      };
+      } as Comment<Extra>;
       return comment;
     });
   } catch (err) {
