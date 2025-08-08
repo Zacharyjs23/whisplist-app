@@ -11,13 +11,14 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '../firebase';
 
-export interface NotificationItem {
-  id: string;
+export interface NotificationDoc {
   type: string;
   message: string;
-  timestamp: Timestamp | null;
+  timestamp: Timestamp;
   read?: boolean;
 }
+
+export type NotificationItem = NotificationDoc & { id: string };
 
 export default function useNotifications() {
   const { user } = useAuth();
@@ -26,10 +27,16 @@ export default function useNotifications() {
 
   useEffect(() => {
     if (!user?.uid) return;
-    const q = query(
-      collection(db, 'users', user.uid, 'notifications'),
-      orderBy('timestamp', 'desc'),
-    );
+    const notificationsRef = collection(
+      db,
+      'users',
+      user.uid,
+      'notifications',
+    ).withConverter<NotificationDoc>({
+      fromFirestore: (snapshot) => snapshot.data() as NotificationDoc,
+      toFirestore: (data: NotificationDoc) => data,
+    });
+    const q = query(notificationsRef, orderBy('timestamp', 'desc'));
     const unsub = onSnapshot(
       q,
       (snap) => {
@@ -37,8 +44,8 @@ export default function useNotifications() {
           setItems(
             snap.docs.map((d) => ({
               id: d.id,
-              ...(d.data() as any),
-            })) as NotificationItem[],
+              ...d.data(),
+            })),
           );
         } catch (err) {
           console.error('Error processing notifications snapshot', err);
