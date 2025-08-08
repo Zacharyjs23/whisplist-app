@@ -4,7 +4,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
   Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -16,7 +15,7 @@ import { db } from '../firebase';
 import { collection, getDocs, doc, onSnapshot } from 'firebase/firestore';
 import { formatTimeLeft } from '../helpers/time';
 import { useAuth } from '@/contexts/AuthContext';
-import ReactionBar, { ReactionKey } from './ReactionBar';
+import { ReactionBar, ReactionKey } from './ReactionBar';
 import * as logger from '@/helpers/logger';
 
 const typeColors: Record<string, string> = {

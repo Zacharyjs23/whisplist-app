@@ -18,9 +18,15 @@ module.exports = defineConfig([
     },
   },
   {
-    files: ['tests/**/*.js'],
+    files: ['tests/**/*.{js,ts,tsx}'],
     languageOptions: {
       globals: globals.node,
+    },
+    rules: {
+      'import/first': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
+      'import/no-named-as-default': 'off',
     },
   },
 ]);

@@ -14,7 +14,9 @@ import {
 import { db } from '../firebase';
 import * as logger from './logger';
 
-export type Comment<Extra extends Record<string, unknown> = {}> = {
+export type Comment<
+  Extra extends Record<string, unknown> = Record<string, unknown>,
+> = {
   id: string;
   text: string;
   userId?: string;
@@ -28,7 +30,9 @@ export type Comment<Extra extends Record<string, unknown> = {}> = {
   nickname?: string;
 } & Extra;
 
-export function listenWishComments<Extra extends Record<string, unknown> = {}>(
+export function listenWishComments<
+  Extra extends Record<string, unknown> = Record<string, unknown>,
+>(
   wishId: string,
   cb: (comments: Comment<Extra>[]) => void,
   onError?: (err: unknown) => void,
@@ -64,7 +68,9 @@ export function listenWishComments<Extra extends Record<string, unknown> = {}>(
   }
 }
 
-export async function addComment<Extra extends Record<string, unknown> = {}>(
+export async function addComment<
+  Extra extends Record<string, unknown> = Record<string, unknown>,
+>(
   wishId: string,
   data: Omit<Comment<Extra>, 'id' | 'timestamp'>,
   onError?: (err: unknown) => void,
@@ -81,7 +87,9 @@ export async function addComment<Extra extends Record<string, unknown> = {}>(
   }
 }
 
-export async function updateCommentReaction<Extra extends Record<string, unknown> = {}>(
+export async function updateCommentReaction<
+  Extra extends Record<string, unknown> = Record<string, unknown>,
+>(
   wishId: string,
   commentId: string,
   emoji: string,
@@ -120,7 +128,9 @@ export async function updateCommentReaction<Extra extends Record<string, unknown
   }
 }
 
-export async function getWishComments<Extra extends Record<string, unknown> = {}>(
+export async function getWishComments<
+  Extra extends Record<string, unknown> = Record<string, unknown>,
+>(
   wishId: string,
   onError?: (err: unknown) => void,
 ): Promise<Comment<Extra>[]> {

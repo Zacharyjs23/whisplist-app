@@ -487,16 +487,21 @@ export default function Page() {
     const originalWishText = wish;
     setRephrasing(true);
     try {
-      const response = await fetch(
-        `https://us-central1-${process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID}.cloudfunctions.net/rephraseWish`,
-        {
+      const url = `https://us-central1-${process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID}.cloudfunctions.net/rephraseWish`;
+      let attempt = 0;
+      let response: Response | null = null;
+      while (attempt < 3) {
+        response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: originalWishText }),
-        },
-      );
+        });
+        if (response.status !== 429) break;
+        await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt++)));
+      }
+      if (!response || !response.ok) throw new Error('rephrase_failed');
       const data = await response.json();
-      const suggestion = data.suggestion?.trim();
+      const suggestion = data.text?.trim();
       if (suggestion) {
         setWish(suggestion);
         const msg = '✨ Wish rephrased';
@@ -508,7 +513,12 @@ export default function Page() {
       }
     } catch (err) {
       logger.error('AI rephrase failed', err);
-      Alert.alert('Failed to rephrase wish', 'Please try again later.');
+      const msg = 'Service is busy. Please try again later.';
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(msg, ToastAndroid.SHORT);
+      } else {
+        Alert.alert(msg);
+      }
     } finally {
       setRephrasing(false);
     }

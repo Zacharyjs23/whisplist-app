@@ -15,6 +15,6 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci
-      - run: CI=1 npx expo install --fix
       - run: npm run typecheck
       - run: npm run lint
+      - run: npm test

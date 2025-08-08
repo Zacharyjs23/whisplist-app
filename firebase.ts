@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApp, getApps } from 'firebase/app';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
@@ -9,7 +9,6 @@ import {
 } from 'firebase/auth';
 import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
 import { Platform } from 'react-native';
-import { trackEvent } from '@/helpers/analytics';
 import * as logger from '@/helpers/logger';
 
 const requiredEnvVars = [
@@ -38,7 +37,7 @@ const firebaseConfig = {
   measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 export const auth =
   Platform.OS === 'web'
@@ -51,26 +50,18 @@ export const storage = getStorage(app);
 
 let analytics: Analytics | undefined;
 
-isSupported()
-  .then((supported) => {
-    if (supported) {
-      analytics = getAnalytics(app);
-    }
-  })
-  .catch((error) => {
-    logger.warn('Failed to initialize analytics:', error);
-    const env = requiredEnvVars.reduce<Record<string, string | undefined>>(
-      (acc, key) => {
-        acc[key] = process.env[key];
-        return acc;
-      },
-      {}
-    );
-    trackEvent('analytics_init_failed', {
-      error: error instanceof Error ? error.message : String(error),
-      platform: Platform.OS,
-      env,
+if (process.env.EXPO_PUBLIC_ENV === 'production') {
+  isSupported()
+    .then((supported) => {
+      if (supported) {
+        analytics = getAnalytics(app);
+      }
+    })
+    .catch((error) => {
+      logger.warn('Failed to initialize analytics:', error);
     });
-  });
+} else {
+  logger.warn('Analytics disabled in non-production environment');
+}
 
 export { analytics };
