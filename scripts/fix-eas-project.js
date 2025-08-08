@@ -14,7 +14,10 @@ function cleanProjectId() {
   const appJson = JSON.parse(raw);
 
   const projectId = appJson.expo?.extra?.eas?.projectId;
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId || '');
+  const isUuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      projectId || '',
+    );
 
   if (projectId && !isUuid) {
     delete appJson.expo.extra.eas.projectId;
@@ -36,4 +39,3 @@ function runEasInit() {
 
 cleanProjectId();
 runEasInit();
-

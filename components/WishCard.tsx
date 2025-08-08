@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View, Animated } from 'react-native';
+import {
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  Animated,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,7 +40,11 @@ const reactionMap = {
 
 type ReactionKey = keyof typeof reactionMap;
 
-export const WishCard: React.FC<{ wish: Wish; onReport?: () => void; followed?: boolean }> = ({ wish, onReport, followed }) => {
+export const WishCard: React.FC<{
+  wish: Wish;
+  onReport?: () => void;
+  followed?: boolean;
+}> = ({ wish, onReport, followed }) => {
   const { theme } = useTheme();
   const router = useRouter();
   const { saved, toggleSave } = useSavedWishes();
@@ -43,10 +54,13 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void; followed?: 
   const [timeLeft, setTimeLeft] = useState('');
   const [userReaction, setUserReaction] = useState<ReactionKey | null>(null);
   const reactionScales = useRef(
-    (Object.keys(reactionMap) as ReactionKey[]).reduce((acc, k) => {
-      acc[k] = new Animated.Value(1);
-      return acc;
-    }, {} as Record<ReactionKey, Animated.Value>)
+    (Object.keys(reactionMap) as ReactionKey[]).reduce(
+      (acc, k) => {
+        acc[k] = new Animated.Value(1);
+        return acc;
+      },
+      {} as Record<ReactionKey, Animated.Value>,
+    ),
   ).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
 
@@ -64,7 +78,9 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void; followed?: 
           getDocs(collection(db, 'gifts', wish.id, 'gifts')),
         ]);
         let msg = false;
-        snaps[0].forEach(d => { if (d.data().message) msg = true; });
+        snaps[0].forEach((d) => {
+          if (d.data().message) msg = true;
+        });
         setGiftCount(snaps[0].size + snaps[1].size);
         setHasGiftMsg(msg);
       } catch (err) {
@@ -78,7 +94,9 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void; followed?: 
     if (!user?.uid || !wish.id) return;
     const ref = doc(db, 'reactions', wish.id, 'users', user.uid);
     const unsub = onSnapshot(ref, (snap) => {
-      setUserReaction(snap.exists() ? (snap.data().emoji as ReactionKey) : null);
+      setUserReaction(
+        snap.exists() ? (snap.data().emoji as ReactionKey) : null,
+      );
     });
     return unsub;
   }, [user?.uid, wish.id]);
@@ -89,14 +107,23 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void; followed?: 
       glowAnim.setValue(0);
       return;
     }
-    const update = () => setTimeLeft(formatTimeLeft(wish.boostedUntil.toDate()));
+    const update = () =>
+      setTimeLeft(formatTimeLeft(wish.boostedUntil.toDate()));
     update();
     const id = setInterval(update, 60000);
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(glowAnim, { toValue: 1, duration: 1000, useNativeDriver: false }),
-        Animated.timing(glowAnim, { toValue: 0, duration: 1000, useNativeDriver: false }),
-      ])
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+      ]),
     );
     loop.start();
     return () => {
@@ -105,7 +132,8 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void; followed?: 
     };
   }, [isBoosted, wish.boostedUntil, glowAnim]);
 
-  const borderColor = moodColors[wish.mood || ''] || typeColors[wish.type || ''] || theme.tint;
+  const borderColor =
+    moodColors[wish.mood || ''] || typeColors[wish.type || ''] || theme.tint;
   const bgTint = `${borderColor}33`;
 
   const handleReact = useCallback(
@@ -117,7 +145,7 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void; followed?: 
         console.warn('Failed to react', err);
       }
     },
-    [wish.id, user?.uid]
+    [wish.id, user?.uid],
   );
 
   return (
@@ -127,28 +155,45 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void; followed?: 
         { backgroundColor: bgTint, borderLeftColor: borderColor },
         isBoosted && {
           shadowColor: theme.tint,
-          shadowOpacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.8] }),
+          shadowOpacity: glowAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.3, 0.8],
+          }),
           shadowRadius: 10,
           shadowOffset: { width: 0, height: 0 },
-          elevation: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [2, 8] }),
+          elevation: glowAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [2, 8],
+          }),
         },
       ]}
     >
-      <TouchableOpacity activeOpacity={0.8} onPress={() => router.push(`/wish/${wish.id}`)}>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => router.push(`/wish/${wish.id}`)}
+      >
         {!wish.isAnonymous && wish.displayName && (
           <TouchableOpacity
             onPress={() => router.push(`/profile/${wish.displayName}`)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Text style={[styles.author, { color: theme.text }]}>@{wish.displayName}</Text>
+            <Text style={[styles.author, { color: theme.text }]}>
+              @{wish.displayName}
+            </Text>
           </TouchableOpacity>
         )}
         {followed && (
-          <Text style={[styles.followTag, { color: theme.tint }]}>👥 You follow this person</Text>
+          <Text style={[styles.followTag, { color: theme.tint }]}>
+            👥 You follow this person
+          </Text>
         )}
-        <Text style={[styles.category, { color: theme.tint }]}>#{wish.category}</Text>
+        <Text style={[styles.category, { color: theme.tint }]}>
+          #{wish.category}
+        </Text>
         <Text style={[styles.text, { color: theme.text }]}>{wish.text}</Text>
-        {wish.imageUrl && <Image source={{ uri: wish.imageUrl }} style={styles.preview} />}
+        {wish.imageUrl && (
+          <Image source={{ uri: wish.imageUrl }} style={styles.preview} />
+        )}
       </TouchableOpacity>
       <View style={styles.reactionBar}>
         {(Object.keys(reactionMap) as ReactionKey[]).map((key) => (
@@ -193,19 +238,27 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void; followed?: 
         </TouchableOpacity>
       </View>
       {isBoosted && (
-        <Text style={[styles.boostLabel, { color: theme.tint }]}>⏳ Boost expires in {timeLeft}</Text>
+        <Text style={[styles.boostLabel, { color: theme.tint }]}>
+          ⏳ Boost expires in {timeLeft}
+        </Text>
       )}
       {(wish.giftLink || giftCount > 0) && (
-        <Text style={[styles.giftInfo, { color: theme.tint }]}>🎁 Supported by {giftCount} people</Text>
+        <Text style={[styles.giftInfo, { color: theme.tint }]}>
+          🎁 Supported by {giftCount} people
+        </Text>
       )}
       {user?.uid === wish.userId && hasGiftMsg && (
-        <Text style={[styles.giftInfo, { color: theme.tint }]}>💬 You received a gift message</Text>
+        <Text style={[styles.giftInfo, { color: theme.tint }]}>
+          💬 You received a gift message
+        </Text>
       )}
       {wish.expiresAt && (
         <Text style={{ color: theme.tint, marginTop: 4 }}>
           ⏳{' '}
           {(() => {
-            const ts = wish.expiresAt.toDate ? wish.expiresAt.toDate() : new Date(wish.expiresAt);
+            const ts = wish.expiresAt.toDate
+              ? wish.expiresAt.toDate()
+              : new Date(wish.expiresAt);
             const diff = ts.getTime() - Date.now();
             const hrs = Math.max(0, Math.ceil(diff / 3600000));
             return `${hrs}h left`;
@@ -214,7 +267,9 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void; followed?: 
       )}
       {onReport && (
         <TouchableOpacity onPress={onReport} style={styles.reportButton}>
-          <Text style={[styles.reactionText, { color: '#f87171' }]}>Report</Text>
+          <Text style={[styles.reactionText, { color: '#f87171' }]}>
+            Report
+          </Text>
         </TouchableOpacity>
       )}
     </Animated.View>

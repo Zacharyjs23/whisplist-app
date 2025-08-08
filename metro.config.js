@@ -5,7 +5,7 @@ const path = require('path');
 const config = getDefaultConfig(__dirname);
 
 // Remove 'cjs' from assetExts and add it to sourceExts
-const assetExts = config.resolver.assetExts.filter(ext => ext !== 'cjs');
+const assetExts = config.resolver.assetExts.filter((ext) => ext !== 'cjs');
 const sourceExts = [...config.resolver.sourceExts, 'cjs'];
 
 config.resolver.assetExts = assetExts;

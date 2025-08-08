@@ -15,7 +15,7 @@ export const stripeWebhook = functions.https.onRequest(async (req, res) => {
     event = stripe.webhooks.constructEvent(
       req.rawBody,
       sig,
-      process.env.STRIPE_WEBHOOK_SECRET as string
+      process.env.STRIPE_WEBHOOK_SECRET as string,
     );
   } catch (err) {
     console.error('Webhook verification failed', err);
@@ -32,7 +32,7 @@ export const stripeWebhook = functions.https.onRequest(async (req, res) => {
     if (wishId) {
       batch.update(db.collection('wishes').doc(wishId), {
         boostedUntil: admin.firestore.Timestamp.fromDate(
-          new Date(Date.now() + 24 * 60 * 60 * 1000)
+          new Date(Date.now() + 24 * 60 * 60 * 1000),
         ),
         boosted: 'stripe',
       });

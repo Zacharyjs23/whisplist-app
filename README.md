@@ -100,4 +100,3 @@ npx expo run:ios
 
 The script removes the `Pods` directory, clears Xcode's derived data, and runs
 `pod install --repo-update` so the iOS project builds from a clean state.
-

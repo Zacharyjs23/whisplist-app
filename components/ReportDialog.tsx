@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { Modal, View, TextInput, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import {
+  Modal,
+  View,
+  TextInput,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+} from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
 
@@ -9,7 +16,11 @@ interface ReportDialogProps {
   onSubmit: (reason: string) => void;
 }
 
-export default function ReportDialog({ visible, onClose, onSubmit }: ReportDialogProps) {
+export default function ReportDialog({
+  visible,
+  onClose,
+  onSubmit,
+}: ReportDialogProps) {
   const [reason, setReason] = useState('');
   const { theme } = useTheme();
   const c = theme;
@@ -21,7 +32,12 @@ export default function ReportDialog({ visible, onClose, onSubmit }: ReportDialo
   };
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       <View style={styles.overlay}>
         <View style={styles.box}>
           <TextInput
@@ -32,10 +48,18 @@ export default function ReportDialog({ visible, onClose, onSubmit }: ReportDialo
             onChangeText={setReason}
           />
           <View style={styles.buttons}>
-            <TouchableOpacity onPress={onClose} style={[styles.button, styles.cancel]} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={[styles.button, styles.cancel]}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <Text style={styles.buttonText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleSubmit} style={styles.button} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity
+              onPress={handleSubmit}
+              style={styles.button}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <Text style={styles.buttonText}>Send Report</Text>
             </TouchableOpacity>
           </View>

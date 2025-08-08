@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, View, TextInput, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import {
+  Modal,
+  View,
+  TextInput,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+} from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
 import { normalizeAndValidateUrl } from '@/helpers/url';
@@ -12,7 +19,12 @@ interface FulfillmentLinkDialogProps {
   existingLink?: string;
 }
 
-export default function FulfillmentLinkDialog({ visible, onClose, onSubmit, existingLink }: FulfillmentLinkDialogProps) {
+export default function FulfillmentLinkDialog({
+  visible,
+  onClose,
+  onSubmit,
+  existingLink,
+}: FulfillmentLinkDialogProps) {
   const [link, setLink] = useState('');
   const [error, setError] = useState('');
   const { theme } = useTheme();
@@ -37,7 +49,12 @@ export default function FulfillmentLinkDialog({ visible, onClose, onSubmit, exis
   };
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       <View style={styles.overlay}>
         <View style={styles.box}>
           <TextInput
@@ -46,13 +63,21 @@ export default function FulfillmentLinkDialog({ visible, onClose, onSubmit, exis
             placeholderTextColor={theme.text + '99'} // theme fix
             value={link}
             onChangeText={setLink}
-        />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        <View style={styles.buttons}>
-            <TouchableOpacity onPress={onClose} style={[styles.button, styles.cancel]} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          />
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+          <View style={styles.buttons}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={[styles.button, styles.cancel]}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <Text style={styles.buttonText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleSubmit} style={styles.button} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity
+              onPress={handleSubmit}
+              style={styles.button}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <Text style={styles.buttonText}>Save</Text>
             </TouchableOpacity>
           </View>

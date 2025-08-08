@@ -1,7 +1,17 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Share, Alert, Animated, Modal } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
+  Share,
+  Alert,
+  Animated,
+  Modal,
+} from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import ConfettiCannon from 'react-native-confetti-cannon';
@@ -79,7 +89,7 @@ export default function BoostPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ wishId: id, userId: user.uid }),
-        }
+        },
       );
       const data = await resp.json();
       if (data.url) {
@@ -100,9 +110,17 @@ export default function BoostPage() {
     if (!done) return;
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.1, duration: 700, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
-      ])
+        Animated.timing(pulseAnim, {
+          toValue: 1.1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+      ]),
     );
     loop.start();
     return () => loop.stop();
@@ -165,19 +183,34 @@ export default function BoostPage() {
             Boost this wish for $0.50
           </Text>
           {profile?.boostCredits && profile.boostCredits > 0 && (
-            <TouchableOpacity onPress={handleFreeBoost} style={[styles.button, { marginBottom: 10 }]}>\
-              <Text style={styles.buttonText}>Use Free Boost ({profile.boostCredits})</Text>\
+            <TouchableOpacity
+              onPress={handleFreeBoost}
+              style={[styles.button, { marginBottom: 10 }]}
+            >
+              \
+              <Text style={styles.buttonText}>
+                Use Free Boost ({profile.boostCredits})
+              </Text>
+              \
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={handleBoost} style={styles.button} disabled={loading || alreadyBoosted}>
+          <TouchableOpacity
+            onPress={handleBoost}
+            style={styles.button}
+            disabled={loading || alreadyBoosted}
+          >
             {loading ? (
               <ActivityIndicator color={theme.text} />
             ) : (
-              <Text style={[styles.buttonText, { color: theme.text }]}>Boost 🚀</Text>
+              <Text style={[styles.buttonText, { color: theme.text }]}>
+                Boost 🚀
+              </Text>
             )}
           </TouchableOpacity>
           {alreadyBoosted && (
-            <Text style={{ color: theme.text, marginTop: 10, textAlign: 'center' }}>
+            <Text
+              style={{ color: theme.text, marginTop: 10, textAlign: 'center' }}
+            >
               This wish is already boosted—try again later.
             </Text>
           )}

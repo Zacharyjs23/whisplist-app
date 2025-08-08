@@ -29,7 +29,17 @@ import * as Audio from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
 import * as Notifications from 'expo-notifications';
 import ReferralNameDialog from '@/components/ReferralNameDialog';
-import { addDoc, collection, deleteDoc, doc, serverTimestamp, getDocs, collectionGroup, query, where } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  serverTimestamp,
+  getDocs,
+  collectionGroup,
+  query,
+  where,
+} from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import React, { useEffect, useState } from 'react';
 import { db, storage } from '../../firebase';
@@ -97,9 +107,11 @@ export default function Page() {
   const [devMode, setDevMode] = useState(profile?.developerMode === true);
   const [dailyQuote, setDailyQuote] = useState(false);
   const [publicProfileEnabled, setPublicProfileEnabled] = useState(
-    profile?.publicProfileEnabled !== false
+    profile?.publicProfileEnabled !== false,
   );
-  const [stripeEnabled, setStripeEnabled] = useState(profile?.giftingEnabled === true);
+  const [stripeEnabled, setStripeEnabled] = useState(
+    profile?.giftingEnabled === true,
+  );
   const [refDialogVisible, setRefDialogVisible] = useState(false);
   const [pushPrefs, setPushPrefs] = useState({
     wish_boosted: true,
@@ -113,10 +125,9 @@ export default function Page() {
     userCount: 0,
   });
 
-  const SettingsSection: React.FC<{ title: string } & React.PropsWithChildren> = ({
-    title,
-    children,
-  }) => {
+  const SettingsSection: React.FC<
+    { title: string } & React.PropsWithChildren
+  > = ({ title, children }) => {
     const [open, setOpen] = useState(true);
     return (
       <View style={styles.sectionContainer}>
@@ -150,8 +161,8 @@ export default function Page() {
       setAnonymize(anon === 'true');
       setDevMode(profile?.developerMode === true);
       setDailyQuote(quote === 'true');
-        if (storedNickname)
-          setLocalUser({ id: 'local', nickname: storedNickname });
+      if (storedNickname)
+        setLocalUser({ id: 'local', nickname: storedNickname });
       setPublicProfileEnabled(profile?.publicProfileEnabled !== false);
       const prefs = await AsyncStorage.getItem('pushPrefs');
       if (prefs) setPushPrefs(JSON.parse(prefs));
@@ -166,14 +177,14 @@ export default function Page() {
       try {
         const wishSnap = await getDocs(collection(db, 'wishes'));
         let boost = 0;
-        wishSnap.forEach(d => {
+        wishSnap.forEach((d) => {
           const b = d.data().boostedUntil;
           if (b && b.toDate && b.toDate() > new Date()) boost += 1;
         });
         const giftSnap = await getDocs(collectionGroup(db, 'gifts'));
         const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
         const userSnap = await getDocs(
-          query(collection(db, 'users'), where('createdAt', '>=', since))
+          query(collection(db, 'users'), where('createdAt', '>=', since)),
         );
         if (!cancelled) {
           setAnalytics({
@@ -197,7 +208,8 @@ export default function Page() {
 
   const pickAvatar = async () => {
     const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!granted) return Alert.alert('Permission required', 'Media access needed');
+    if (!granted)
+      return Alert.alert('Permission required', 'Media access needed');
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.7,
@@ -275,7 +287,10 @@ export default function Page() {
   const permissionsInfo = async () => {
     const mic = await (Audio as any).getRecordingPermissionsAsync();
     const notif = await Notifications.getPermissionsAsync();
-    Alert.alert('Permissions', `Microphone: ${mic.status}\nNotifications: ${notif.status}`);
+    Alert.alert(
+      'Permissions',
+      `Microphone: ${mic.status}\nNotifications: ${notif.status}`,
+    );
   };
 
   const sendInvite = async (name: string) => {
@@ -318,10 +333,11 @@ export default function Page() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ uid: user.uid }),
-          }
+          },
         );
         const data = await resp.json();
-        if (data.accountId) await updateProfile({ stripeAccountId: data.accountId });
+        if (data.accountId)
+          await updateProfile({ stripeAccountId: data.accountId });
         if (data.url) await WebBrowser.openBrowserAsync(data.url);
       } catch (err) {
         console.error('Failed to start Stripe onboarding', err);
@@ -336,7 +352,9 @@ export default function Page() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: theme.background }]}
+    >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -348,152 +366,217 @@ export default function Page() {
             { backgroundColor: theme.background },
           ]}
         >
-        <ThemedText style={styles.title}>Settings</ThemedText>
+          <ThemedText style={styles.title}>Settings</ThemedText>
 
-        <SettingsSection title="Privacy & Profile">
-          <View style={styles.row}>
-            <ThemedText style={styles.label}>Anonymize Username</ThemedText>
-            <Switch value={anonymize} onValueChange={toggleAnonymize} />
-          </View>
-          <View style={styles.row}>
-            <ThemedText style={styles.label}>Public Profile Enabled</ThemedText>
-            <Switch value={publicProfileEnabled} onValueChange={togglePublicProfile} />
-          </View>
-          <View style={styles.row}>
-            <ThemedText style={styles.label}>Enable Stripe Gifting</ThemedText>
-            <Switch value={stripeEnabled} onValueChange={toggleStripe} />
-          </View>
-        </SettingsSection>
-
-        <SettingsSection title="Notifications">
-          <View style={styles.row}>
-            <ThemedText style={styles.label}>Daily Quote</ThemedText>
-            <Switch value={dailyQuote} onValueChange={toggleDailyQuote} />
-          </View>
-          <View style={styles.row}>
-            <ThemedText style={styles.label}>Boost Notifications</ThemedText>
-            <Switch
-              value={pushPrefs.wish_boosted}
-              onValueChange={(v) => togglePush('wish_boosted', v)}
-            />
-          </View>
-          <View style={styles.row}>
-            <ThemedText style={styles.label}>Comment Notifications</ThemedText>
-            <Switch
-              value={pushPrefs.new_comment}
-              onValueChange={(v) => togglePush('new_comment', v)}
-            />
-          </View>
-        </SettingsSection>
-
-        {profile?.isDev === true && (
-          <SettingsSection title="Advanced / Developer">
+          <SettingsSection title="Privacy & Profile">
             <View style={styles.row}>
-              <ThemedText style={styles.label}>Developer Mode</ThemedText>
-              <Switch value={devMode} onValueChange={toggleDevMode} />
+              <ThemedText style={styles.label}>Anonymize Username</ThemedText>
+              <Switch value={anonymize} onValueChange={toggleAnonymize} />
             </View>
             <View style={styles.row}>
-              <ThemedText style={styles.label}>Referral Bonuses</ThemedText>
+              <ThemedText style={styles.label}>
+                Public Profile Enabled
+              </ThemedText>
               <Switch
-                value={pushPrefs.referral_bonus}
-                onValueChange={(v) => togglePush('referral_bonus', v)}
+                value={publicProfileEnabled}
+                onValueChange={togglePublicProfile}
               />
             </View>
-            {profile?.developerMode && (
-              <View style={[styles.devAnalytics, { backgroundColor: theme.input }]}>
-                <Text style={{ color: theme.text }}>Total Wishes: {analytics.wishCount}</Text>
-                <Text style={{ color: theme.text }}>Total Boosts: {analytics.boostCount}</Text>
-                <Text style={{ color: theme.text }}>Total Gifts: {analytics.giftCount}</Text>
-                <Text style={{ color: theme.text }}>Active Users (past 7d): {analytics.userCount}</Text>
-              </View>
-            )}
+            <View style={styles.row}>
+              <ThemedText style={styles.label}>
+                Enable Stripe Gifting
+              </ThemedText>
+              <Switch value={stripeEnabled} onValueChange={toggleStripe} />
+            </View>
           </SettingsSection>
-        )}
 
-        <SettingsSection title="System & Account">
-          <ThemedButton title="Pick Avatar" onPress={pickAvatar} />
-          {avatarUrl && <Image source={{ uri: avatarUrl }} style={styles.avatar} />}
-          {profile?.boostCredits !== undefined && (
-            <ThemedText style={styles.section}>
-              You&apos;ve earned {profile.boostCredits} free boosts!
-            </ThemedText>
+          <SettingsSection title="Notifications">
+            <View style={styles.row}>
+              <ThemedText style={styles.label}>Daily Quote</ThemedText>
+              <Switch value={dailyQuote} onValueChange={toggleDailyQuote} />
+            </View>
+            <View style={styles.row}>
+              <ThemedText style={styles.label}>Boost Notifications</ThemedText>
+              <Switch
+                value={pushPrefs.wish_boosted}
+                onValueChange={(v) => togglePush('wish_boosted', v)}
+              />
+            </View>
+            <View style={styles.row}>
+              <ThemedText style={styles.label}>
+                Comment Notifications
+              </ThemedText>
+              <Switch
+                value={pushPrefs.new_comment}
+                onValueChange={(v) => togglePush('new_comment', v)}
+              />
+            </View>
+          </SettingsSection>
+
+          {profile?.isDev === true && (
+            <SettingsSection title="Advanced / Developer">
+              <View style={styles.row}>
+                <ThemedText style={styles.label}>Developer Mode</ThemedText>
+                <Switch value={devMode} onValueChange={toggleDevMode} />
+              </View>
+              <View style={styles.row}>
+                <ThemedText style={styles.label}>Referral Bonuses</ThemedText>
+                <Switch
+                  value={pushPrefs.referral_bonus}
+                  onValueChange={(v) => togglePush('referral_bonus', v)}
+                />
+              </View>
+              {profile?.developerMode && (
+                <View
+                  style={[
+                    styles.devAnalytics,
+                    { backgroundColor: theme.input },
+                  ]}
+                >
+                  <Text style={{ color: theme.text }}>
+                    Total Wishes: {analytics.wishCount}
+                  </Text>
+                  <Text style={{ color: theme.text }}>
+                    Total Boosts: {analytics.boostCount}
+                  </Text>
+                  <Text style={{ color: theme.text }}>
+                    Total Gifts: {analytics.giftCount}
+                  </Text>
+                  <Text style={{ color: theme.text }}>
+                    Active Users (past 7d): {analytics.userCount}
+                  </Text>
+                </View>
+              )}
+            </SettingsSection>
           )}
-          <ThemedButton title="Refer a Friend" onPress={handleShareInvite} />
-          <ThemedText style={styles.section}>Default Category</ThemedText>
-          <Picker
-            selectedValue={defaultCategory}
-            onValueChange={async (v) => {
-              setDefaultCategory(v);
-              await AsyncStorage.setItem('defaultCategory', v);
-            }}
-            style={[styles.picker, { backgroundColor: theme.input, color: theme.text }]}
-          >
-            <Picker.Item label="General" value="general" />
-            <Picker.Item label="Love" value="love" />
-            <Picker.Item label="Career" value="career" />
-            <Picker.Item label="Health" value="health" />
-          </Picker>
-          <ThemedText style={styles.section}>Language</ThemedText>
-          <Picker
-            selectedValue={language}
-            onValueChange={async (v) => {
-              setLanguage(v);
-              await AsyncStorage.setItem('language', v);
-            }}
-            style={[styles.picker, { backgroundColor: theme.input, color: theme.text }]}
-          >
-            <Picker.Item label="English" value="en" />
-            <Picker.Item label="Spanish" value="es" />
-          </Picker>
-          <TextInput
-            style={[styles.input, { backgroundColor: theme.input, color: theme.text, height: 80, textAlignVertical: 'top' }]}
-            placeholder="Send feedback"
-            placeholderTextColor="#888"
-            value={feedback}
-            onChangeText={setFeedback}
-            multiline
-          />
-          <ThemedButton title="Submit Feedback" onPress={handleSendFeedback} />
-          <ThemedButton title="Export History" onPress={handleExport} />
+
+          <SettingsSection title="System & Account">
+            <ThemedButton title="Pick Avatar" onPress={pickAvatar} />
+            {avatarUrl && (
+              <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+            )}
+            {profile?.boostCredits !== undefined && (
+              <ThemedText style={styles.section}>
+                You&apos;ve earned {profile.boostCredits} free boosts!
+              </ThemedText>
+            )}
+            <ThemedButton title="Refer a Friend" onPress={handleShareInvite} />
+            <ThemedText style={styles.section}>Default Category</ThemedText>
+            <Picker
+              selectedValue={defaultCategory}
+              onValueChange={async (v) => {
+                setDefaultCategory(v);
+                await AsyncStorage.setItem('defaultCategory', v);
+              }}
+              style={[
+                styles.picker,
+                { backgroundColor: theme.input, color: theme.text },
+              ]}
+            >
+              <Picker.Item label="General" value="general" />
+              <Picker.Item label="Love" value="love" />
+              <Picker.Item label="Career" value="career" />
+              <Picker.Item label="Health" value="health" />
+            </Picker>
+            <ThemedText style={styles.section}>Language</ThemedText>
+            <Picker
+              selectedValue={language}
+              onValueChange={async (v) => {
+                setLanguage(v);
+                await AsyncStorage.setItem('language', v);
+              }}
+              style={[
+                styles.picker,
+                { backgroundColor: theme.input, color: theme.text },
+              ]}
+            >
+              <Picker.Item label="English" value="en" />
+              <Picker.Item label="Spanish" value="es" />
+            </Picker>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.input,
+                  color: theme.text,
+                  height: 80,
+                  textAlignVertical: 'top',
+                },
+              ]}
+              placeholder="Send feedback"
+              placeholderTextColor="#888"
+              value={feedback}
+              onChangeText={setFeedback}
+              multiline
+            />
+            <ThemedButton
+              title="Submit Feedback"
+              onPress={handleSendFeedback}
+            />
+            <ThemedButton title="Export History" onPress={handleExport} />
             <ThemedButton
               title="Rate this App"
               onPress={() => {
                 Linking.openURL('https://example.com');
               }}
             />
-          <ThemedButton title="Permissions" onPress={permissionsInfo} />
-          <ThemedButton title="Delete My Content" onPress={handleDeleteContent} />
-          <ThemedButton title="Reset App Data" onPress={handleReset} />
-          <Text style={{ color: theme.text, marginBottom: 10, textAlign: 'center' }}>
-            WhispList promises a safe, anonymous place to share your dreams.
-          </Text>
-          <ThemedButton title="Terms of Service" onPress={() => router.push('/terms')} />
-          <ThemedButton title="Privacy Policy" onPress={() => router.push('/privacy')} />
-        </SettingsSection>
+            <ThemedButton title="Permissions" onPress={permissionsInfo} />
+            <ThemedButton
+              title="Delete My Content"
+              onPress={handleDeleteContent}
+            />
+            <ThemedButton title="Reset App Data" onPress={handleReset} />
+            <Text
+              style={{
+                color: theme.text,
+                marginBottom: 10,
+                textAlign: 'center',
+              }}
+            >
+              WhispList promises a safe, anonymous place to share your dreams.
+            </Text>
+            <ThemedButton
+              title="Terms of Service"
+              onPress={() => router.push('/terms')}
+            />
+            <ThemedButton
+              title="Privacy Policy"
+              onPress={() => router.push('/privacy')}
+            />
+          </SettingsSection>
 
-        <SettingsSection title="Theme">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.themeList}>
-            {themeOptions.map((t) => (
-              <ThemeSwatch key={t} name={t} />
-            ))}
-          </ScrollView>
-          <Picker
-            selectedValue={theme.name}
-            onValueChange={(value) => setTheme(value as ThemeName)}
-            style={[styles.picker, { backgroundColor: theme.input, color: theme.text }]}
-          >
-            {themeOptions.map((t) => (
-              <Picker.Item key={t} label={t} value={t} />
-            ))}
-          </Picker>
-        </SettingsSection>
+          <SettingsSection title="Theme">
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.themeList}
+            >
+              {themeOptions.map((t) => (
+                <ThemeSwatch key={t} name={t} />
+              ))}
+            </ScrollView>
+            <Picker
+              selectedValue={theme.name}
+              onValueChange={(value) => setTheme(value as ThemeName)}
+              style={[
+                styles.picker,
+                { backgroundColor: theme.input, color: theme.text },
+              ]}
+            >
+              {themeOptions.map((t) => (
+                <Picker.Item key={t} label={t} value={t} />
+              ))}
+            </Picker>
+          </SettingsSection>
 
-        <ReferralNameDialog
-          visible={refDialogVisible}
-          defaultName={profile?.referralDisplayName || profile?.displayName || ''}
-          onClose={() => setRefDialogVisible(false)}
-          onSubmit={sendInvite}
-        />
+          <ReferralNameDialog
+            visible={refDialogVisible}
+            defaultName={
+              profile?.referralDisplayName || profile?.displayName || ''
+            }
+            onClose={() => setRefDialogVisible(false)}
+            onSubmit={sendInvite}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

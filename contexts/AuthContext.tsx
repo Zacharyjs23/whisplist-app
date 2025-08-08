@@ -89,7 +89,11 @@ const AuthContext = createContext<AuthContextValue>({
   pickImage: async () => undefined,
 });
 
-export const AuthProvider = ({ children }: { children: ReactNode }): ReactElement => {
+export const AuthProvider = ({
+  children,
+}: {
+  children: ReactNode;
+}): ReactElement => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -167,16 +171,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
           try {
             const inviteRef = await AsyncStorage.getItem('inviteRef');
             if (inviteRef) {
-              const q = query(collection(db, 'users'), where('displayName', '==', inviteRef));
+              const q = query(
+                collection(db, 'users'),
+                where('displayName', '==', inviteRef),
+              );
               const res = await getDocs(q);
               if (!res.empty) {
                 const referrerId = res.docs[0].id;
-                await updateDoc(doc(db, 'users', referrerId), { boostCredits: increment(1) });
+                await updateDoc(doc(db, 'users', referrerId), {
+                  boostCredits: increment(1),
+                });
                 await updateDoc(ref, { boostCredits: increment(1) });
                 await setDoc(doc(db, 'referrals', u.uid), {
                   referrerId,
                   referrerDisplayName:
-                    res.docs[0].data().referralDisplayName || res.docs[0].data().displayName,
+                    res.docs[0].data().referralDisplayName ||
+                    res.docs[0].data().displayName,
                   timestamp: serverTimestamp(),
                 });
               }
@@ -194,7 +204,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
     });
     return unsub;
   }, []);
-
 
   const signUp = async (email: string, password: string) => {
     try {
@@ -226,7 +235,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
     try {
       const res = await promptAsync();
       if (res?.type === 'success' && res.authentication?.idToken) {
-        const credential = GoogleAuthProvider.credential(res.authentication.idToken);
+        const credential = GoogleAuthProvider.credential(
+          res.authentication.idToken,
+        );
         await signInWithCredential(auth, credential);
       }
     } catch (err) {
@@ -264,7 +275,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
       }
       const snap = await getDoc(ref);
       const newData = snap.data() as Profile;
-      if (newData.publicProfileEnabled === undefined) newData.publicProfileEnabled = true;
+      if (newData.publicProfileEnabled === undefined)
+        newData.publicProfileEnabled = true;
       if (newData.developerMode === undefined) newData.developerMode = false;
       setProfile(newData);
     } catch (err) {
@@ -274,9 +286,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
 
   const pickImage = async () => {
     try {
-      const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { granted } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!granted) return;
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7 });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+      });
       if (!result.canceled && result.assets.length > 0) {
         const asset = result.assets[0];
         if (!user) return;

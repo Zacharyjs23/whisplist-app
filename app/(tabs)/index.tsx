@@ -15,7 +15,20 @@ import { formatTimeLeft } from '../../helpers/time';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as WebBrowser from 'expo-web-browser';
-import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, doc, getDoc, collectionGroup, limit, startAfter } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  serverTimestamp,
+  getDocs,
+  query,
+  orderBy,
+  where,
+  doc,
+  getDoc,
+  collectionGroup,
+  limit,
+  startAfter,
+} from 'firebase/firestore';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -61,7 +74,9 @@ const typeInfo: Record<string, { emoji: string; color: string }> = {
  * have been used recently, the recent list is cleared to start fresh.
  */
 const pickPromptIndex = (recent: number[]): number => {
-  let available = DAILY_PROMPTS.map((_, i) => i).filter((i) => !recent.includes(i));
+  let available = DAILY_PROMPTS.map((_, i) => i).filter(
+    (i) => !recent.includes(i),
+  );
   if (available.length === 0) {
     recent = [];
     available = DAILY_PROMPTS.map((_, i) => i);
@@ -69,14 +84,17 @@ const pickPromptIndex = (recent: number[]): number => {
   return available[Math.floor(Math.random() * available.length)];
 };
 
-
 export default function Page() {
   const [wish, setWish] = useState('');
-  const [postType, setPostType] = useState<'wish' | 'confession' | 'advice' | 'dream'>('wish');
+  const [postType, setPostType] = useState<
+    'wish' | 'confession' | 'advice' | 'dream'
+  >('wish');
   const [wishList, setWishList] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'wish' | 'confession' | 'advice' | 'dream'>('all');
+  const [filterType, setFilterType] = useState<
+    'all' | 'wish' | 'confession' | 'advice' | 'dream'
+  >('all');
   const [reportVisible, setReportVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -100,11 +118,18 @@ export default function Page() {
   const [useProfilePost, setUseProfilePost] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
-  const [stripeAccounts, setStripeAccounts] = useState<Record<string, string | null>>({});
+  const [stripeAccounts, setStripeAccounts] = useState<
+    Record<string, string | null>
+  >({});
   const [followStatus, setFollowStatus] = useState<Record<string, boolean>>({});
   const [streakCount, setStreakCount] = useState(0);
   const [dailyPrompt, setDailyPrompt] = useState('');
-  const [impact, setImpact] = useState({ wishes: 0, boosts: 0, gifts: 0, giftTotal: 0 });
+  const [impact, setImpact] = useState({
+    wishes: 0,
+    boosts: 0,
+    gifts: 0,
+    giftTotal: 0,
+  });
   const promptOpacity = useRef(new Animated.Value(0)).current;
   const { user, profile } = useAuth();
   const stripeEnabled = profile?.giftingEnabled && profile?.stripeAccountId;
@@ -121,217 +146,248 @@ export default function Page() {
 
   const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 
+  useEffect(() => {
+    cleanupExpiredWishes();
+  }, []);
 
-useEffect(() => {
-  cleanupExpiredWishes();
-}, []);
-
-useEffect(() => {
-  const load = async () => {
-    setLoading(true);
-    try {
-      const following = user ? await getFollowingIds(user.uid) : [];
-      const now = new Date();
-      const boostedSnap = await getDocs(
-        query(
-          collection(db, 'wishes'),
-          where('boostedUntil', '>', now),
-          orderBy('boostedUntil', 'desc')
-        )
-      );
-      const boosted = boostedSnap.docs.map(d => ({
-        id: d.id,
-        ...(d.data() as Omit<Wish, 'id'>),
-      })) as Wish[];
-      let normal: Wish[] = [];
-      if (following.length) {
-        const q = query(
-          collection(db, 'wishes'),
-          where('userId', 'in', following),
-          orderBy('timestamp', 'desc'),
-          limit(20)
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const following = user ? await getFollowingIds(user.uid) : [];
+        const now = new Date();
+        const boostedSnap = await getDocs(
+          query(
+            collection(db, 'wishes'),
+            where('boostedUntil', '>', now),
+            orderBy('boostedUntil', 'desc'),
+          ),
         );
-        const snap = await getDocs(q);
-        setLastDoc(snap.docs[snap.docs.length - 1] || null);
-        normal = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Wish,'id'>) })) as Wish[];
+        const boosted = boostedSnap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as Omit<Wish, 'id'>),
+        })) as Wish[];
+        let normal: Wish[] = [];
+        if (following.length) {
+          const q = query(
+            collection(db, 'wishes'),
+            where('userId', 'in', following),
+            orderBy('timestamp', 'desc'),
+            limit(20),
+          );
+          const snap = await getDocs(q);
+          setLastDoc(snap.docs[snap.docs.length - 1] || null);
+          normal = snap.docs.map((d) => ({
+            id: d.id,
+            ...(d.data() as Omit<Wish, 'id'>),
+          })) as Wish[];
+        }
+        setWishList([...boosted, ...normal]);
+        setError(null);
+      } catch (err) {
+        console.warn('Failed to load wishes', err);
+        setError("Couldn't load data. Check your connection and try again.");
+      } finally {
+        setLoading(false);
       }
-      setWishList([...boosted, ...normal]);
-      setError(null);
-    } catch (err) {
-      console.warn('Failed to load wishes', err);
-      setError("Couldn't load data. Check your connection and try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-  load();
-}, [user]);
+    };
+    load();
+  }, [user]);
 
-useEffect(() => {
-  const loadImpact = async () => {
-    if (!user?.uid) return;
-    try {
-      const snap = await getDocs(query(collection(db, 'wishes'), where('userId', '==', user.uid)));
-      const list = snap.docs.map(d => d.data());
-      const wishes = list.length;
-      const boosts = list.filter(l => l.boostedUntil).length;
-      let gifts = 0;
-      let giftTotal = 0;
-      const giftSnap = await getDocs(query(collectionGroup(db, 'gifts'), where('recipientId', '==', user.uid)));
-      giftSnap.forEach(g => {
-        gifts += 1;
-        giftTotal += g.data().amount || 0;
-      });
-      setImpact({ wishes, boosts, gifts, giftTotal });
-    } catch (err) {
-      console.error('Failed to load impact', err);
-    }
-  };
-  loadImpact();
-}, [user]);
+  useEffect(() => {
+    const loadImpact = async () => {
+      if (!user?.uid) return;
+      try {
+        const snap = await getDocs(
+          query(collection(db, 'wishes'), where('userId', '==', user.uid)),
+        );
+        const list = snap.docs.map((d) => d.data());
+        const wishes = list.length;
+        const boosts = list.filter((l) => l.boostedUntil).length;
+        let gifts = 0;
+        let giftTotal = 0;
+        const giftSnap = await getDocs(
+          query(
+            collectionGroup(db, 'gifts'),
+            where('recipientId', '==', user.uid),
+          ),
+        );
+        giftSnap.forEach((g) => {
+          gifts += 1;
+          giftTotal += g.data().amount || 0;
+        });
+        setImpact({ wishes, boosts, gifts, giftTotal });
+      } catch (err) {
+        console.error('Failed to load impact', err);
+      }
+    };
+    loadImpact();
+  }, [user]);
 
-useEffect(() => {
-  const fetchStatus = async () => {
-    const ids = Array.from(
-      new Set(
-        wishList
-          .map((w) => w.userId)
-          .filter((id): id is string => typeof id === 'string' && id.length > 0)
-      )
-    );
-    try {
-      await Promise.all(
-        ids.map(async (id) => {
-          if (publicStatus[id] === undefined || stripeAccounts[id] === undefined) {
-            try {
-              const snap = await getDoc(doc(db, 'users', id));
-              if (publicStatus[id] === undefined) {
-                setPublicStatus((prev) => ({
-                  ...prev,
-                  [id]: snap.exists() ? snap.data().publicProfileEnabled !== false : false,
-                }));
-              }
-              if (stripeAccounts[id] === undefined) {
-                setStripeAccounts((prev) => ({
-                  ...prev,
-                  [id]: snap.exists() ? snap.data().stripeAccountId || null : null,
-                }));
-              }
-            } catch (err) {
-              console.warn('Failed to fetch user', err);
-              if (publicStatus[id] === undefined) {
-                setPublicStatus((prev) => ({ ...prev, [id]: false }));
-              }
-              if (stripeAccounts[id] === undefined) {
-                setStripeAccounts((prev) => ({ ...prev, [id]: null }));
+  useEffect(() => {
+    const fetchStatus = async () => {
+      const ids = Array.from(
+        new Set(
+          wishList
+            .map((w) => w.userId)
+            .filter(
+              (id): id is string => typeof id === 'string' && id.length > 0,
+            ),
+        ),
+      );
+      try {
+        await Promise.all(
+          ids.map(async (id) => {
+            if (
+              publicStatus[id] === undefined ||
+              stripeAccounts[id] === undefined
+            ) {
+              try {
+                const snap = await getDoc(doc(db, 'users', id));
+                if (publicStatus[id] === undefined) {
+                  setPublicStatus((prev) => ({
+                    ...prev,
+                    [id]: snap.exists()
+                      ? snap.data().publicProfileEnabled !== false
+                      : false,
+                  }));
+                }
+                if (stripeAccounts[id] === undefined) {
+                  setStripeAccounts((prev) => ({
+                    ...prev,
+                    [id]: snap.exists()
+                      ? snap.data().stripeAccountId || null
+                      : null,
+                  }));
+                }
+              } catch (err) {
+                console.warn('Failed to fetch user', err);
+                if (publicStatus[id] === undefined) {
+                  setPublicStatus((prev) => ({ ...prev, [id]: false }));
+                }
+                if (stripeAccounts[id] === undefined) {
+                  setStripeAccounts((prev) => ({ ...prev, [id]: null }));
+                }
               }
             }
-          }
-        })
-      );
-    } catch (err) {
-      console.error('Failed to fetch public status', err);
-    }
-  };
-  fetchStatus();
-}, [wishList, publicStatus, stripeAccounts]);
-
-useEffect(() => {
-  const fetchFollow = async () => {
-    if (!user) return;
-    const ids = Array.from(
-      new Set(
-        wishList
-          .map((w) => w.userId)
-          .filter((id): id is string => typeof id === 'string' && id !== user.uid)
-      )
-    );
-    try {
-      await Promise.all(
-        ids.map(async (id) => {
-          if (followStatus[id] === undefined) {
-            try {
-              const snap = await getDoc(doc(db, 'users', user.uid, 'following', id));
-              setFollowStatus((prev) => ({ ...prev, [id]: snap.exists() }));
-            } catch (err) {
-              console.warn('Failed to fetch follow status for', id, err);
-              setFollowStatus((prev) => ({ ...prev, [id]: false }));
-            }
-          }
-        })
-      );
-    } catch (err) {
-      console.error('Failed to fetch follow status', err);
-    }
-  };
-  fetchFollow();
-}, [wishList, user, followStatus]);
-
-useEffect(() => {
-  const showWelcome = async () => {
-    try {
-      const seen = await AsyncStorage.getItem('seenWelcome');
-      if (!seen) {
-        Alert.alert(
-          'Welcome to WhispList',
-          'Share your wishes anonymously and tap a wish to read or comment.'
+          }),
         );
-        await AsyncStorage.setItem('seenWelcome', 'true');
+      } catch (err) {
+        console.error('Failed to fetch public status', err);
       }
-    } catch (err) {
-      console.error('Failed in showWelcome', err);
-    }
-  };
-  showWelcome();
-}, []);
+    };
+    fetchStatus();
+  }, [wishList, publicStatus, stripeAccounts]);
 
-useEffect(() => {
-  const loadPromptAndStreak = async () => {
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const savedDate = await AsyncStorage.getItem('dailyPromptDate');
-      let savedPrompt = await AsyncStorage.getItem('dailyPromptText');
-      const recentRaw = await AsyncStorage.getItem('recentPromptIndices');
-      let recent: number[] = recentRaw ? JSON.parse(recentRaw) : [];
-
-      if (savedDate !== today || !savedPrompt) {
-        const index = pickPromptIndex(recent);
-        savedPrompt = DAILY_PROMPTS[index];
-        await AsyncStorage.setItem('dailyPromptDate', today);
-        await AsyncStorage.setItem('dailyPromptText', savedPrompt);
-        recent = [index, ...recent].slice(0, 20);
-        await AsyncStorage.setItem('recentPromptIndices', JSON.stringify(recent));
+  useEffect(() => {
+    const fetchFollow = async () => {
+      if (!user) return;
+      const ids = Array.from(
+        new Set(
+          wishList
+            .map((w) => w.userId)
+            .filter(
+              (id): id is string => typeof id === 'string' && id !== user.uid,
+            ),
+        ),
+      );
+      try {
+        await Promise.all(
+          ids.map(async (id) => {
+            if (followStatus[id] === undefined) {
+              try {
+                const snap = await getDoc(
+                  doc(db, 'users', user.uid, 'following', id),
+                );
+                setFollowStatus((prev) => ({ ...prev, [id]: snap.exists() }));
+              } catch (err) {
+                console.warn('Failed to fetch follow status for', id, err);
+                setFollowStatus((prev) => ({ ...prev, [id]: false }));
+              }
+            }
+          }),
+        );
+      } catch (err) {
+        console.error('Failed to fetch follow status', err);
       }
+    };
+    fetchFollow();
+  }, [wishList, user, followStatus]);
 
-      setDailyPrompt(savedPrompt || '');
-      Animated.timing(promptOpacity, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }).start();
+  useEffect(() => {
+    const showWelcome = async () => {
+      try {
+        const seen = await AsyncStorage.getItem('seenWelcome');
+        if (!seen) {
+          Alert.alert(
+            'Welcome to WhispList',
+            'Share your wishes anonymously and tap a wish to read or comment.',
+          );
+          await AsyncStorage.setItem('seenWelcome', 'true');
+        }
+      } catch (err) {
+        console.error('Failed in showWelcome', err);
+      }
+    };
+    showWelcome();
+  }, []);
 
-      const streak = await AsyncStorage.getItem('streakCount');
-      if (streak) setStreakCount(parseInt(streak, 10));
-    } catch (err) {
-      console.error('Failed to load prompt or streak', err);
-    }
-  };
+  useEffect(() => {
+    const loadPromptAndStreak = async () => {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const savedDate = await AsyncStorage.getItem('dailyPromptDate');
+        let savedPrompt = await AsyncStorage.getItem('dailyPromptText');
+        const recentRaw = await AsyncStorage.getItem('recentPromptIndices');
+        let recent: number[] = recentRaw ? JSON.parse(recentRaw) : [];
 
-  loadPromptAndStreak();
-}, [promptOpacity]);
+        if (savedDate !== today || !savedPrompt) {
+          const index = pickPromptIndex(recent);
+          savedPrompt = DAILY_PROMPTS[index];
+          await AsyncStorage.setItem('dailyPromptDate', today);
+          await AsyncStorage.setItem('dailyPromptText', savedPrompt);
+          recent = [index, ...recent].slice(0, 20);
+          await AsyncStorage.setItem(
+            'recentPromptIndices',
+            JSON.stringify(recent),
+          );
+        }
+
+        setDailyPrompt(savedPrompt || '');
+        Animated.timing(promptOpacity, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }).start();
+
+        const streak = await AsyncStorage.getItem('streakCount');
+        if (streak) setStreakCount(parseInt(streak, 10));
+      } catch (err) {
+        console.error('Failed to load prompt or streak', err);
+      }
+    };
+
+    loadPromptAndStreak();
+  }, [promptOpacity]);
 
   const startRecording = async () => {
     try {
-      const { granted } = await (ExpoAudio as any).requestRecordingPermissionsAsync();
+      const { granted } = await (
+        ExpoAudio as any
+      ).requestRecordingPermissionsAsync();
       if (!granted) {
-        Alert.alert('Permission required', 'Microphone access is needed to record');
+        Alert.alert(
+          'Permission required',
+          'Microphone access is needed to record',
+        );
         return;
       }
       await (ExpoAudio as any).setAudioModeAsync({
         allowsRecording: true,
         interruptionMode: (ExpoAudio as any).INTERRUPTION_MODE_IOS_DO_NOT_MIX,
         playsInSilentMode: true,
-        interruptionModeAndroid: (ExpoAudio as any).INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
+        interruptionModeAndroid: (ExpoAudio as any)
+          .INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
         shouldPlayInBackground: false,
         shouldRouteThroughEarpiece: false,
       });
@@ -360,7 +416,10 @@ useEffect(() => {
   const pickImage = async () => {
     const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!granted) {
-      Alert.alert('Permission required', 'Media access is needed to select images');
+      Alert.alert(
+        'Permission required',
+        'Media access is needed to select images',
+      );
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -375,7 +434,10 @@ useEffect(() => {
   const updateStreak = async () => {
     const today = new Date().toISOString().split('T')[0];
     const lastDate = await AsyncStorage.getItem('lastPostedDate');
-    let streak = parseInt((await AsyncStorage.getItem('streakCount')) || '0', 10);
+    let streak = parseInt(
+      (await AsyncStorage.getItem('streakCount')) || '0',
+      10,
+    );
     if (lastDate === today) return;
     if (lastDate) {
       const diff =
@@ -427,7 +489,7 @@ useEffect(() => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: originalWishText }),
-        }
+        },
       );
       const data = await response.json();
       const suggestion = data.suggestion?.trim();
@@ -454,7 +516,10 @@ useEffect(() => {
     setPosting(true);
     try {
       if (giftLink.trim() && !/^https?:\/\//.test(giftLink.trim())) {
-        Alert.alert('Invalid link', 'Gift link must start with http:// or https://');
+        Alert.alert(
+          'Invalid link',
+          'Gift link must start with http:// or https://',
+        );
         setPosting(false);
         return;
       }
@@ -482,11 +547,12 @@ useEffect(() => {
         displayName: useProfilePost ? profile?.displayName || '' : '',
         photoURL: useProfilePost ? profile?.photoURL || '' : '',
         isAnonymous: !useProfilePost,
-        ...(enableExternalGift && giftLink.trim() && {
-          giftLink: giftLink.trim(),
-          ...(giftType.trim() && { giftType: giftType.trim() }),
-          ...(giftLabel.trim() && { giftLabel: giftLabel.trim() }),
-        }),
+        ...(enableExternalGift &&
+          giftLink.trim() && {
+            giftLink: giftLink.trim(),
+            ...(giftType.trim() && { giftType: giftType.trim() }),
+            ...(giftLabel.trim() && { giftLabel: giftLabel.trim() }),
+          }),
         ...(isPoll && {
           isPoll: true,
           optionA: optionA.trim(),
@@ -496,7 +562,9 @@ useEffect(() => {
         }),
         ...(audioUrl && { audioUrl }),
         ...(imageUrl && { imageUrl }),
-        ...(autoDelete && { expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) }),
+        ...(autoDelete && {
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        }),
       });
 
       try {
@@ -504,7 +572,10 @@ useEffect(() => {
         const history = raw ? JSON.parse(raw) : [];
         history.unshift({ text: wish.trim(), timestamp: Date.now() });
         if (history.length > 7) history.splice(7);
-        await AsyncStorage.setItem('reflectionHistory', JSON.stringify(history));
+        await AsyncStorage.setItem(
+          'reflectionHistory',
+          JSON.stringify(history),
+        );
       } catch (err) {
         console.error('Failed to save reflection history', err);
       }
@@ -529,7 +600,6 @@ useEffect(() => {
       setPosting(false);
     }
   };
-
 
   const handleReport = async (reason: string) => {
     if (!reportTarget) return;
@@ -558,10 +628,13 @@ useEffect(() => {
         query(
           collection(db, 'wishes'),
           where('boostedUntil', '>', now),
-          orderBy('boostedUntil', 'desc')
-        )
+          orderBy('boostedUntil', 'desc'),
+        ),
       );
-      const boosted = boostedSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
+      const boosted = boostedSnap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<Wish, 'id'>),
+      })) as Wish[];
 
       let normal: Wish[] = [];
       if (user && followingIds.length) {
@@ -570,11 +643,14 @@ useEffect(() => {
             collection(db, 'wishes'),
             where('userId', 'in', followingIds),
             orderBy('timestamp', 'desc'),
-            limit(20)
-          )
+            limit(20),
+          ),
         );
         setLastDoc(normalSnap.docs[normalSnap.docs.length - 1] || null);
-        normal = normalSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
+        normal = normalSnap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as Omit<Wish, 'id'>),
+        })) as Wish[];
       }
       setWishList([...boosted, ...normal]);
       setError(null);
@@ -597,12 +673,15 @@ useEffect(() => {
           where('userId', 'in', followingIds),
           orderBy('timestamp', 'desc'),
           startAfter(lastDoc),
-          limit(20)
-        )
+          limit(20),
+        ),
       );
       setLastDoc(snap.docs[snap.docs.length - 1] || lastDoc);
-      const more = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Wish,'id'>) })) as Wish[];
-      setWishList(prev => [...prev, ...more]);
+      const more = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<Wish, 'id'>),
+      })) as Wish[];
+      setWishList((prev) => [...prev, ...more]);
     } catch (err) {
       console.warn('Failed to load more wishes', err);
       setError("Couldn't load data. Check your connection and try again.");
@@ -613,7 +692,9 @@ useEffect(() => {
     (wish) =>
       wish.text.toLowerCase().includes(searchTerm.toLowerCase()) &&
       (filterType === 'all' || wish.type === filterType) &&
-      (!wish.expiresAt || (wish.expiresAt.toDate ? wish.expiresAt.toDate() : wish.expiresAt) > new Date())
+      (!wish.expiresAt ||
+        (wish.expiresAt.toDate ? wish.expiresAt.toDate() : wish.expiresAt) >
+          new Date()),
   );
 
   const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
@@ -635,7 +716,9 @@ useEffect(() => {
             getDocs(collection(db, 'gifts', item.id, 'gifts')),
           ]);
           let msg = false;
-          snaps[0].forEach(d => { if (d.data().message) msg = true; });
+          snaps[0].forEach((d) => {
+            if (d.data().message) msg = true;
+          });
           setGiftCount(snaps[0].size + snaps[1].size);
           setHasGiftMsg(msg);
         } catch (err) {
@@ -647,14 +730,23 @@ useEffect(() => {
 
     useEffect(() => {
       if (isBoosted && item.boostedUntil?.toDate) {
-        const update = () => setTimeLeft(formatTimeLeft(item.boostedUntil.toDate()));
+        const update = () =>
+          setTimeLeft(formatTimeLeft(item.boostedUntil.toDate()));
         update();
         const id = setInterval(update, 60000);
         const loop = Animated.loop(
           Animated.sequence([
-            Animated.timing(glowAnim, { toValue: 1, duration: 1000, useNativeDriver: false }),
-            Animated.timing(glowAnim, { toValue: 0, duration: 1000, useNativeDriver: false }),
-          ])
+            Animated.timing(glowAnim, {
+              toValue: 1,
+              duration: 1000,
+              useNativeDriver: false,
+            }),
+            Animated.timing(glowAnim, {
+              toValue: 0,
+              duration: 1000,
+              useNativeDriver: false,
+            }),
+          ]),
         );
         loop.start();
         return () => {
@@ -667,7 +759,10 @@ useEffect(() => {
     }, [glowAnim, isBoosted, item.boostedUntil]);
 
     const borderColor = isBoosted
-      ? glowAnim.interpolate({ inputRange: [0, 1], outputRange: ['#facc15', '#fde68a'] })
+      ? glowAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: ['#facc15', '#fde68a'],
+        })
       : 'transparent';
 
     const canBoost =
@@ -689,7 +784,7 @@ useEffect(() => {
             },
           },
           { text: 'Cancel', style: 'cancel' },
-        ]
+        ],
       );
     };
 
@@ -700,7 +795,11 @@ useEffect(() => {
           text: 'Continue',
           onPress: async () => {
             try {
-              const res = await createGiftCheckout(item.id!, amount, item.userId!);
+              const res = await createGiftCheckout(
+                item.id!,
+                amount,
+                item.userId!,
+              );
               if (res.url) await WebBrowser.openBrowserAsync(res.url);
             } catch (err) {
               console.error('Failed to checkout', err);
@@ -722,8 +821,11 @@ useEffect(() => {
           },
         ]}
       >
-        {(item.giftLink) && <Text style={styles.giftBadge}>🎁 Gifted</Text>}
-        <TouchableOpacity onPress={() => router.push(`/wish/${item.id}`)} hitSlop={HIT_SLOP}>
+        {item.giftLink && <Text style={styles.giftBadge}>🎁 Gifted</Text>}
+        <TouchableOpacity
+          onPress={() => router.push(`/wish/${item.id}`)}
+          hitSlop={HIT_SLOP}
+        >
           {!item.isAnonymous &&
             item.displayName &&
             publicStatus[item.userId || ''] && (
@@ -735,38 +837,65 @@ useEffect(() => {
               </TouchableOpacity>
             )}
           <Text style={{ color: '#a78bfa', fontSize: 12 }}>
-            {typeInfo[item.type || 'wish'].emoji} #{item.category} {item.audioUrl ? '🔊' : ''}
+            {typeInfo[item.type || 'wish'].emoji} #{item.category}{' '}
+            {item.audioUrl ? '🔊' : ''}
           </Text>
           <Text style={styles.wishText}>{item.text}</Text>
-          {item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.preview} />}
+          {item.imageUrl && (
+            <Image source={{ uri: item.imageUrl }} style={styles.preview} />
+          )}
           {item.isPoll ? (
             <View style={{ marginTop: 6 }}>
-              <Text style={styles.pollText}>{item.optionA}: {item.votesA || 0}</Text>
-              <Text style={styles.pollText}>{item.optionB}: {item.votesB || 0}</Text>
+              <Text style={styles.pollText}>
+                {item.optionA}: {item.votesA || 0}
+              </Text>
+              <Text style={styles.pollText}>
+                {item.optionB}: {item.votesB || 0}
+              </Text>
             </View>
           ) : (
             <Text style={styles.likeText}>❤️ {item.likes}</Text>
           )}
           {isBoosted && (
-            <Text style={styles.boostedLabel}>⏳ Boost expires in {timeLeft}</Text>
+            <Text style={styles.boostedLabel}>
+              ⏳ Boost expires in {timeLeft}
+            </Text>
           )}
           {(item.giftLink || giftCount > 0) && (
-            <Text style={styles.boostedLabel}>🎁 Supported by {giftCount} people</Text>
+            <Text style={styles.boostedLabel}>
+              🎁 Supported by {giftCount} people
+            </Text>
           )}
           {user?.uid === item.userId && hasGiftMsg && (
-            <Text style={styles.boostedLabel}>💬 You received a gift message</Text>
+            <Text style={styles.boostedLabel}>
+              💬 You received a gift message
+            </Text>
           )}
           {profile?.giftingEnabled && item.giftLink && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginTop: 6,
+              }}
+            >
               <TouchableOpacity
                 onPress={() => openGiftLink(item.giftLink!)}
-                style={{ backgroundColor: theme.input, padding: 6, borderRadius: 6 }}
+                style={{
+                  backgroundColor: theme.input,
+                  padding: 6,
+                  borderRadius: 6,
+                }}
               >
                 <Text style={{ color: theme.tint }}>
                   {(() => {
                     try {
                       const url = new URL(item.giftLink!);
-                      const trusted = ['venmo.com', 'paypal.me', 'amazon.com'].some(d => url.hostname.includes(d));
+                      const trusted = [
+                        'venmo.com',
+                        'paypal.me',
+                        'amazon.com',
+                      ].some((d) => url.hostname.includes(d));
                       return `${trusted ? '✅' : '⚠️'} 🎁 ${item.giftLabel || 'Send Gift'}`;
                     } catch {
                       return `⚠️ 🎁 ${item.giftLabel || 'Send Gift'}`;
@@ -778,19 +907,23 @@ useEffect(() => {
                 onPress={() =>
                   Alert.alert(
                     'Gift Info',
-                    'Gifting is anonymous and optional. You can attach a support link like Venmo or Stripe.'
+                    'Gifting is anonymous and optional. You can attach a support link like Venmo or Stripe.',
                   )
                 }
                 style={{ marginLeft: 6 }}
                 hitSlop={HIT_SLOP}
               >
-                <Ionicons name="information-circle-outline" size={16} color={theme.text} />
+                <Ionicons
+                  name="information-circle-outline"
+                  size={16}
+                  color={theme.text}
+                />
               </TouchableOpacity>
             </View>
           )}
           {profile?.giftingEnabled && stripeAccounts[item.userId || ''] && (
             <View style={{ flexDirection: 'row', marginTop: 4 }}>
-              {[3,5,10].map((amt) => (
+              {[3, 5, 10].map((amt) => (
                 <TouchableOpacity
                   key={amt}
                   onPress={() => sendMoney(amt)}
@@ -809,7 +942,9 @@ useEffect(() => {
         </TouchableOpacity>
 
         {canBoost && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+          <View
+            style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}
+          >
             <TouchableOpacity
               onPress={() => router.push(`/boost/${item.id}`)}
               hitSlop={HIT_SLOP}
@@ -818,12 +953,19 @@ useEffect(() => {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() =>
-                Alert.alert('Boost Info', 'Boosting highlights a wish for 24 hours.')
+                Alert.alert(
+                  'Boost Info',
+                  'Boosting highlights a wish for 24 hours.',
+                )
               }
               style={{ marginLeft: 6 }}
               hitSlop={HIT_SLOP}
             >
-              <Ionicons name="information-circle-outline" size={16} color={theme.text} />
+              <Ionicons
+                name="information-circle-outline"
+                size={16}
+                color={theme.text}
+              />
             </TouchableOpacity>
           </View>
         )}
@@ -870,302 +1012,417 @@ useEffect(() => {
   try {
     return (
       <SafeAreaView style={styles.safeArea}>
-      <Modal
-        visible={postConfirm}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPostConfirm(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setPostConfirm(false)}
+        <Modal
+          visible={postConfirm}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setPostConfirm(false)}
         >
-          <View style={[styles.modalContent, { backgroundColor: theme.input }]}>
-            <Text style={{ color: theme.text, marginBottom: 10, textAlign: 'center' }}>
-              💭 Your wish has been sent into the world.
-            </Text>
-            <TouchableOpacity onPress={() => { setPostConfirm(false); router.push('/feed'); }} style={{ marginBottom: 10 }}>
-              <Text style={{ color: theme.tint, textAlign: 'center' }}>View in Feed</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setPostConfirm(false)}>
-              <Text style={{ color: theme.tint, textAlign: 'center' }}>Post another wish</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-      <RNStatusBar
-        barStyle={theme.name === 'dark' ? 'light-content' : 'dark-content'}
-        backgroundColor={theme.background}
-      />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.container}
-      >
-        <FlatList
-          data={filteredWishes}
-          keyExtractor={(item) => item.id}
-          onEndReached={loadMore}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          contentContainerStyle={styles.contentContainer}
-          ListHeaderComponent={
-            <>
-              <Text style={styles.title}>WhispList ✨</Text>
-              {error && (
-                <Text style={{ color: theme.tint, textAlign: 'center', marginBottom: 8 }}>
-                  {error}
-                </Text>
-              )}
-              <Text style={styles.subtitle}>Post a wish and see what dreams grow 🌱</Text>
-              {streakCount > 0 && (
-                <Text style={styles.streak}>
-                  🔥 You’ve posted {streakCount} days in a row!
-                </Text>
-              )}
-
-              <Text style={styles.label}>Search</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Search wishes..."
-                placeholderTextColor="#999"
-                value={searchTerm}
-                onChangeText={setSearchTerm}
-              />
-
-              <Text style={styles.label}>Filter by Type</Text>
-              <Picker
-                selectedValue={filterType}
-                onValueChange={(val) => setFilterType(val)}
-                style={styles.input}
-                dropdownIconColor="#fff"
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setPostConfirm(false)}
+          >
+            <View
+              style={[styles.modalContent, { backgroundColor: theme.input }]}
+            >
+              <Text
+                style={{
+                  color: theme.text,
+                  marginBottom: 10,
+                  textAlign: 'center',
+                }}
               >
-                <Picker.Item label="All" value="all" />
-                <Picker.Item label="Wish 💭" value="wish" />
-                <Picker.Item label="Confession 😶‍🌫️" value="confession" />
-                <Picker.Item label="Advice Request 🧠" value="advice" />
-                <Picker.Item label="Dream 🌙" value="dream" />
-              </Picker>
-
-              <View style={styles.formCard}>
-                <Text style={styles.sectionTitle}>💭 What’s your wish today?</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="What's your wish?"
-                  placeholderTextColor="#999"
-                  value={wish}
-                  onChangeText={setWish}
-                />
-                <TouchableOpacity
-                  onPress={handleRephrase}
-                  style={[styles.button, { marginBottom: 10 }]}
-                  disabled={rephrasing || wish.trim() === ''}
-                >
-                  <Text style={styles.buttonText}>
-                    {rephrasing ? 'Thinking...' : '✨ Help me rephrase this'}
+                💭 Your wish has been sent into the world.
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setPostConfirm(false);
+                  router.push('/feed');
+                }}
+                style={{ marginBottom: 10 }}
+              >
+                <Text style={{ color: theme.tint, textAlign: 'center' }}>
+                  View in Feed
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setPostConfirm(false)}>
+                <Text style={{ color: theme.tint, textAlign: 'center' }}>
+                  Post another wish
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+        <RNStatusBar
+          barStyle={theme.name === 'dark' ? 'light-content' : 'dark-content'}
+          backgroundColor={theme.background}
+        />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.container}
+        >
+          <FlatList
+            data={filteredWishes}
+            keyExtractor={(item) => item.id}
+            onEndReached={loadMore}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            contentContainerStyle={styles.contentContainer}
+            ListHeaderComponent={
+              <>
+                <Text style={styles.title}>WhispList ✨</Text>
+                {error && (
+                  <Text
+                    style={{
+                      color: theme.tint,
+                      textAlign: 'center',
+                      marginBottom: 8,
+                    }}
+                  >
+                    {error}
                   </Text>
-                </TouchableOpacity>
-
-                {dailyPrompt !== '' && (
-                  <>
-                    <Text style={styles.promptTitle}>Daily Prompt ✨</Text>
-                    <Animated.View style={[styles.promptCard, { opacity: promptOpacity }]}>
-                      <Text style={styles.promptText}>{dailyPrompt}</Text>
-                    </Animated.View>
-                    <TouchableOpacity onPress={requestNewPrompt}>
-                      <Text style={{ color: theme.tint }}>🔁 Give me a different prompt</Text>
-                    </TouchableOpacity>
-                  </>
+                )}
+                <Text style={styles.subtitle}>
+                  Post a wish and see what dreams grow 🌱
+                </Text>
+                {streakCount > 0 && (
+                  <Text style={styles.streak}>
+                    🔥 You’ve posted {streakCount} days in a row!
+                  </Text>
                 )}
 
-                <Text style={styles.label}>Post Type</Text>
+                <Text style={styles.label}>Search</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Search wishes..."
+                  placeholderTextColor="#999"
+                  value={searchTerm}
+                  onChangeText={setSearchTerm}
+                />
+
+                <Text style={styles.label}>Filter by Type</Text>
                 <Picker
-                  selectedValue={postType}
-                  onValueChange={(val) => setPostType(val)}
+                  selectedValue={filterType}
+                  onValueChange={(val) => setFilterType(val)}
                   style={styles.input}
                   dropdownIconColor="#fff"
                 >
+                  <Picker.Item label="All" value="all" />
                   <Picker.Item label="Wish 💭" value="wish" />
                   <Picker.Item label="Confession 😶‍🌫️" value="confession" />
                   <Picker.Item label="Advice Request 🧠" value="advice" />
-                <Picker.Item label="Dream 🌙" value="dream" />
-              </Picker>
+                  <Picker.Item label="Dream 🌙" value="dream" />
+                </Picker>
 
-                <TouchableOpacity
-                  onPress={() => {
-                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                    setShowAdvanced(!showAdvanced);
-                  }}
-                >
-                  <Text style={styles.sectionTitle}>Advanced Options {showAdvanced ? '▲' : '▼'}</Text>
-                </TouchableOpacity>
-                {showAdvanced && (
-                  <>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                      <Text style={{ color: theme.text, marginRight: 8 }}>Poll Mode</Text>
-                      <Switch value={isPoll} onValueChange={setIsPoll} />
-                    </View>
-                    {isPoll && (
-                      <>
-                        <Text style={styles.label}>Option A</Text>
-                        <TextInput
-                          style={styles.input}
-                          placeholder="Option A"
-                          placeholderTextColor="#999"
-                          value={optionA}
-                          onChangeText={setOptionA}
-                        />
-                        <Text style={styles.label}>Option B</Text>
-                        <TextInput
-                          style={styles.input}
-                          placeholder="Option B"
-                          placeholderTextColor="#999"
-                          value={optionB}
-                          onChangeText={setOptionB}
-                        />
-                      </>
-                    )}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                      <Text style={{ color: theme.text, marginRight: 8 }}>Include Audio</Text>
-                      <Switch
-                        value={includeAudio}
-                        onValueChange={(v) => {
-                          setIncludeAudio(v);
-                          if (!v) {
-                            if (isRecording) stopRecording();
-                            setRecordedUri(null);
-                          }
+                <View style={styles.formCard}>
+                  <Text style={styles.sectionTitle}>
+                    💭 What’s your wish today?
+                  </Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="What's your wish?"
+                    placeholderTextColor="#999"
+                    value={wish}
+                    onChangeText={setWish}
+                  />
+                  <TouchableOpacity
+                    onPress={handleRephrase}
+                    style={[styles.button, { marginBottom: 10 }]}
+                    disabled={rephrasing || wish.trim() === ''}
+                  >
+                    <Text style={styles.buttonText}>
+                      {rephrasing ? 'Thinking...' : '✨ Help me rephrase this'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {dailyPrompt !== '' && (
+                    <>
+                      <Text style={styles.promptTitle}>Daily Prompt ✨</Text>
+                      <Animated.View
+                        style={[styles.promptCard, { opacity: promptOpacity }]}
+                      >
+                        <Text style={styles.promptText}>{dailyPrompt}</Text>
+                      </Animated.View>
+                      <TouchableOpacity onPress={requestNewPrompt}>
+                        <Text style={{ color: theme.tint }}>
+                          🔁 Give me a different prompt
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+
+                  <Text style={styles.label}>Post Type</Text>
+                  <Picker
+                    selectedValue={postType}
+                    onValueChange={(val) => setPostType(val)}
+                    style={styles.input}
+                    dropdownIconColor="#fff"
+                  >
+                    <Picker.Item label="Wish 💭" value="wish" />
+                    <Picker.Item label="Confession 😶‍🌫️" value="confession" />
+                    <Picker.Item label="Advice Request 🧠" value="advice" />
+                    <Picker.Item label="Dream 🌙" value="dream" />
+                  </Picker>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      LayoutAnimation.configureNext(
+                        LayoutAnimation.Presets.easeInEaseOut,
+                      );
+                      setShowAdvanced(!showAdvanced);
+                    }}
+                  >
+                    <Text style={styles.sectionTitle}>
+                      Advanced Options {showAdvanced ? '▲' : '▼'}
+                    </Text>
+                  </TouchableOpacity>
+                  {showAdvanced && (
+                    <>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          marginBottom: 10,
                         }}
-                      />
-                    </View>
-                    {stripeEnabled && (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                        <Text style={{ color: theme.text, marginRight: 8 }}>Add External Gift Option</Text>
-                        <Switch value={enableExternalGift} onValueChange={setEnableExternalGift} />
+                      >
+                        <Text style={{ color: theme.text, marginRight: 8 }}>
+                          Poll Mode
+                        </Text>
+                        <Switch value={isPoll} onValueChange={setIsPoll} />
                       </View>
+                      {isPoll && (
+                        <>
+                          <Text style={styles.label}>Option A</Text>
+                          <TextInput
+                            style={styles.input}
+                            placeholder="Option A"
+                            placeholderTextColor="#999"
+                            value={optionA}
+                            onChangeText={setOptionA}
+                          />
+                          <Text style={styles.label}>Option B</Text>
+                          <TextInput
+                            style={styles.input}
+                            placeholder="Option B"
+                            placeholderTextColor="#999"
+                            value={optionB}
+                            onChangeText={setOptionB}
+                          />
+                        </>
+                      )}
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          marginBottom: 10,
+                        }}
+                      >
+                        <Text style={{ color: theme.text, marginRight: 8 }}>
+                          Include Audio
+                        </Text>
+                        <Switch
+                          value={includeAudio}
+                          onValueChange={(v) => {
+                            setIncludeAudio(v);
+                            if (!v) {
+                              if (isRecording) stopRecording();
+                              setRecordedUri(null);
+                            }
+                          }}
+                        />
+                      </View>
+                      {stripeEnabled && (
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            marginBottom: 10,
+                          }}
+                        >
+                          <Text style={{ color: theme.text, marginRight: 8 }}>
+                            Add External Gift Option
+                          </Text>
+                          <Switch
+                            value={enableExternalGift}
+                            onValueChange={setEnableExternalGift}
+                          />
+                        </View>
+                      )}
+                      {(!stripeEnabled || enableExternalGift) && (
+                        <>
+                          <Text style={styles.label}>
+                            Add a gift link (e.g., Venmo, wishlist)
+                          </Text>
+                          <TextInput
+                            style={styles.input}
+                            placeholder="Gift link (optional)"
+                            placeholderTextColor="#999"
+                            value={giftLink}
+                            onChangeText={setGiftLink}
+                          />
+                          <Text style={styles.label}>Gift Type</Text>
+                          <TextInput
+                            style={styles.input}
+                            placeholder="kofi, paypal, etc"
+                            placeholderTextColor="#999"
+                            value={giftType}
+                            onChangeText={setGiftType}
+                          />
+                          <Text style={styles.label}>Gift Label</Text>
+                          <TextInput
+                            style={styles.input}
+                            placeholder="Support on Ko-fi"
+                            placeholderTextColor="#999"
+                            value={giftLabel}
+                            onChangeText={setGiftLabel}
+                          />
+                        </>
+                      )}
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          marginBottom: 10,
+                        }}
+                      >
+                        <Text style={{ color: theme.text, marginRight: 8 }}>
+                          Post with profile
+                        </Text>
+                        <Switch
+                          value={useProfilePost}
+                          onValueChange={setUseProfilePost}
+                        />
+                      </View>
+                    </>
+                  )}
+
+                  {/* Poll Mode Switch and Inputs removed, handled above */}
+
+                  {/* Auto-delete after 24h */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      marginBottom: 10,
+                    }}
+                  >
+                    <Text style={{ color: '#fff', marginRight: 8 }}>
+                      Auto-delete after 24h
+                    </Text>
+                    <Switch value={autoDelete} onValueChange={setAutoDelete} />
+                  </View>
+
+                  {/* Audio Recording Button */}
+                  {includeAudio && (
+                    <TouchableOpacity
+                      style={[
+                        styles.recButton,
+                        {
+                          backgroundColor: isRecording ? '#ef4444' : '#22c55e',
+                        },
+                      ]}
+                      onPress={isRecording ? stopRecording : startRecording}
+                      hitSlop={HIT_SLOP}
+                    >
+                      <Text style={styles.buttonText}>
+                        {isRecording ? 'Stop Recording' : 'Record Audio'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {selectedImage && (
+                    <Image
+                      source={{ uri: selectedImage }}
+                      style={styles.preview}
+                    />
+                  )}
+                  <TouchableOpacity
+                    style={styles.button}
+                    onPress={pickImage}
+                    hitSlop={HIT_SLOP}
+                  >
+                    <Text style={styles.buttonText}>
+                      {selectedImage ? 'Change Image' : 'Attach Image'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <Pressable
+                    style={[
+                      styles.button,
+                      { opacity: wish.trim() === '' || posting ? 0.5 : 1 },
+                    ]}
+                    onPress={handlePostWish}
+                    disabled={wish.trim() === '' || posting}
+                    hitSlop={HIT_SLOP}
+                  >
+                    {posting ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.buttonText}>Post Wish</Text>
                     )}
-                    {(!stripeEnabled || enableExternalGift) && (
-                      <>
-                        <Text style={styles.label}>Add a gift link (e.g., Venmo, wishlist)</Text>
-                        <TextInput
-                          style={styles.input}
-                          placeholder="Gift link (optional)"
-                          placeholderTextColor="#999"
-                          value={giftLink}
-                          onChangeText={setGiftLink}
-                        />
-                        <Text style={styles.label}>Gift Type</Text>
-                        <TextInput
-                          style={styles.input}
-                          placeholder="kofi, paypal, etc"
-                          placeholderTextColor="#999"
-                          value={giftType}
-                          onChangeText={setGiftType}
-                        />
-                        <Text style={styles.label}>Gift Label</Text>
-                        <TextInput
-                          style={styles.input}
-                          placeholder="Support on Ko-fi"
-                          placeholderTextColor="#999"
-                          value={giftLabel}
-                          onChangeText={setGiftLabel}
-                        />
-                      </>
-                    )}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                      <Text style={{ color: theme.text, marginRight: 8 }}>Post with profile</Text>
-                      <Switch value={useProfilePost} onValueChange={setUseProfilePost} />
-                    </View>
-                  </>
-                )}
+                  </Pressable>
 
-        {/* Poll Mode Switch and Inputs removed, handled above */}
-
-        {/* Auto-delete after 24h */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-          <Text style={{ color: '#fff', marginRight: 8 }}>Auto-delete after 24h</Text>
-          <Switch value={autoDelete} onValueChange={setAutoDelete} />
-        </View>
-
-        {/* Audio Recording Button */}
-        {includeAudio && (
-          <TouchableOpacity
-            style={[
-              styles.recButton,
-              { backgroundColor: isRecording ? '#ef4444' : '#22c55e' },
-            ]}
-            onPress={isRecording ? stopRecording : startRecording}
-            hitSlop={HIT_SLOP}
-          >
-            <Text style={styles.buttonText}>
-              {isRecording ? 'Stop Recording' : 'Record Audio'}
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {selectedImage && (
-          <Image source={{ uri: selectedImage }} style={styles.preview} />
-        )}
-        <TouchableOpacity style={styles.button} onPress={pickImage} hitSlop={HIT_SLOP}>
-          <Text style={styles.buttonText}>
-            {selectedImage ? 'Change Image' : 'Attach Image'}
-          </Text>
-        </TouchableOpacity>
-
-        <Pressable
-          style={[styles.button, { opacity: wish.trim() === '' || posting ? 0.5 : 1 }]}
-          onPress={handlePostWish}
-          disabled={wish.trim() === '' || posting}
-          hitSlop={HIT_SLOP}
-        >
-          {posting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Post Wish</Text>
-          )}
-        </Pressable>
-
-        <TouchableOpacity onPress={() => router.push('/auth')} style={styles.authButton}>
-          <Text style={styles.authButtonText}>Go to Auth</Text>
-        </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => router.push('/auth')}
+                    style={styles.authButton}
+                  >
+                    <Text style={styles.authButtonText}>Go to Auth</Text>
+                  </TouchableOpacity>
                 </View>
 
                 <View style={styles.formCard}>
                   <Text style={styles.sectionTitle}>Your Impact</Text>
-                  <Text style={styles.info}>🔥 You’ve posted {impact.wishes} wishes</Text>
-                  <Text style={styles.info}>🌟 Boosted {impact.boosts} — earned {impact.wishes > 0 ? impact.boosts * 9 : 0} likes</Text>
-                  <Text style={styles.info}>🎁 Received {impact.gifts} gifts — ${impact.giftTotal}</Text>
+                  <Text style={styles.info}>
+                    🔥 You’ve posted {impact.wishes} wishes
+                  </Text>
+                  <Text style={styles.info}>
+                    🌟 Boosted {impact.boosts} — earned{' '}
+                    {impact.wishes > 0 ? impact.boosts * 9 : 0} likes
+                  </Text>
+                  <Text style={styles.info}>
+                    🎁 Received {impact.gifts} gifts — ${impact.giftTotal}
+                  </Text>
                 </View>
-            </>
-          }
-          ListEmptyComponent={
-            loading ? (
-              <ActivityIndicator size="large" color="#a78bfa" style={{ marginTop: 20 }} />
-            ) : (
-              <Text style={styles.noResults}>
-                No wishes yet in this category. Be the first to post ✨
-              </Text>
-            )
-          }
-          ListFooterComponent={
-            lastDoc ? (
-              <TouchableOpacity onPress={loadMore} style={{ marginVertical: 20 }}>
-                <Text style={{ color: theme.tint, textAlign: 'center' }}>Load More</Text>
-              </TouchableOpacity>
-            ) : null
-          }
-          renderItem={({ item }) => <WishCard item={item} />}
-        />
-        <ReportDialog
-          visible={reportVisible}
-          onClose={() => {
-            setReportVisible(false);
-            setReportTarget(null);
-          }}
-          onSubmit={handleReport}
-        />
-      </KeyboardAvoidingView>
+              </>
+            }
+            ListEmptyComponent={
+              loading ? (
+                <ActivityIndicator
+                  size="large"
+                  color="#a78bfa"
+                  style={{ marginTop: 20 }}
+                />
+              ) : (
+                <Text style={styles.noResults}>
+                  No wishes yet in this category. Be the first to post ✨
+                </Text>
+              )
+            }
+            ListFooterComponent={
+              lastDoc ? (
+                <TouchableOpacity
+                  onPress={loadMore}
+                  style={{ marginVertical: 20 }}
+                >
+                  <Text style={{ color: theme.tint, textAlign: 'center' }}>
+                    Load More
+                  </Text>
+                </TouchableOpacity>
+              ) : null
+            }
+            renderItem={({ item }) => <WishCard item={item} />}
+          />
+          <ReportDialog
+            visible={reportVisible}
+            onClose={() => {
+              setReportVisible(false);
+              setReportTarget(null);
+            }}
+            onSubmit={handleReport}
+          />
+        </KeyboardAvoidingView>
       </SafeAreaView>
     );
   } catch (err) {
@@ -1361,4 +1618,3 @@ const createStyles = (c: (typeof Colors)['light'] & { name: string }) =>
       borderRadius: 10,
     },
   });
-

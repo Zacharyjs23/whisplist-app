@@ -13,7 +13,14 @@ import {
 } from 'react-native';
 import { formatDistanceToNow } from 'date-fns';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { collection, addDoc, serverTimestamp, query, orderBy, getDocs } from 'firebase/firestore';
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  orderBy,
+  getDocs,
+} from 'firebase/firestore';
 import { addWish } from '../helpers/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -45,7 +52,7 @@ export default function JournalPage() {
       const savedDate = await AsyncStorage.getItem('dailyPromptDate');
       let savedPrompt = await AsyncStorage.getItem('dailyPromptText');
       const recentRaw = await AsyncStorage.getItem('recentPrompts');
-      let recent = recentRaw ? JSON.parse(recentRaw) as string[] : [];
+      let recent = recentRaw ? (JSON.parse(recentRaw) as string[]) : [];
       if (savedDate !== today || !savedPrompt) {
         let newPrompt = savedPrompt || '';
         for (let i = 0; i < 10; i++) {
@@ -58,29 +65,42 @@ export default function JournalPage() {
         savedPrompt = newPrompt;
         await AsyncStorage.setItem('dailyPromptDate', today);
         await AsyncStorage.setItem('dailyPromptText', newPrompt);
-        recent = [newPrompt, ...recent.filter(r => r !== newPrompt)].slice(0, 3);
+        recent = [newPrompt, ...recent.filter((r) => r !== newPrompt)].slice(
+          0,
+          3,
+        );
         await AsyncStorage.setItem('recentPrompts', JSON.stringify(recent));
       }
       promptOpacity.setValue(0);
       setPrompt(savedPrompt || '');
-      Animated.timing(promptOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+      Animated.timing(promptOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
       const sc = await AsyncStorage.getItem('journalStreakCount');
       setStreak(sc ? parseInt(sc, 10) : 0);
       if (user) {
-        const q = query(collection(db, 'users', user.uid, 'journalEntries'), orderBy('timestamp', 'desc'));
+        const q = query(
+          collection(db, 'users', user.uid, 'journalEntries'),
+          orderBy('timestamp', 'desc'),
+        );
         const snap = await getDocs(q);
-        let loaded = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+        let loaded = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
         const offlineRaw = await AsyncStorage.getItem('offlineJournalEntries');
         if (offlineRaw) {
           try {
             const offline = JSON.parse(offlineRaw) as any[];
             for (const o of offline) {
-              await addDoc(collection(db, 'users', user.uid, 'journalEntries'), {
-                text: o.text,
-                mood: o.mood,
-                prompt: o.prompt,
-                timestamp: serverTimestamp(),
-              });
+              await addDoc(
+                collection(db, 'users', user.uid, 'journalEntries'),
+                {
+                  text: o.text,
+                  mood: o.mood,
+                  prompt: o.prompt,
+                  timestamp: serverTimestamp(),
+                },
+              );
               loaded.unshift({ id: Math.random().toString(), ...o });
             }
             await AsyncStorage.removeItem('offlineJournalEntries');
@@ -90,7 +110,7 @@ export default function JournalPage() {
         }
         setEntries(loaded);
         const summary: Record<string, number> = {};
-        loaded.slice(0, 7).forEach(e => {
+        loaded.slice(0, 7).forEach((e) => {
           if (e.mood) summary[e.mood] = (summary[e.mood] || 0) + 1;
         });
         setMoodSummary(summary);
@@ -102,10 +122,14 @@ export default function JournalPage() {
   const updateStreak = async () => {
     const today = new Date().toISOString().split('T')[0];
     const lastDate = await AsyncStorage.getItem('lastJournalDate');
-    let count = parseInt((await AsyncStorage.getItem('journalStreakCount')) || '0', 10);
+    let count = parseInt(
+      (await AsyncStorage.getItem('journalStreakCount')) || '0',
+      10,
+    );
     if (lastDate === today) return;
     if (lastDate) {
-      const diff = (new Date(today).getTime() - new Date(lastDate).getTime()) / 86400000;
+      const diff =
+        (new Date(today).getTime() - new Date(lastDate).getTime()) / 86400000;
       count = diff === 1 ? count + 1 : 1;
     } else {
       count = 1;
@@ -132,7 +156,10 @@ export default function JournalPage() {
       const offlineRaw = await AsyncStorage.getItem('offlineJournalEntries');
       const offline = offlineRaw ? JSON.parse(offlineRaw) : [];
       offline.push({ ...data, timestamp: Date.now() });
-      await AsyncStorage.setItem('offlineJournalEntries', JSON.stringify(offline));
+      await AsyncStorage.setItem(
+        'offlineJournalEntries',
+        JSON.stringify(offline),
+      );
       Alert.alert('Saved offline', 'Your entry will sync when online.');
     }
     setEntries([
@@ -143,7 +170,7 @@ export default function JournalPage() {
       },
       ...entries,
     ]);
-    setMoodSummary(prev => ({
+    setMoodSummary((prev) => ({
       ...prev,
       [mood]: (prev[mood] || 0) + 1,
     }));
@@ -174,7 +201,9 @@ export default function JournalPage() {
     let recent = recentRaw ? (JSON.parse(recentRaw) as string[]) : [];
 
     let newPrompt = prompt;
-    const available = prompts.filter((p) => p !== prompt && !recent.includes(p));
+    const available = prompts.filter(
+      (p) => p !== prompt && !recent.includes(p),
+    );
     if (available.length > 0) {
       newPrompt = available[Math.floor(Math.random() * available.length)];
     } else {
@@ -209,47 +238,68 @@ export default function JournalPage() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <Text style={[styles.header, { color: theme.text }]}>Your Private Journal ✨</Text>
+      <Text style={[styles.header, { color: theme.text }]}>
+        Your Private Journal ✨
+      </Text>
       {usePrompt && (
         <>
           <Animated.View style={{ opacity: promptOpacity }}>
             <Text style={[styles.prompt, { color: theme.text }]}>{prompt}</Text>
           </Animated.View>
           <TouchableOpacity onPress={requestNewPrompt}>
-            <Text style={{ color: theme.tint }}>🔄 Give me a different prompt</Text>
+            <Text style={{ color: theme.tint }}>
+              🔄 Give me a different prompt
+            </Text>
           </TouchableOpacity>
         </>
       )}
       {streak > 0 && (
-        <Text style={[styles.streak, { color: theme.tint }]}>🔥 {streak}-day streak</Text>
+        <Text style={[styles.streak, { color: theme.tint }]}>
+          🔥 {streak}-day streak
+        </Text>
       )}
       {Object.keys(moodSummary).length > 0 && (
-        <Text style={[styles.summary, { color: theme.text }]}> 
+        <Text style={[styles.summary, { color: theme.text }]}>
           {Object.entries(moodSummary)
             .map(([m, c]) => `${m} ${c}`)
             .join('  ')}
         </Text>
       )}
       <View style={styles.row}>
-        {['😢','😐','😊','😄'].map((m) => (
-          <TouchableOpacity key={m} onPress={() => setMood(m)} style={{ marginRight: 8, opacity: mood === m ? 1 : 0.5 }}>
+        {['😢', '😐', '😊', '😄'].map((m) => (
+          <TouchableOpacity
+            key={m}
+            onPress={() => setMood(m)}
+            style={{ marginRight: 8, opacity: mood === m ? 1 : 0.5 }}
+          >
             <Text style={{ fontSize: 20 }}>{m}</Text>
           </TouchableOpacity>
         ))}
-        <TouchableOpacity onPress={() => setUsePrompt((p) => !p)} style={{ marginLeft: 'auto' }}>
-          <Text style={{ color: theme.tint }}>{usePrompt ? 'Freeform' : 'Use Prompt'}</Text>
+        <TouchableOpacity
+          onPress={() => setUsePrompt((p) => !p)}
+          style={{ marginLeft: 'auto' }}
+        >
+          <Text style={{ color: theme.tint }}>
+            {usePrompt ? 'Freeform' : 'Use Prompt'}
+          </Text>
         </TouchableOpacity>
       </View>
       <TextInput
         ref={inputRef}
-        style={[styles.input, { backgroundColor: theme.input, color: theme.text }]}
+        style={[
+          styles.input,
+          { backgroundColor: theme.input, color: theme.text },
+        ]}
         placeholder="Write your thoughts"
         placeholderTextColor={theme.text + '99'} // theme fix
         value={entry}
         onChangeText={setEntry}
         multiline
       />
-      <TouchableOpacity style={[styles.button, { backgroundColor: theme.tint }]} onPress={handlePost}>
+      <TouchableOpacity
+        style={[styles.button, { backgroundColor: theme.tint }]}
+        onPress={handlePost}
+      >
         <Text style={styles.buttonText}>Save Entry</Text>
       </TouchableOpacity>
       <FlatList
@@ -257,10 +307,12 @@ export default function JournalPage() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <TouchableOpacity
-            onPress={() => setExpandedId(expandedId === item.id ? null : item.id)}
+            onPress={() =>
+              setExpandedId(expandedId === item.id ? null : item.id)
+            }
             style={styles.entryItem}
           >
-            <Text style={[styles.entryText, { color: theme.text }]}> 
+            <Text style={[styles.entryText, { color: theme.text }]}>
               {item.mood || '😊'}{' '}
               {expandedId === item.id
                 ? item.text
@@ -268,22 +320,30 @@ export default function JournalPage() {
                   ? item.text.slice(0, 80) + '...'
                   : item.text}
             </Text>
-              <Text style={[styles.entryDate, { color: theme.text + '99' }]}> 
-                {/* theme fix */}
-                {item.timestamp?.seconds
-                  ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), { addSuffix: true })
-                  : 'Just now'}
-              </Text>
+            <Text style={[styles.entryDate, { color: theme.text + '99' }]}>
+              {/* theme fix */}
+              {item.timestamp?.seconds
+                ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), {
+                    addSuffix: true,
+                  })
+                : 'Just now'}
+            </Text>
             {expandedId === item.id && (
               <TouchableOpacity onPress={() => shareAsWish(item.text)}>
-                <Text style={{ color: theme.tint }}>📤 Turn this into a wish</Text>
+                <Text style={{ color: theme.tint }}>
+                  📤 Turn this into a wish
+                </Text>
               </TouchableOpacity>
             )}
           </TouchableOpacity>
         )}
         ListEmptyComponent={() => (
           <View style={{ alignItems: 'center' }}>
-            <Text style={[styles.entryText, { color: theme.text, marginBottom: 8 }]}>Start your week with a single thought. You’ve got this. 🌱</Text>
+            <Text
+              style={[styles.entryText, { color: theme.text, marginBottom: 8 }]}
+            >
+              Start your week with a single thought. You’ve got this. 🌱
+            </Text>
             <TouchableOpacity onPress={() => inputRef.current?.focus()}>
               <Text style={{ color: theme.tint }}>Use this prompt</Text>
             </TouchableOpacity>
@@ -297,11 +357,21 @@ export default function JournalPage() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20 },
-  header: { fontSize: 20, fontWeight: '600', marginBottom: 10, textAlign: 'center' },
+  header: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
   prompt: { fontSize: 16, marginBottom: 10, fontWeight: '600' },
   streak: { marginBottom: 10 },
   input: { padding: 12, borderRadius: 10, marginBottom: 10, height: 100 },
-  button: { padding: 12, borderRadius: 10, alignItems: 'center', marginBottom: 20 },
+  button: {
+    padding: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   buttonText: { fontWeight: '600' },
   entryItem: { marginBottom: 12 },
   entryText: { fontSize: 14 },

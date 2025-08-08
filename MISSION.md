@@ -1,5 +1,4 @@
-WhispList Mission & Promise
-===========================
+# WhispList Mission & Promise
 
 **Emotional Purpose**
 WhispList exists so people can privately share their hopes, fears and confessions without judgement. Every wish is treated with empathy so users feel lighter and more connected after posting.

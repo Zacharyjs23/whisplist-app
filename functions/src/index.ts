@@ -6,7 +6,11 @@ admin.initializeApp();
 const db = admin.firestore();
 const expo = new Expo();
 
-async function sendPush(userId: string | undefined, title: string, body: string) {
+async function sendPush(
+  userId: string | undefined,
+  title: string,
+  body: string,
+) {
   if (!userId) return null;
   const userRef = db.collection('users').doc(userId);
   const snap = await userRef.get();
@@ -22,13 +26,19 @@ async function sendPush(userId: string | undefined, title: string, body: string)
     const messages = [{ to: expoToken, sound: 'default', title, body }];
     try {
       await expo.sendPushNotificationsAsync(messages);
-      await metaRef.set({ lastSent: admin.firestore.FieldValue.serverTimestamp() });
+      await metaRef.set({
+        lastSent: admin.firestore.FieldValue.serverTimestamp(),
+      });
     } catch (err) {
       console.error('Error sending Expo push notification', err);
       if (fcmToken) {
         try {
-          await admin.messaging().send({ token: fcmToken, notification: { title, body } });
-          await metaRef.set({ lastSent: admin.firestore.FieldValue.serverTimestamp() });
+          await admin
+            .messaging()
+            .send({ token: fcmToken, notification: { title, body } });
+          await metaRef.set({
+            lastSent: admin.firestore.FieldValue.serverTimestamp(),
+          });
         } catch (err2) {
           console.error('Error sending fallback FCM notification', err2);
         }
@@ -36,8 +46,12 @@ async function sendPush(userId: string | undefined, title: string, body: string)
     }
   } else if (fcmToken) {
     try {
-      await admin.messaging().send({ token: fcmToken, notification: { title, body } });
-      await metaRef.set({ lastSent: admin.firestore.FieldValue.serverTimestamp() });
+      await admin
+        .messaging()
+        .send({ token: fcmToken, notification: { title, body } });
+      await metaRef.set({
+        lastSent: admin.firestore.FieldValue.serverTimestamp(),
+      });
     } catch (err) {
       console.error('Error sending FCM notification', err);
     }
@@ -54,7 +68,7 @@ export const notifyWishLike = functions.firestore
       await sendPush(
         after.userId,
         'Someone liked your wish! \u2764\ufe0f',
-        'Your dream is spreading good vibes.'
+        'Your dream is spreading good vibes.',
       );
     }
     return null;
@@ -80,14 +94,14 @@ export const notifyWishComment = functions.firestore
         await sendPush(
           parent.userId,
           'New reply to your comment \ud83d\udcac',
-          'Someone replied to your comment.'
+          'Someone replied to your comment.',
         );
       }
     } else if (wish && wish.userId && !wish.isAnonymous) {
       await sendPush(
         wish.userId,
         'New comment on your wish \ud83d\udcac',
-        'Someone left a comment on your wish.'
+        'Someone left a comment on your wish.',
       );
     }
     return null;
@@ -100,11 +114,16 @@ export const notifyWishBoost = functions.firestore
     const after = change.after.data();
     if (
       after.boostedUntil &&
-      (!before.boostedUntil || after.boostedUntil.seconds !== before.boostedUntil.seconds) &&
+      (!before.boostedUntil ||
+        after.boostedUntil.seconds !== before.boostedUntil.seconds) &&
       after.userId &&
       !after.isAnonymous
     ) {
-      await sendPush(after.userId, 'Your wish was boosted! \ud83d\ude80', 'Someone boosted your wish.');
+      await sendPush(
+        after.userId,
+        'Your wish was boosted! \ud83d\ude80',
+        'Someone boosted your wish.',
+      );
     }
     return null;
   });
@@ -116,7 +135,11 @@ export const notifyGiftReceived = functions.firestore
     const wishSnap = await db.collection('wishes').doc(wishId).get();
     const wish = wishSnap.data();
     if (wish && wish.userId && !wish.isAnonymous) {
-      await sendPush(wish.userId, 'You received a gift \ud83c\udf81', 'Someone supported your wish.');
+      await sendPush(
+        wish.userId,
+        'You received a gift \ud83c\udf81',
+        'Someone supported your wish.',
+      );
     }
     return null;
   });
@@ -125,7 +148,9 @@ export const notifyBoostEnd = functions.pubsub
   .schedule('every 60 minutes')
   .onRun(async () => {
     const now = admin.firestore.Timestamp.now();
-    const oneHourAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 60 * 60 * 1000);
+    const oneHourAgo = admin.firestore.Timestamp.fromMillis(
+      Date.now() - 60 * 60 * 1000,
+    );
     const snap = await db
       .collection('wishes')
       .where('boostedUntil', '>=', oneHourAgo)
@@ -135,10 +160,14 @@ export const notifyBoostEnd = functions.pubsub
       snap.docs.map((d) => {
         const data = d.data();
         if (data.userId && !data.isAnonymous) {
-          return sendPush(data.userId, 'Boost ended', 'Boost again to keep visibility.');
+          return sendPush(
+            data.userId,
+            'Boost ended',
+            'Boost again to keep visibility.',
+          );
         }
         return null;
-      })
+      }),
     );
     return null;
   });
@@ -148,4 +177,3 @@ export { createGiftCheckoutSession } from './createGiftCheckoutSession';
 export { createStripeAccountLink } from './createStripeAccountLink';
 export { stripeWebhook } from './stripeWebhook';
 export { rephraseWish } from './rephraseWish';
-

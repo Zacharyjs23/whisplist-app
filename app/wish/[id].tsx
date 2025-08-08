@@ -92,7 +92,6 @@ interface Comment {
   nickname?: string;
 }
 
-
 const emojiOptions = ['❤️', '😂', '😢', '👍'];
 // Approximate height of a single comment item including margins
 const COMMENT_ITEM_HEIGHT = 80;
@@ -102,16 +101,22 @@ export default function Page() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { theme } = useTheme();
-  const typeInfo = React.useMemo(() => ({
-    ...baseTypeInfo,
-    wish: { emoji: '💭', color: theme.input },
-  }), [theme]);
+  const typeInfo = React.useMemo(
+    () => ({
+      ...baseTypeInfo,
+      wish: { emoji: '💭', color: theme.input },
+    }),
+    [theme],
+  );
   const [wish, setWish] = useState<Wish | null>(null);
   const t: WishType = (wish?.type as WishType) || 'wish';
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
   const [replyTo, setReplyTo] = useState<string | null>(null);
-  const [reportTarget, setReportTarget] = useState<{ type: 'wish' | 'comment'; id: string } | null>(null);
+  const [reportTarget, setReportTarget] = useState<{
+    type: 'wish' | 'comment';
+    id: string;
+  } | null>(null);
   const [reportVisible, setReportVisible] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
   const [fulfillmentVisible, setFulfillmentVisible] = useState(false);
@@ -121,13 +126,20 @@ export default function Page() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [postingComment, setPostingComment] = useState(false);
   const [useProfileComment, setUseProfileComment] = useState(true);
-  const [confirmGift, setConfirmGift] = useState<{link?: string; amount?: number; wishId?: string; recipientId?: string} | null>(null);
+  const [confirmGift, setConfirmGift] = useState<{
+    link?: string;
+    amount?: number;
+    wishId?: string;
+    recipientId?: string;
+  } | null>(null);
   const [showThanks, setShowThanks] = useState(false);
   const [thanksMessage, setThanksMessage] = useState('');
   const [nickname, setNickname] = useState('');
   const [owner, setOwner] = useState<any | null>(null);
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
-  const [verifiedStatus, setVerifiedStatus] = useState<Record<string, boolean>>({});
+  const [verifiedStatus, setVerifiedStatus] = useState<Record<string, boolean>>(
+    {},
+  );
   const [refreshing, setRefreshing] = useState(false);
   const { user, profile } = useAuth();
   useEffect(() => {
@@ -143,23 +155,32 @@ export default function Page() {
     wish.boostedUntil.toDate &&
     wish.boostedUntil.toDate() > new Date();
   const isActiveWish =
-    isBoosted ||
-    (wish?.likes || 0) > 5 ||
-    wish?.active === true;
+    isBoosted || (wish?.likes || 0) > 5 || wish?.active === true;
   const [timeLeft, setTimeLeft] = useState(
-    isBoosted && wish?.boostedUntil?.toDate ? formatTimeLeft(wish.boostedUntil.toDate()) : ''
+    isBoosted && wish?.boostedUntil?.toDate
+      ? formatTimeLeft(wish.boostedUntil.toDate())
+      : '',
   );
   const glowAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (isBoosted && wish?.boostedUntil?.toDate) {
-      const update = () => setTimeLeft(formatTimeLeft(wish.boostedUntil.toDate()));
+      const update = () =>
+        setTimeLeft(formatTimeLeft(wish.boostedUntil.toDate()));
       update();
       const id = setInterval(update, 60000);
       const loop = Animated.loop(
         Animated.sequence([
-          Animated.timing(glowAnim, { toValue: 1, duration: 1000, useNativeDriver: false }),
-          Animated.timing(glowAnim, { toValue: 0, duration: 1000, useNativeDriver: false }),
-        ])
+          Animated.timing(glowAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(glowAnim, {
+            toValue: 0,
+            duration: 1000,
+            useNativeDriver: false,
+          }),
+        ]),
       );
       loop.start();
       return () => {
@@ -210,7 +231,9 @@ export default function Page() {
     const checkVote = async () => {
       if (!user?.uid) return;
       try {
-        const snap = await getDoc(doc(db, 'votes', id as string, 'users', user.uid));
+        const snap = await getDoc(
+          doc(db, 'votes', id as string, 'users', user.uid),
+        );
         if (snap.exists()) setHasVoted(true);
       } catch (err) {
         console.warn('Failed to check vote', err);
@@ -220,37 +243,42 @@ export default function Page() {
   }, [id, user]);
 
   const subscribeToComments = useCallback(() => {
-setLoading(true);
-try {
-  const unsubscribe = listenWishComments(id as string, (list) => {
-    list.forEach((d) => {
-      const commentId = d.id;
-      if (!animationRefs.current[commentId]) {
-        animationRefs.current[commentId] = new Animated.Value(0);
-      }
-    });
+    setLoading(true);
+    try {
+      const unsubscribe = listenWishComments(id as string, (list) => {
+        list.forEach((d) => {
+          const commentId = d.id;
+          if (!animationRefs.current[commentId]) {
+            animationRefs.current[commentId] = new Animated.Value(0);
+          }
+        });
 
-    const sorted = [...list].sort((a, b) => {
-      const aCount = Object.values(a.reactions || {}).reduce((s, v) => s + v, 0);
-      const bCount = Object.values(b.reactions || {}).reduce((s, v) => s + v, 0);
-      return bCount - aCount;
-    });
+        const sorted = [...list].sort((a, b) => {
+          const aCount = Object.values(a.reactions || {}).reduce(
+            (s, v) => s + v,
+            0,
+          );
+          const bCount = Object.values(b.reactions || {}).reduce(
+            (s, v) => s + v,
+            0,
+          );
+          return bCount - aCount;
+        });
 
-    setComments(sorted);
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 300);
-    setLoading(false);
-  });
+        setComments(sorted);
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 300);
+        setLoading(false);
+      });
 
-  return unsubscribe;
-} catch (err) {
-  console.error('❌ Failed to load comments:', err);
-  setError('Failed to load comments');
-  setLoading(false);
-  return () => {};
-}
-
+      return unsubscribe;
+    } catch (err) {
+      console.error('❌ Failed to load comments:', err);
+      setError('Failed to load comments');
+      setLoading(false);
+      return () => {};
+    }
   }, [id]);
 
   useEffect(() => {
@@ -270,14 +298,16 @@ try {
               const snap = await getDoc(doc(db, 'users', uid));
               setPublicStatus((prev) => ({
                 ...prev,
-                [uid]: snap.exists() ? snap.data().publicProfileEnabled !== false : false,
+                [uid]: snap.exists()
+                  ? snap.data().publicProfileEnabled !== false
+                  : false,
               }));
             } catch (err) {
               console.warn('Failed to fetch user status', err);
               setPublicStatus((prev) => ({ ...prev, [uid]: false }));
             }
           }
-        })
+        }),
       );
     };
     fetchStatus();
@@ -285,11 +315,16 @@ try {
 
   useEffect(() => {
     const fetchVerified = async () => {
-      const ids = Array.from(new Set(comments.map((c) => c.userId).filter(Boolean)));
+      const ids = Array.from(
+        new Set(comments.map((c) => c.userId).filter(Boolean)),
+      );
       await Promise.all(
         ids.map(async (uid) => {
           if (!uid || verifiedStatus[uid] !== undefined) return;
-          const q = query(collectionGroup(db, 'comments'), where('userId', '==', uid));
+          const q = query(
+            collectionGroup(db, 'comments'),
+            where('userId', '==', uid),
+          );
           const snap = await getDocs(q);
           let total = 0;
           snap.forEach((d) => {
@@ -297,7 +332,7 @@ try {
             total += Object.values(r).reduce((s: number, v: any) => s + v, 0);
           });
           setVerifiedStatus((prev) => ({ ...prev, [uid]: total >= 10 }));
-        })
+        }),
       );
     };
     fetchVerified();
@@ -363,30 +398,41 @@ try {
     }
   }, [comment, id, replyTo, user, profile, useProfileComment, nickname]);
 
+  const handleReact = useCallback(
+    async (commentId: string, emoji: string) => {
+      const comment = comments.find((c) => c.id === commentId);
+      if (!comment) return;
+      const currentUser = user?.uid || 'anon';
+      const prevEmoji = comment.userReactions?.[currentUser];
 
-  const handleReact = useCallback(async (commentId: string, emoji: string) => {
-    const comment = comments.find((c) => c.id === commentId);
-    if (!comment) return;
-    const currentUser = user?.uid || 'anon';
-    const prevEmoji = comment.userReactions?.[currentUser];
-
-    try {
-      await updateCommentReaction(id as string, commentId, emoji, prevEmoji, currentUser);
-    } catch (err) {
-      console.error('❌ Failed to update reaction:', err);
-    }
-  }, [comments, id, user]);
+      try {
+        await updateCommentReaction(
+          id as string,
+          commentId,
+          emoji,
+          prevEmoji,
+          currentUser,
+        );
+      } catch (err) {
+        console.error('❌ Failed to update reaction:', err);
+      }
+    },
+    [comments, id, user],
+  );
 
   const handleReport = useCallback(
     async (reason: string) => {
       if (!reportTarget) return;
       try {
         if (reportTarget.type === 'comment') {
-          await addDoc(collection(db, 'wishes', id as string, 'commentReports'), {
-            commentId: reportTarget.id,
-            reason,
-            timestamp: serverTimestamp(),
-          });
+          await addDoc(
+            collection(db, 'wishes', id as string, 'commentReports'),
+            {
+              commentId: reportTarget.id,
+              reason,
+              timestamp: serverTimestamp(),
+            },
+          );
         } else {
           await addDoc(collection(db, 'reports'), {
             itemId: reportTarget.id,
@@ -402,7 +448,7 @@ try {
         setReportTarget(null);
       }
     },
-    [id, reportTarget]
+    [id, reportTarget],
   );
 
   const handleVote = useCallback(
@@ -426,7 +472,7 @@ try {
         console.error('❌ Failed to vote:', err);
       }
     },
-    [fetchWish, hasVoted, wish, user]
+    [fetchWish, hasVoted, wish, user],
   );
 
   const handleFulfillWish = useCallback(
@@ -439,7 +485,7 @@ try {
         console.error('❌ Failed to fulfill wish:', err);
       }
     },
-    [fetchWish, id]
+    [fetchWish, id],
   );
 
   const handleBoostWish = useCallback(() => {
@@ -456,7 +502,7 @@ try {
       if (!wish || !wish.userId) return;
       setConfirmGift({ amount, wishId: wish.id, recipientId: wish.userId });
     },
-    [wish]
+    [wish],
   );
 
   const onRefresh = useCallback(async () => {
@@ -464,7 +510,6 @@ try {
     await fetchWish();
     setRefreshing(false);
   }, [fetchWish]);
-
 
   const renderCommentItem = useCallback(
     (item: Comment, level = 0) => {
@@ -477,7 +522,9 @@ try {
 
       const currentUser = user?.uid || 'anon';
       const userReaction = item.userReactions?.[currentUser];
-      const replies = isActiveWish ? comments.filter((c) => c.parentId === item.id) : [];
+      const replies = isActiveWish
+        ? comments.filter((c) => c.parentId === item.id)
+        : [];
 
       return (
         <View key={item.id}>
@@ -501,30 +548,54 @@ try {
                 onPress={() => router.push(`/profile/${item.displayName}`)}
                 hitSlop={HIT_SLOP}
               >
-                <Text style={[styles.nickname, { color: theme.text + '99' }]}> {/* theme fix */}
+                <Text style={[styles.nickname, { color: theme.text + '99' }]}>
+                  {' '}
+                  {/* theme fix */}
                   {item.displayName}
                   {verifiedStatus[item.userId || ''] ? ' \u2705 Verified' : ''}
                 </Text>
               </TouchableOpacity>
             ) : (
-              <Text style={[styles.nickname, { color: theme.text + '99' }]}>{item.nickname || 'Anonymous'}</Text>
+              <Text style={[styles.nickname, { color: theme.text + '99' }]}>
+                {item.nickname || 'Anonymous'}
+              </Text>
             )}
             {item.userId === wish?.userId && (
-              <Text style={[styles.nickname, { color: theme.tint }]}> (author)</Text>
+              <Text style={[styles.nickname, { color: theme.tint }]}>
+                {' '}
+                (author)
+              </Text>
             )}
-            <Text style={[styles.comment, { color: theme.text }]}>{item.text}</Text>
-            <Text style={[styles.timestamp, { color: theme.text + '99' }]}> {/* theme fix */}
+            <Text style={[styles.comment, { color: theme.text }]}>
+              {item.text}
+            </Text>
+            <Text style={[styles.timestamp, { color: theme.text + '99' }]}>
+              {' '}
+              {/* theme fix */}
               {item.timestamp?.seconds
-                ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), { addSuffix: true })
+                ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), {
+                    addSuffix: true,
+                  })
                 : 'Just now'}
             </Text>
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginTop: 6,
+              }}
+            >
               {emojiOptions.map((emoji) => (
                 <TouchableOpacity
                   key={emoji}
                   onPress={() => handleReact(item.id, emoji)}
-                  style={{ marginRight: 8, padding: 6, borderRadius: 6, opacity: userReaction === emoji ? 1 : 0.4 }}
+                  style={{
+                    marginRight: 8,
+                    padding: 6,
+                    borderRadius: 6,
+                    opacity: userReaction === emoji ? 1 : 0.4,
+                  }}
                 >
                   <Text style={{ fontSize: 20 }}>
                     {emoji} {item.reactions?.[emoji] || 0}
@@ -532,7 +603,10 @@ try {
                 </TouchableOpacity>
               ))}
               {isActiveWish && (
-                <TouchableOpacity onPress={() => setReplyTo(item.id)} style={{ marginLeft: 8 }}>
+                <TouchableOpacity
+                  onPress={() => setReplyTo(item.id)}
+                  style={{ marginLeft: 8 }}
+                >
                   <Text style={{ color: '#a78bfa' }}>Reply</Text>
                 </TouchableOpacity>
               )}
@@ -563,10 +637,13 @@ try {
       theme.tint,
       verifiedStatus,
       wish?.userId,
-    ]
+    ],
   );
 
-  const renderComment = useCallback(({ item }: { item: Comment }) => renderCommentItem(item), [renderCommentItem]);
+  const renderComment = useCallback(
+    ({ item }: { item: Comment }) => renderCommentItem(item),
+    [renderCommentItem],
+  );
 
   return (
     <SafeAreaView
@@ -582,379 +659,546 @@ try {
         keyboardVerticalOffset={80}
       >
         <ScrollView contentContainerStyle={styles.contentContainer}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} hitSlop={HIT_SLOP}>
-          <Text style={[styles.backButtonText, { color: theme.tint }]}>← Back</Text>
-        </TouchableOpacity>
-
-{loading ? (
-  <ActivityIndicator size="large" color={theme.tint} style={{ marginTop: 20 }} /> // theme fix
-) : error ? (
-  <Text style={styles.errorText}>{error}</Text>
-) : (
-  <>
-    {wish && (
-      <Animated.View
-        style={[
-          styles.wishBox,
-          {
-            backgroundColor: typeInfo[t].color,
-            borderColor: isBoosted
-              ? glowAnim.interpolate({ inputRange: [0, 1], outputRange: ['#facc15', '#fde68a'] })
-              : 'transparent',
-            borderWidth: isBoosted ? 2 : 0,
-          },
-        ]}
-      >
-        <Text style={[styles.wishCategory, { color: theme.tint }]}>
-          {typeInfo[t].emoji} #{wish.category}
-        </Text>
-        <Text style={[styles.wishText, { color: theme.text }]}>{wish.text}</Text>
-        {wish.fulfillmentLink && (
-          <Text style={{ color: theme.tint, marginTop: 4 }}>💝 Fulfilled</Text>
-        )}
-        {wish.imageUrl && (
-          <Image source={{ uri: wish.imageUrl }} style={styles.preview} />
-        )}
-
-        {wish.isPoll ? (
-          <View style={{ marginTop: 8 }}>
-            {(() => {
-              const totalVotes = (wish.votesA || 0) + (wish.votesB || 0);
-              const percentA = totalVotes
-                ? Math.round(((wish.votesA || 0) / totalVotes) * 100)
-                : 0;
-              const percentB = totalVotes
-                ? Math.round(((wish.votesB || 0) / totalVotes) * 100)
-                : 0;
-              return (
-                <>
-                  <TouchableOpacity
-                    style={styles.pollOption}
-                    disabled={hasVoted}
-                    onPress={() => handleVote('A')}
-                  >
-                    <Text style={[styles.pollOptionText, { color: theme.text }]}>
-                      {wish.optionA} - {wish.votesA || 0} ({percentA}%)
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.pollOption}
-                    disabled={hasVoted}
-                    onPress={() => handleVote('B')}
-                  >
-                    <Text style={[styles.pollOptionText, { color: theme.text }]}>
-                      {wish.optionB} - {wish.votesB || 0} ({percentB}%)
-                    </Text>
-                  </TouchableOpacity>
-                  <Text style={{ color: theme.text, marginTop: 4 }}>
-                    Total votes: {totalVotes}
-                  </Text>
-                </>
-              );
-            })()}
-            <BarChart
-              data={{
-                labels: [wish.optionA || 'A', wish.optionB || 'B'],
-                datasets: [{ data: [wish.votesA || 0, wish.votesB || 0] }],
-              }}
-              width={Dimensions.get('window').width - 80}
-              height={220}
-              yAxisLabel=""
-              yAxisSuffix=""
-              fromZero
-              chartConfig={{
-                backgroundColor: theme.input,
-                backgroundGradientFrom: theme.input,
-                backgroundGradientTo: theme.input,
-                color: () => theme.tint,
-                labelColor: () => theme.text + '99',
-              }}
-              style={{ marginTop: 10 }}
-            />
-          </View>
-        ) : (
-          <Text style={[styles.likes, { color: theme.tint }]}>❤️ {wish.likes}</Text>
-        )}
-        {isBoosted && (
-          <Text style={styles.boostedLabel}>⏳ Time left: {timeLeft}</Text>
-        )}
-
-        {wish.audioUrl && (
-          <TouchableOpacity onPress={toggleAudio} style={{ marginTop: 10 }}>
-            <Text style={{ color: '#a78bfa' }}>
-              {isPlaying ? '⏸ Pause Audio' : '▶ Play Audio'}
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {profile?.giftingEnabled && wish.giftLink && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-            <TouchableOpacity
-              onPress={() => openGiftLink(wish.giftLink!)}
-              style={{ backgroundColor: theme.input, padding: 8, borderRadius: 8 }}
-            >
-              <Text style={{ color: theme.tint }}>
-                {(() => {
-                  try {
-                    const url = new URL(wish.giftLink!);
-                    const trusted = ['venmo.com', 'paypal.me', 'amazon.com'].some(d => url.hostname.includes(d));
-                    return `${trusted ? '✅' : '⚠️'} 🎁 ${wish.giftLabel || 'Send Gift'}`;
-                  } catch {
-                    return `⚠️ 🎁 ${wish.giftLabel || 'Send Gift'}`;
-                  }
-                })()}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() =>
-                Alert.alert(
-                  'Gift Info',
-                  'Gifting is anonymous and optional. You can attach a support link like Venmo or Stripe.'
-                )
-              }
-              style={{ marginLeft: 6 }}
-              hitSlop={HIT_SLOP}
-            >
-              <Ionicons name="information-circle-outline" size={16} color={theme.text} />
-            </TouchableOpacity>
-          </View>
-        )}
-        {profile?.giftingEnabled && owner?.stripeAccountId && (
-          <View style={{ flexDirection: 'row', marginTop: 8 }}>
-            {[3,5,10].map((amt) => (
-              <TouchableOpacity
-                key={amt}
-                onPress={() => handleSendMoney(amt)}
-                style={{
-                  backgroundColor: theme.input,
-                  padding: 8,
-                  borderRadius: 8,
-                  marginRight: 6,
-                }}
-              >
-                <Text style={{ color: theme.tint }}>${amt}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {canBoost && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-            <TouchableOpacity onPress={handleBoostWish} hitSlop={HIT_SLOP}>
-              <Text style={{ color: '#facc15' }}>Boost Wish</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => Alert.alert('Boost Info', 'Boosting highlights a wish for 24 hours.')}
-              style={{ marginLeft: 6 }}
-              hitSlop={HIT_SLOP}
-            >
-              <Ionicons name="information-circle-outline" size={16} color={theme.text} />
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <TouchableOpacity
-          onPress={() => {
-            setReportTarget({ type: 'wish', id: wish.id });
-            setReportVisible(true);
-          }}
-          style={{ marginTop: 8 }}
-          hitSlop={HIT_SLOP}
-        >
-          <Text style={{ color: '#f87171' }}>Report</Text>
-        </TouchableOpacity>
-      </Animated.View>
-    )}
-  </>
-)}
-
-
-
-<FlatList
-  ref={flatListRef}
-  data={comments.filter((c) => isActiveWish || !c.parentId)}
-  keyExtractor={(item) => item.id}
-  renderItem={renderComment}
-  refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-  contentContainerStyle={{ paddingBottom: 80, flexGrow: 1 }}
-  scrollEnabled={false}
-  initialNumToRender={10}
-  getItemLayout={(_, index) => ({
-    length: COMMENT_ITEM_HEIGHT,
-    offset: COMMENT_ITEM_HEIGHT * index,
-    index,
-  })}
-/>
-
-
-        {replyTo && (
-          <View style={styles.replyInfo}>
-            <Text style={{ color: '#a78bfa' }}>
-              Replying to{' '}
-              {(() => {
-                const r = comments.find((c) => c.id === replyTo);
-                if (r && !r.isAnonymous && publicStatus[r.userId || '']) {
-                  return r.displayName;
-                }
-                return 'Anonymous';
-              })()}
-            </Text>
-            <TouchableOpacity onPress={() => setReplyTo(null)} style={{ marginLeft: 8 }}>
-              <Text style={{ color: theme.text }}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <Text style={[styles.label, { color: theme.text + '99' }]}>Comment</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: theme.input, color: theme.text }]}
-          placeholder="Your comment"
-          placeholderTextColor={theme.text + '99'} // theme fix
-          value={comment}
-          onChangeText={setComment}
-        />
-        {!useProfileComment && (
-          <TextInput
-            style={[styles.input, { backgroundColor: theme.input, color: theme.text }]}
-            placeholder="Nickname or emoji"
-            placeholderTextColor={theme.text + '99'} // theme fix
-            value={nickname}
-            onChangeText={setNickname}
-          />
-        )}
-
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-          <Text style={{ color: theme.text, marginRight: 8 }}>Comment with profile</Text>
-          <Switch value={useProfileComment} onValueChange={setUseProfileComment} />
-        </View>
-
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: theme.tint }]}
-          onPress={handlePostComment}
-          disabled={postingComment}
-          hitSlop={HIT_SLOP}
-        >
-          {postingComment ? (
-            <ActivityIndicator color={theme.text} />
-          ) : (
-            <Text style={[styles.buttonText, { color: theme.text }]}>Send Comment</Text>
-          )}
-        </TouchableOpacity>
-        <ReportDialog
-          visible={reportVisible}
-          onClose={() => {
-            setReportVisible(false);
-            setReportTarget(null);
-          }}
-          onSubmit={handleReport}
-        />
-
-        {wish?.fulfillmentLink ? (
           <TouchableOpacity
-            onPress={() => {
-              trackEvent('open_fulfillment_link');
-              Linking.openURL(wish.fulfillmentLink!);
-            }}
-            style={{ marginTop: 8 }}
-          >
-            <Text style={{ color: theme.tint }}>View Fulfillment Link</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: theme.tint }]}
-            onPress={() => setFulfillmentVisible(true)}
+            onPress={() => router.back()}
+            style={styles.backButton}
             hitSlop={HIT_SLOP}
           >
-            <Text style={[styles.buttonText, { color: theme.text }]}>Fulfill this Wish</Text>
+            <Text style={[styles.backButtonText, { color: theme.tint }]}>
+              ← Back
+            </Text>
           </TouchableOpacity>
-        )}
 
-        <FulfillmentLinkDialog
-          visible={fulfillmentVisible}
-          onClose={() => setFulfillmentVisible(false)}
-          onSubmit={(link) => {
-            setFulfillmentVisible(false);
-            handleFulfillWish(link);
-          }}
-        />
+          {loading ? (
+            <ActivityIndicator
+              size="large"
+              color={theme.tint}
+              style={{ marginTop: 20 }}
+            /> // theme fix
+          ) : error ? (
+            <Text style={styles.errorText}>{error}</Text>
+          ) : (
+            <>
+              {wish && (
+                <Animated.View
+                  style={[
+                    styles.wishBox,
+                    {
+                      backgroundColor: typeInfo[t].color,
+                      borderColor: isBoosted
+                        ? glowAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: ['#facc15', '#fde68a'],
+                          })
+                        : 'transparent',
+                      borderWidth: isBoosted ? 2 : 0,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.wishCategory, { color: theme.tint }]}>
+                    {typeInfo[t].emoji} #{wish.category}
+                  </Text>
+                  <Text style={[styles.wishText, { color: theme.text }]}>
+                    {wish.text}
+                  </Text>
+                  {wish.fulfillmentLink && (
+                    <Text style={{ color: theme.tint, marginTop: 4 }}>
+                      💝 Fulfilled
+                    </Text>
+                  )}
+                  {wish.imageUrl && (
+                    <Image
+                      source={{ uri: wish.imageUrl }}
+                      style={styles.preview}
+                    />
+                  )}
 
-        {confirmGift && (
-          <Modal transparent animationType="fade" visible onRequestClose={() => setConfirmGift(null)}>
-            <View style={styles.modalBackdrop}>
-              <View style={[styles.modalCard, { backgroundColor: theme.input }]}>
-                <Text style={[styles.modalText, { color: theme.text }]}>Confirm sending gift?</Text>
-                <View style={{ flexDirection: 'row', marginTop: 10 }}>
-                  <TouchableOpacity
-                    onPress={async () => {
-                      if (confirmGift.link) {
-                        await WebBrowser.openBrowserAsync(confirmGift.link);
-                        setShowThanks(true);
-                      } else if (confirmGift.wishId && confirmGift.recipientId && confirmGift.amount) {
-                        try {
-                          const res = await createGiftCheckout(confirmGift.wishId, confirmGift.amount, confirmGift.recipientId);
-                          if (res.url) await WebBrowser.openBrowserAsync(res.url);
-                          setShowThanks(true);
-                        } catch (err) {
-                          console.error('Failed to checkout', err);
+                  {wish.isPoll ? (
+                    <View style={{ marginTop: 8 }}>
+                      {(() => {
+                        const totalVotes =
+                          (wish.votesA || 0) + (wish.votesB || 0);
+                        const percentA = totalVotes
+                          ? Math.round(((wish.votesA || 0) / totalVotes) * 100)
+                          : 0;
+                        const percentB = totalVotes
+                          ? Math.round(((wish.votesB || 0) / totalVotes) * 100)
+                          : 0;
+                        return (
+                          <>
+                            <TouchableOpacity
+                              style={styles.pollOption}
+                              disabled={hasVoted}
+                              onPress={() => handleVote('A')}
+                            >
+                              <Text
+                                style={[
+                                  styles.pollOptionText,
+                                  { color: theme.text },
+                                ]}
+                              >
+                                {wish.optionA} - {wish.votesA || 0} ({percentA}
+                                %)
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.pollOption}
+                              disabled={hasVoted}
+                              onPress={() => handleVote('B')}
+                            >
+                              <Text
+                                style={[
+                                  styles.pollOptionText,
+                                  { color: theme.text },
+                                ]}
+                              >
+                                {wish.optionB} - {wish.votesB || 0} ({percentB}
+                                %)
+                              </Text>
+                            </TouchableOpacity>
+                            <Text style={{ color: theme.text, marginTop: 4 }}>
+                              Total votes: {totalVotes}
+                            </Text>
+                          </>
+                        );
+                      })()}
+                      <BarChart
+                        data={{
+                          labels: [wish.optionA || 'A', wish.optionB || 'B'],
+                          datasets: [
+                            { data: [wish.votesA || 0, wish.votesB || 0] },
+                          ],
+                        }}
+                        width={Dimensions.get('window').width - 80}
+                        height={220}
+                        yAxisLabel=""
+                        yAxisSuffix=""
+                        fromZero
+                        chartConfig={{
+                          backgroundColor: theme.input,
+                          backgroundGradientFrom: theme.input,
+                          backgroundGradientTo: theme.input,
+                          color: () => theme.tint,
+                          labelColor: () => theme.text + '99',
+                        }}
+                        style={{ marginTop: 10 }}
+                      />
+                    </View>
+                  ) : (
+                    <Text style={[styles.likes, { color: theme.tint }]}>
+                      ❤️ {wish.likes}
+                    </Text>
+                  )}
+                  {isBoosted && (
+                    <Text style={styles.boostedLabel}>
+                      ⏳ Time left: {timeLeft}
+                    </Text>
+                  )}
+
+                  {wish.audioUrl && (
+                    <TouchableOpacity
+                      onPress={toggleAudio}
+                      style={{ marginTop: 10 }}
+                    >
+                      <Text style={{ color: '#a78bfa' }}>
+                        {isPlaying ? '⏸ Pause Audio' : '▶ Play Audio'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {profile?.giftingEnabled && wish.giftLink && (
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginTop: 8,
+                      }}
+                    >
+                      <TouchableOpacity
+                        onPress={() => openGiftLink(wish.giftLink!)}
+                        style={{
+                          backgroundColor: theme.input,
+                          padding: 8,
+                          borderRadius: 8,
+                        }}
+                      >
+                        <Text style={{ color: theme.tint }}>
+                          {(() => {
+                            try {
+                              const url = new URL(wish.giftLink!);
+                              const trusted = [
+                                'venmo.com',
+                                'paypal.me',
+                                'amazon.com',
+                              ].some((d) => url.hostname.includes(d));
+                              return `${trusted ? '✅' : '⚠️'} 🎁 ${wish.giftLabel || 'Send Gift'}`;
+                            } catch {
+                              return `⚠️ 🎁 ${wish.giftLabel || 'Send Gift'}`;
+                            }
+                          })()}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() =>
+                          Alert.alert(
+                            'Gift Info',
+                            'Gifting is anonymous and optional. You can attach a support link like Venmo or Stripe.',
+                          )
                         }
-                      }
-                      setConfirmGift(null);
+                        style={{ marginLeft: 6 }}
+                        hitSlop={HIT_SLOP}
+                      >
+                        <Ionicons
+                          name="information-circle-outline"
+                          size={16}
+                          color={theme.text}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  {profile?.giftingEnabled && owner?.stripeAccountId && (
+                    <View style={{ flexDirection: 'row', marginTop: 8 }}>
+                      {[3, 5, 10].map((amt) => (
+                        <TouchableOpacity
+                          key={amt}
+                          onPress={() => handleSendMoney(amt)}
+                          style={{
+                            backgroundColor: theme.input,
+                            padding: 8,
+                            borderRadius: 8,
+                            marginRight: 6,
+                          }}
+                        >
+                          <Text style={{ color: theme.tint }}>${amt}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {canBoost && (
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginTop: 8,
+                      }}
+                    >
+                      <TouchableOpacity
+                        onPress={handleBoostWish}
+                        hitSlop={HIT_SLOP}
+                      >
+                        <Text style={{ color: '#facc15' }}>Boost Wish</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() =>
+                          Alert.alert(
+                            'Boost Info',
+                            'Boosting highlights a wish for 24 hours.',
+                          )
+                        }
+                        style={{ marginLeft: 6 }}
+                        hitSlop={HIT_SLOP}
+                      >
+                        <Ionicons
+                          name="information-circle-outline"
+                          size={16}
+                          color={theme.text}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      setReportTarget({ type: 'wish', id: wish.id });
+                      setReportVisible(true);
                     }}
-                    style={[styles.button, { backgroundColor: theme.tint, marginRight: 8 }]}
+                    style={{ marginTop: 8 }}
                     hitSlop={HIT_SLOP}
                   >
-                    <Text style={styles.buttonText}>Send</Text>
+                    <Text style={{ color: '#f87171' }}>Report</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setConfirmGift(null)} style={[styles.button, { backgroundColor: theme.input }]} hitSlop={HIT_SLOP}>
-                    <Text style={[styles.buttonText, { color: theme.text }]}>Cancel</Text>
+                </Animated.View>
+              )}
+            </>
+          )}
+
+          <FlatList
+            ref={flatListRef}
+            data={comments.filter((c) => isActiveWish || !c.parentId)}
+            keyExtractor={(item) => item.id}
+            renderItem={renderComment}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            contentContainerStyle={{ paddingBottom: 80, flexGrow: 1 }}
+            scrollEnabled={false}
+            initialNumToRender={10}
+            getItemLayout={(_, index) => ({
+              length: COMMENT_ITEM_HEIGHT,
+              offset: COMMENT_ITEM_HEIGHT * index,
+              index,
+            })}
+          />
+
+          {replyTo && (
+            <View style={styles.replyInfo}>
+              <Text style={{ color: '#a78bfa' }}>
+                Replying to{' '}
+                {(() => {
+                  const r = comments.find((c) => c.id === replyTo);
+                  if (r && !r.isAnonymous && publicStatus[r.userId || '']) {
+                    return r.displayName;
+                  }
+                  return 'Anonymous';
+                })()}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setReplyTo(null)}
+                style={{ marginLeft: 8 }}
+              >
+                <Text style={{ color: theme.text }}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <Text style={[styles.label, { color: theme.text + '99' }]}>
+            Comment
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              { backgroundColor: theme.input, color: theme.text },
+            ]}
+            placeholder="Your comment"
+            placeholderTextColor={theme.text + '99'} // theme fix
+            value={comment}
+            onChangeText={setComment}
+          />
+          {!useProfileComment && (
+            <TextInput
+              style={[
+                styles.input,
+                { backgroundColor: theme.input, color: theme.text },
+              ]}
+              placeholder="Nickname or emoji"
+              placeholderTextColor={theme.text + '99'} // theme fix
+              value={nickname}
+              onChangeText={setNickname}
+            />
+          )}
+
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginBottom: 10,
+            }}
+          >
+            <Text style={{ color: theme.text, marginRight: 8 }}>
+              Comment with profile
+            </Text>
+            <Switch
+              value={useProfileComment}
+              onValueChange={setUseProfileComment}
+            />
+          </View>
+
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: theme.tint }]}
+            onPress={handlePostComment}
+            disabled={postingComment}
+            hitSlop={HIT_SLOP}
+          >
+            {postingComment ? (
+              <ActivityIndicator color={theme.text} />
+            ) : (
+              <Text style={[styles.buttonText, { color: theme.text }]}>
+                Send Comment
+              </Text>
+            )}
+          </TouchableOpacity>
+          <ReportDialog
+            visible={reportVisible}
+            onClose={() => {
+              setReportVisible(false);
+              setReportTarget(null);
+            }}
+            onSubmit={handleReport}
+          />
+
+          {wish?.fulfillmentLink ? (
+            <TouchableOpacity
+              onPress={() => {
+                trackEvent('open_fulfillment_link');
+                Linking.openURL(wish.fulfillmentLink!);
+              }}
+              style={{ marginTop: 8 }}
+            >
+              <Text style={{ color: theme.tint }}>View Fulfillment Link</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: theme.tint }]}
+              onPress={() => setFulfillmentVisible(true)}
+              hitSlop={HIT_SLOP}
+            >
+              <Text style={[styles.buttonText, { color: theme.text }]}>
+                Fulfill this Wish
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          <FulfillmentLinkDialog
+            visible={fulfillmentVisible}
+            onClose={() => setFulfillmentVisible(false)}
+            onSubmit={(link) => {
+              setFulfillmentVisible(false);
+              handleFulfillWish(link);
+            }}
+          />
+
+          {confirmGift && (
+            <Modal
+              transparent
+              animationType="fade"
+              visible
+              onRequestClose={() => setConfirmGift(null)}
+            >
+              <View style={styles.modalBackdrop}>
+                <View
+                  style={[styles.modalCard, { backgroundColor: theme.input }]}
+                >
+                  <Text style={[styles.modalText, { color: theme.text }]}>
+                    Confirm sending gift?
+                  </Text>
+                  <View style={{ flexDirection: 'row', marginTop: 10 }}>
+                    <TouchableOpacity
+                      onPress={async () => {
+                        if (confirmGift.link) {
+                          await WebBrowser.openBrowserAsync(confirmGift.link);
+                          setShowThanks(true);
+                        } else if (
+                          confirmGift.wishId &&
+                          confirmGift.recipientId &&
+                          confirmGift.amount
+                        ) {
+                          try {
+                            const res = await createGiftCheckout(
+                              confirmGift.wishId,
+                              confirmGift.amount,
+                              confirmGift.recipientId,
+                            );
+                            if (res.url)
+                              await WebBrowser.openBrowserAsync(res.url);
+                            setShowThanks(true);
+                          } catch (err) {
+                            console.error('Failed to checkout', err);
+                          }
+                        }
+                        setConfirmGift(null);
+                      }}
+                      style={[
+                        styles.button,
+                        { backgroundColor: theme.tint, marginRight: 8 },
+                      ]}
+                      hitSlop={HIT_SLOP}
+                    >
+                      <Text style={styles.buttonText}>Send</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setConfirmGift(null)}
+                      style={[styles.button, { backgroundColor: theme.input }]}
+                      hitSlop={HIT_SLOP}
+                    >
+                      <Text style={[styles.buttonText, { color: theme.text }]}>
+                        Cancel
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </Modal>
+          )}
+          {showThanks && (
+            <Modal
+              transparent
+              animationType="fade"
+              visible
+              onRequestClose={() => setShowThanks(false)}
+            >
+              <View style={styles.modalBackdrop}>
+                <View
+                  style={[styles.modalCard, { backgroundColor: theme.input }]}
+                >
+                  <Text style={[styles.modalText, { color: theme.text }]}>
+                    💝 Thanks for supporting this wish!
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        marginTop: 10,
+                        backgroundColor: theme.input,
+                        color: theme.text,
+                      },
+                    ]}
+                    placeholder="Add a message (optional)"
+                    placeholderTextColor={theme.text + '99'} // theme fix
+                    value={thanksMessage}
+                    onChangeText={setThanksMessage}
+                  />
+                  {confirmGift?.wishId && (
+                    <TouchableOpacity
+                      onPress={async () => {
+                        try {
+                          await addDoc(
+                            collection(
+                              db,
+                              'wishes',
+                              confirmGift!.wishId!,
+                              'gifts',
+                            ),
+                            {
+                              message: thanksMessage,
+                              from: user?.displayName || 'anonymous',
+                              timestamp: serverTimestamp(),
+                            },
+                          );
+                        } catch (err) {
+                          console.error('Failed to save message', err);
+                        }
+                        setThanksMessage('');
+                        setShowThanks(false);
+                      }}
+                      style={[
+                        styles.button,
+                        { backgroundColor: theme.tint, marginTop: 10 },
+                      ]}
+                      hitSlop={HIT_SLOP}
+                    >
+                      <Text style={[styles.buttonText, { color: theme.text }]}>
+                        Send
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    onPress={() => setShowThanks(false)}
+                    style={[
+                      styles.button,
+                      { backgroundColor: theme.tint, marginTop: 10 },
+                    ]}
+                    hitSlop={HIT_SLOP}
+                  >
+                    <Text style={[styles.buttonText, { color: theme.text }]}>
+                      Close
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
-          </Modal>
-        )}
-        {showThanks && (
-          <Modal transparent animationType="fade" visible onRequestClose={() => setShowThanks(false)}>
-            <View style={styles.modalBackdrop}>
-              <View style={[styles.modalCard, { backgroundColor: theme.input }]}>
-                <Text style={[styles.modalText, { color: theme.text }]}>💝 Thanks for supporting this wish!</Text>
-                <TextInput
-                  style={[styles.input, { marginTop: 10, backgroundColor: theme.input, color: theme.text }]}
-                  placeholder="Add a message (optional)"
-                  placeholderTextColor={theme.text + '99'} // theme fix
-                  value={thanksMessage}
-                  onChangeText={setThanksMessage}
-                />
-                {confirmGift?.wishId && (
-                  <TouchableOpacity
-                    onPress={async () => {
-                      try {
-                        await addDoc(collection(db, 'wishes', confirmGift!.wishId!, 'gifts'), {
-                          message: thanksMessage,
-                          from: user?.displayName || 'anonymous',
-                          timestamp: serverTimestamp(),
-                        });
-                      } catch (err) {
-                        console.error('Failed to save message', err);
-                      }
-                      setThanksMessage('');
-                      setShowThanks(false);
-                    }}
-                    style={[styles.button, { backgroundColor: theme.tint, marginTop: 10 }]}
-                    hitSlop={HIT_SLOP}
-                  >
-                    <Text style={[styles.buttonText, { color: theme.text }]}>Send</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity onPress={() => setShowThanks(false)} style={[styles.button, { backgroundColor: theme.tint, marginTop: 10 }]} hitSlop={HIT_SLOP}>
-                  <Text style={[styles.buttonText, { color: theme.text }]}>Close</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
-        )}
+            </Modal>
+          )}
         </ScrollView>
-
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
