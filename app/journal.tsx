@@ -21,7 +21,7 @@ import {
   orderBy,
   getDocs,
 } from 'firebase/firestore';
-import { addWish } from '../helpers/firestore';
+import { addWish } from '../helpers/wishes';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { db } from '../firebase';

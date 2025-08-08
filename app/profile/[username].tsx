@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { db } from '../../firebase';
-import { followUser, unfollowUser } from '../../helpers/firestore';
+import { followUser, unfollowUser } from '../../helpers/followers';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Wish } from '../../types/Wish';
 

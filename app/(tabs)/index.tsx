@@ -5,12 +5,14 @@ import { createRecorder, type AudioRecorder } from 'expo-audio';
 import * as ExpoAudio from 'expo-audio';
 import {
   addWish,
+  createGiftCheckout,
+  cleanupExpiredWishes,
+} from '../../helpers/wishes';
+import {
   getFollowingIds,
   followUser,
   unfollowUser,
-  createGiftCheckout,
-  cleanupExpiredWishes,
-} from '../../helpers/firestore';
+} from '../../helpers/followers';
 import { formatTimeLeft } from '../../helpers/time';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';

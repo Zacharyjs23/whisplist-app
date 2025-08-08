@@ -43,11 +43,8 @@ import {
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import React, { useEffect, useState } from 'react';
 import { db, storage } from '../../firebase';
-import {
-  getAllWishes,
-  getWishComments,
-  getWishesByNickname,
-} from '../../helpers/firestore';
+import { getAllWishes, getWishesByNickname } from '../../helpers/wishes';
+import { getWishComments } from '../../helpers/comments';
 
 export default function Page() {
   const { theme, setTheme } = useTheme();
