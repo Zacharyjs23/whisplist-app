@@ -31,28 +31,54 @@ export interface Comment {
 export function listenWishComments(
   wishId: string,
   cb: (comments: Comment[]) => void,
+  onError?: (err: unknown) => void,
 ) {
-  const q = query(
-    collection(db, 'wishes', wishId, 'comments'),
-    orderBy('timestamp', 'asc'),
-  );
-  return onSnapshot(q, (snap) => {
-    const data = snap.docs.map((d) => ({
-      id: d.id,
-      ...(d.data() as Omit<Comment, 'id'>),
-    }));
-    cb(data as Comment[]);
-  });
+  try {
+    const q = query(
+      collection(db, 'wishes', wishId, 'comments'),
+      orderBy('timestamp', 'asc'),
+    );
+    return onSnapshot(
+      q,
+      (snap) => {
+        try {
+          const data = snap.docs.map((d) => ({
+            id: d.id,
+            ...(d.data() as Omit<Comment, 'id'>),
+          }));
+          cb(data as Comment[]);
+        } catch (err) {
+          console.error('Error processing wish comments snapshot', err);
+          onError?.(err);
+        }
+      },
+      (err) => {
+        console.error('Error listening to wish comments', err);
+        onError?.(err);
+      },
+    );
+  } catch (err) {
+    console.error('Error setting up wish comments listener', err);
+    onError?.(err);
+    return () => {};
+  }
 }
 
 export async function addComment(
   wishId: string,
   data: Omit<Comment, 'id' | 'timestamp'>,
+  onError?: (err: unknown) => void,
 ) {
-  return addDoc(collection(db, 'wishes', wishId, 'comments'), {
-    timestamp: serverTimestamp(),
-    ...data,
-  });
+  try {
+    return await addDoc(collection(db, 'wishes', wishId, 'comments'), {
+      timestamp: serverTimestamp(),
+      ...data,
+    });
+  } catch (err) {
+    console.error('Error adding comment', err);
+    onError?.(err);
+    throw err;
+  }
 }
 
 export async function updateCommentReaction(
@@ -61,46 +87,62 @@ export async function updateCommentReaction(
   emoji: string,
   prevEmoji: string | undefined,
   user: string,
+  onError?: (err: unknown) => void,
 ) {
-  const ref = doc(db, 'wishes', wishId, 'comments', commentId);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) return;
-  const data = snap.data() as Comment;
-  const reactions = { ...(data.reactions || {}) } as Record<string, number>;
-  const userReactions = { ...(data.userReactions || {}) } as Record<
-    string,
-    string
-  >;
+  try {
+    const ref = doc(db, 'wishes', wishId, 'comments', commentId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+    const data = snap.data() as Comment;
+    const reactions = { ...(data.reactions || {}) } as Record<string, number>;
+    const userReactions = { ...(data.userReactions || {}) } as Record<
+      string,
+      string
+    >;
 
-  if (prevEmoji && reactions[prevEmoji]) {
-    reactions[prevEmoji] -= 1;
-    if (reactions[prevEmoji] === 0) delete reactions[prevEmoji];
+    if (prevEmoji && reactions[prevEmoji]) {
+      reactions[prevEmoji] -= 1;
+      if (reactions[prevEmoji] === 0) delete reactions[prevEmoji];
+    }
+
+    if (prevEmoji === emoji) {
+      delete userReactions[user];
+    } else {
+      userReactions[user] = emoji;
+      reactions[emoji] = (reactions[emoji] || 0) + 1;
+    }
+
+    return await updateDoc(ref, { reactions, userReactions });
+  } catch (err) {
+    console.error('Error updating comment reaction', err);
+    onError?.(err);
+    throw err;
   }
-
-  if (prevEmoji === emoji) {
-    delete userReactions[user];
-  } else {
-    userReactions[user] = emoji;
-    reactions[emoji] = (reactions[emoji] || 0) + 1;
-  }
-
-  return updateDoc(ref, { reactions, userReactions });
 }
 
-export async function getWishComments(wishId: string): Promise<Comment[]> {
-  const snap = await getDocs(collection(db, 'wishes', wishId, 'comments'));
-  return snap.docs.map((d) => {
-    const data = d.data();
-    const comment: Comment = {
-      id: d.id,
-      text: data.text,
-      nickname: data.nickname,
-      timestamp: data.timestamp,
-      parentId: data.parentId,
-      reactions: data.reactions,
-      userReactions: data.userReactions,
-    };
-    return comment;
-  });
+export async function getWishComments(
+  wishId: string,
+  onError?: (err: unknown) => void,
+): Promise<Comment[]> {
+  try {
+    const snap = await getDocs(collection(db, 'wishes', wishId, 'comments'));
+    return snap.docs.map((d) => {
+      const data = d.data();
+      const comment: Comment = {
+        id: d.id,
+        text: data.text,
+        nickname: data.nickname,
+        timestamp: data.timestamp,
+        parentId: data.parentId,
+        reactions: data.reactions,
+        userReactions: data.userReactions,
+      };
+      return comment;
+    });
+  } catch (err) {
+    console.error('Error fetching wish comments', err);
+    onError?.(err);
+    throw err;
+  }
 }
 

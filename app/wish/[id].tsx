@@ -233,8 +233,9 @@ export default function Page() {
 
   const subscribeToComments = useCallback(() => {
     setLoading(true);
-    try {
-      const unsubscribe = listenWishComments(id as string, (list) => {
+    const unsubscribe = listenWishComments(
+      id as string,
+      (list) => {
         list.forEach((d) => {
           const commentId = d.id;
           if (!animationRefs.current[commentId]) {
@@ -259,15 +260,15 @@ export default function Page() {
           flatListRef.current?.scrollToEnd({ animated: true });
         }, 300);
         setLoading(false);
-      });
+      },
+      (err) => {
+        console.error('❌ Failed to load comments:', err);
+        setError('Failed to load comments');
+        setLoading(false);
+      },
+    );
 
-      return unsubscribe;
-    } catch (err) {
-      console.error('❌ Failed to load comments:', err);
-      setError('Failed to load comments');
-      setLoading(false);
-      return () => {};
-    }
+    return unsubscribe;
   }, [id]);
 
   useEffect(() => {
@@ -363,25 +364,31 @@ export default function Page() {
     if (!comment.trim()) return;
     setPostingComment(true);
     try {
-      await addComment(id as string, {
-        text: comment.trim(),
-        userId: user?.uid,
-        displayName: useProfileComment ? profile?.displayName || '' : '',
-        photoURL: useProfileComment ? profile?.photoURL || '' : '',
-        isAnonymous: !useProfileComment,
-        ...(nickname && !useProfileComment ? { nickname } : {}),
-        parentId: replyTo,
-        reactions: {},
-        userReactions: {},
-      });
+      await addComment(
+        id as string,
+        {
+          text: comment.trim(),
+          userId: user?.uid,
+          displayName: useProfileComment ? profile?.displayName || '' : '',
+          photoURL: useProfileComment ? profile?.photoURL || '' : '',
+          isAnonymous: !useProfileComment,
+          ...(nickname && !useProfileComment ? { nickname } : {}),
+          parentId: replyTo,
+          reactions: {},
+          userReactions: {},
+        },
+        (err) => {
+          console.error('❌ Failed to post comment:', err);
+        },
+      );
       setComment('');
       setReplyTo(null);
       if (nickname) await AsyncStorage.setItem('nickname', nickname);
 
       // Push notifications are sent from Cloud Functions
       Alert.alert('Comment posted!');
-    } catch (err) {
-      console.error('❌ Failed to post comment:', err);
+    } catch {
+      // error handled in onError
     } finally {
       setPostingComment(false);
     }
@@ -401,9 +408,12 @@ export default function Page() {
           emoji,
           prevEmoji,
           currentUser,
+          (err) => {
+            console.error('❌ Failed to update reaction:', err);
+          },
         );
-      } catch (err) {
-        console.error('❌ Failed to update reaction:', err);
+      } catch {
+        // error handled in onError
       }
     },
     [comments, id, user],
