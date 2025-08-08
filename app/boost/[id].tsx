@@ -190,11 +190,9 @@ export default function BoostPage() {
               onPress={handleFreeBoost}
               style={[styles.button, { marginBottom: 10 }]}
             >
-              \
               <Text style={styles.buttonText}>
                 Use Free Boost ({profile.boostCredits})
               </Text>
-              \
             </TouchableOpacity>
           )}
           <TouchableOpacity
