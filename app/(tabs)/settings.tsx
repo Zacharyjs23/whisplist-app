@@ -45,23 +45,12 @@ import React, { useEffect, useState } from 'react';
 import { db, storage } from '../../firebase';
 import { getAllWishes, getWishesByNickname } from '../../helpers/wishes';
 import { getWishComments } from '../../helpers/comments';
+import type { Profile } from '../../types/Profile';
 
 export default function Page() {
   const { theme, setTheme } = useTheme();
-  type Profile = {
-    displayName?: string;
-    bio?: string;
-    photoURL?: string;
-    publicProfileEnabled?: boolean;
-    giftingEnabled?: boolean;
-    stripeAccountId?: string;
-    referralDisplayName?: string;
-    developerMode?: boolean;
-    boostCredits?: number;
-    isDev?: boolean;
-  };
   const { user, profile: profileData, updateProfile } = useAuth();
-  const profile = profileData as Profile | null;
+  const profile = profileData as (Profile & { isDev?: boolean }) | null;
   const router = useRouter();
 
   const themeOptions = Object.keys(Colors) as ThemeName[];

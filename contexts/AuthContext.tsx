@@ -33,32 +33,17 @@ import {
   getDocs,
   query,
   where,
+  Timestamp,
 } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
+import type { Profile } from '../types/Profile';
 
 WebBrowser.maybeCompleteAuthSession();
 
 if (!auth || !db || !storage) {
   console.error('Firebase modules are undefined in AuthContext');
-}
-
-interface Profile {
-  displayName: string | null;
-  email: string | null;
-  bio?: string;
-  photoURL?: string | null;
-  isAnonymous: boolean;
-  publicProfileEnabled?: boolean;
-  boostCredits?: number;
-  createdAt?: any;
-  giftingEnabled?: boolean;
-  stripeAccountId?: string;
-  giftsReceived?: number;
-  referralDisplayName?: string;
-  developerMode?: boolean;
-  acceptedTermsAt?: any;
 }
 
 interface AuthContextValue {
@@ -148,7 +133,7 @@ export const AuthProvider = ({
             if (accepted) {
               const ts = serverTimestamp();
               await updateDoc(ref, { acceptedTermsAt: ts });
-              data.acceptedTermsAt = ts as any;
+              data.acceptedTermsAt = ts as unknown as Timestamp;
             }
           }
           setProfile(data);
@@ -163,9 +148,9 @@ export const AuthProvider = ({
             isAnonymous: u.isAnonymous,
             publicProfileEnabled: true,
             boostCredits: 0,
-            createdAt: serverTimestamp(),
+            createdAt: serverTimestamp() as unknown as Timestamp,
             developerMode: false,
-            acceptedTermsAt: accepted ? ts : undefined,
+            acceptedTermsAt: accepted ? (ts as unknown as Timestamp) : undefined,
           };
           await setDoc(ref, data);
           try {
