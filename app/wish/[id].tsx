@@ -9,6 +9,7 @@ import {
   getWish,
   setFulfillmentLink,
   createGiftCheckout,
+  updateWish,
 } from '../../helpers/wishes';
 import {
   listenWishComments,
@@ -30,6 +31,7 @@ import {
   collectionGroup,
   updateDoc,
   setDoc,
+  deleteDoc,
 } from 'firebase/firestore'; // ✅ Keep only if used directly in this file
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -131,6 +133,9 @@ export default function Page() {
     {},
   );
   const [refreshing, setRefreshing] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState('');
+  const [editCategory, setEditCategory] = useState('');
   const { user, profile } = useAuth();
   useEffect(() => {
     const loadNickname = async () => {
@@ -504,6 +509,35 @@ export default function Page() {
     },
     [wish],
   );
+
+  const handleUpdateWish = useCallback(async () => {
+    if (!wish) return;
+    try {
+      await updateWish(wish.id, { text: editText, category: editCategory });
+      await fetchWish();
+      setEditing(false);
+    } catch (err) {
+      logger.error('❌ Failed to update wish:', err);
+    }
+  }, [wish, editText, editCategory, fetchWish]);
+
+  const handleDeleteWish = useCallback(() => {
+    Alert.alert('Delete Wish', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteDoc(doc(db, 'wishes', id as string));
+            router.back();
+          } catch (err) {
+            logger.error('❌ Failed to delete wish:', err);
+          }
+        },
+      },
+    ]);
+  }, [id, router]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -908,6 +942,33 @@ export default function Page() {
                     </View>
                   )}
 
+                  {user?.uid === wish.userId && (
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        marginTop: 8,
+                      }}
+                    >
+                      <TouchableOpacity
+                        onPress={() => {
+                          setEditText(wish.text);
+                          setEditCategory(wish.category);
+                          setEditing(true);
+                        }}
+                        hitSlop={HIT_SLOP}
+                      >
+                        <Text style={{ color: theme.tint }}>Edit</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={handleDeleteWish}
+                        style={{ marginLeft: 10 }}
+                        hitSlop={HIT_SLOP}
+                      >
+                        <Text style={{ color: '#f87171' }}>Delete</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
                   <TouchableOpacity
                     onPress={() => {
                       setReportTarget({ type: 'wish', id: wish.id });
@@ -1057,6 +1118,61 @@ export default function Page() {
               handleFulfillWish(link);
             }}
           />
+
+          {editing && wish && (
+            <Modal
+              transparent
+              animationType="fade"
+              visible
+              onRequestClose={() => setEditing(false)}
+            >
+              <View style={styles.modalBackdrop}>
+                <View
+                  style={[styles.modalCard, { backgroundColor: theme.input }]}
+                >
+                  <Text style={[styles.modalText, { color: theme.text }]}>Edit Wish</Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        marginTop: 10,
+                        backgroundColor: theme.input,
+                        color: theme.text,
+                      },
+                    ]}
+                    placeholder="Wish text"
+                    placeholderTextColor={theme.text + '99'}
+                    value={editText}
+                    onChangeText={setEditText}
+                  />
+                  <TextInput
+                    style={[
+                      styles.input,
+                      { backgroundColor: theme.input, color: theme.text },
+                    ]}
+                    placeholder="Category"
+                    placeholderTextColor={theme.text + '99'}
+                    value={editCategory}
+                    onChangeText={setEditCategory}
+                  />
+                  <TouchableOpacity
+                    onPress={handleUpdateWish}
+                    style={[styles.button, { backgroundColor: theme.tint }]}
+                    hitSlop={HIT_SLOP}
+                  >
+                    <Text style={[styles.buttonText, { color: theme.text }]}>Save</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setEditing(false)}
+                    style={[styles.button, { backgroundColor: theme.input }]}
+                    hitSlop={HIT_SLOP}
+                  >
+                    <Text style={[styles.buttonText, { color: theme.text }]}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Modal>
+          )}
 
           {confirmGift && (
             <Modal
