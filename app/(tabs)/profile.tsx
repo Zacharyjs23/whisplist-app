@@ -18,6 +18,7 @@ import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/useProfile';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
   collection,
@@ -35,7 +36,8 @@ import type { Wish } from '../../types/Wish';
 import { useSavedWishes } from '@/contexts/SavedWishesContext';
 
 export default function Page() {
-  const { user, profile, updateProfile, pickImage, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
+  const { updateProfile, pickImage } = useProfile();
   const router = useRouter();
   const [displayName, setDisplayName] = useState(profile?.displayName || '');
   const [bio, setBio] = useState(profile?.bio || '');

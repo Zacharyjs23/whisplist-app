@@ -13,6 +13,7 @@ import {
   Modal,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/hooks/useProfile';
 import { useTheme } from '@/contexts/ThemeContext';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import * as Linking from 'expo-linking';
@@ -21,7 +22,8 @@ import { formatTimeLeft } from '../../helpers/time';
 
 export default function BoostPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { user, profile, updateProfile } = useAuth();
+  const { user, profile } = useAuth();
+  const { updateProfile } = useProfile();
   const router = useRouter();
   const { theme } = useTheme();
   const [loading, setLoading] = useState(false);
