@@ -222,10 +222,16 @@ export default function Page() {
     const wishes = await getWishesByNickname(localUser?.nickname);
     const comments: any[] = [];
     for (const w of wishes) {
-      const list = await getWishComments(w.id);
-      list.forEach((c) => {
-        if (c.nickname === localUser?.nickname) comments.push(c);
-      });
+      try {
+        const list = await getWishComments(w.id, (err) => {
+          console.error('Failed to fetch comments for export', err);
+        });
+        list.forEach((c) => {
+          if (c.nickname === localUser?.nickname) comments.push(c);
+        });
+      } catch {
+        // handled in onError
+      }
     }
     const data = JSON.stringify({ wishes, comments }, null, 2);
     Share.share({ message: data });
@@ -256,11 +262,17 @@ export default function Page() {
     }
     const all = await getAllWishes();
     for (const wish of all) {
-      const list = await getWishComments(wish.id);
-      for (const c of list) {
-        if (c.nickname === localUser?.nickname) {
-          await deleteDoc(doc(db, 'wishes', wish.id, 'comments', c.id));
+      try {
+        const list = await getWishComments(wish.id, (err) => {
+          console.error('Failed to fetch comments for deletion', err);
+        });
+        for (const c of list) {
+          if (c.nickname === localUser?.nickname) {
+            await deleteDoc(doc(db, 'wishes', wish.id, 'comments', c.id));
+          }
         }
+      } catch {
+        // handled in onError
       }
     }
     Alert.alert('Content deleted');
