@@ -94,7 +94,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }): ReactElemen
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+  const [, , promptAsync] = Google.useIdTokenAuthRequest({
     clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
   });

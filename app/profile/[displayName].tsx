@@ -74,7 +74,7 @@ export default function Page() {
       setLoading(false);
     };
     load();
-  }, [displayName]);
+    }, [displayName, user]);
 
   const handleCopy = async () => {
     if (!displayName) return;

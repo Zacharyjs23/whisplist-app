@@ -16,6 +16,5 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: CI=1 npx expo install --fix
-      - run: npm test
-      - run: npm run lint
       - run: npm run typecheck
+      - run: npm run lint

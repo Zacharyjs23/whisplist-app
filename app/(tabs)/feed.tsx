@@ -17,10 +17,9 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import ReportDialog from '../../components/ReportDialog';
-import WishCard from '../../components/WishCard';
+import WishCardComponent from '../../components/WishCard';
 import {
   listenTrendingWishes,
-  listenWishes,
   getFollowingIds,
   listenBoostedWishes,
   getTopBoostedCreators,
@@ -63,7 +62,6 @@ export default function Page() {
   const [reportTarget, setReportTarget] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [lastVisible, setLastVisible] = useState<any | null>(null);
-  const [lastDoc, setLastDoc] = useState<any | null>(null);
 
   const loadPersonalPrefs = useCallback(async (): Promise<Pref> => {
     if (!user) return { categories: [], type: undefined };
@@ -185,8 +183,8 @@ export default function Page() {
         });
       }
 
-      const unsubscribe = activeTab === 'trending'
-        ? listenTrendingWishes((all: Wish[]) => {
+      if (activeTab === 'trending') {
+        return listenTrendingWishes((all: Wish[]) => {
             try {
               const filtered = all.filter((wish) => {
                 const show =
@@ -203,31 +201,32 @@ export default function Page() {
             } finally {
               setLoading(false);
             }
-          })
-        : (async () => {
-            try {
-              const snap = await getDocs(
-                query(
-                  collection(db, 'wishes'),
-                  orderBy('timestamp', 'desc'),
-                  limit(20)
-                )
-              );
-              setLastVisible(snap.docs[snap.docs.length - 1] || null);
-              const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
-              const filtered = all.filter((wish) => {
-                const show = !selectedCategory || wish.category === selectedCategory;
-                const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
-                return show && inSearch;
-              });
-              setFilteredWishes(filtered);
-            } catch (err) {
-              console.error('❌ Failed to load wishes:', err);
-              setError('Failed to load wishes');
-            } finally {
-              setLoading(false);
-            }
-          })();
+          });
+      }
+      (async () => {
+        try {
+          const snap = await getDocs(
+            query(
+              collection(db, 'wishes'),
+              orderBy('timestamp', 'desc'),
+              limit(20)
+            )
+          );
+          setLastVisible(snap.docs[snap.docs.length - 1] || null);
+          const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
+          const filtered = all.filter((wish) => {
+            const show = !selectedCategory || wish.category === selectedCategory;
+            const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
+            return show && inSearch;
+          });
+          setFilteredWishes(filtered);
+        } catch (err) {
+          console.error('❌ Failed to load wishes:', err);
+          setError('Failed to load wishes');
+        } finally {
+          setLoading(false);
+        }
+      })();
       return () => {};
     } catch (err) {
       console.error('❌ Failed to load wishes:', err);
@@ -235,7 +234,7 @@ export default function Page() {
       setLoading(false);
       return () => {};
     }
-  }, [activeTab, selectedCategory, searchTerm, user, followingIds]);
+    }, [activeTab, selectedCategory, searchTerm, followingIds, loadPersonalPrefs]);
 
   useEffect(() => {
     const unsubscribe = fetchWishes();
@@ -324,7 +323,7 @@ export default function Page() {
     } finally {
       setRefreshing(false);
     }
-  }, [activeTab, selectedCategory, searchTerm, user, followingIds]);
+  }, [activeTab, selectedCategory, searchTerm, user, followingIds, loadPersonalPrefs]);
 
   const loadMore = useCallback(async () => {
     if (!lastVisible) return;
@@ -338,7 +337,7 @@ export default function Page() {
     } catch (err) {
       console.error('Failed to load more wishes', err);
     }
-  }, [lastVisible, selectedCategory, searchTerm]);
+  }, [lastVisible]);
 
   const Skeleton: React.FC = () => (
     <View style={styles.skeletonContainer}>
@@ -370,7 +369,7 @@ export default function Page() {
   };
 
   const renderWish = ({ item }: { item: Wish }) => (
-    <WishCard
+    <WishCardComponent
       wish={item}
       followed={followingIds.includes(item.userId || '')}
       onReport={() => {

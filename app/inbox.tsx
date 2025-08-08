@@ -8,18 +8,19 @@ export default function InboxPage() {
   const { theme } = useTheme();
   const { items, markAllRead } = useNotifications();
 
-  useEffect(() => {
-    markAllRead();
-  }, []);
+    useEffect(() => {
+      markAllRead();
+    }, [markAllRead]);
 
   const renderItem = ({ item }: any) => (
     <View style={[styles.item, { backgroundColor: theme.input }]}>
       <Text style={[styles.text, { color: theme.text }]}>{item.message}</Text>
-      <Text style={[styles.time, { color: theme.text + '99' }]}> // theme fix
-        {item.timestamp?.seconds
-          ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), { addSuffix: true })
-          : 'just now'}
-      </Text>
+        <Text style={[styles.time, { color: theme.text + '99' }]}> 
+          {/* theme fix */}
+          {item.timestamp?.seconds
+            ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), { addSuffix: true })
+            : 'just now'}
+        </Text>
     </View>
   );
 

@@ -197,7 +197,7 @@ export default function Page() {
     );
     anim.start();
     return () => anim.stop();
-  }, [boostCount]);
+  }, [boostAnim, boostCount]);
 
   useEffect(() => {
     const loadLocal = async () => {

@@ -13,8 +13,6 @@ import {
   getDocs,
   startAfter,
   where,
-  FieldPath,
-  collectionGroup,
   setDoc,
   deleteDoc,
 } from 'firebase/firestore';
