@@ -1,0 +1,58 @@
+{
+  "report": {
+    "reasonPlaceholder": "Razón del reporte",
+    "send": "Enviar reporte"
+  },
+  "referral": {
+    "namePlaceholder": "Nombre o usuario",
+    "share": "Compartir"
+  },
+  "fulfillment": {
+    "linkPlaceholder": "Pega el enlace de cumplimiento",
+    "invalidLink": "Por favor ingresa un enlace HTTPS válido",
+    "save": "Guardar"
+  },
+  "common": {
+    "cancel": "Cancelar",
+    "ok": "Aceptar"
+  },
+  "auth": {
+    "errorTitle": "Error de autenticación"
+  },
+  "wish": {
+    "followed": "Sigues a esta persona",
+    "boostExpires": "El impulso expira en {{timeLeft}}",
+    "supportedBy": "Apoyado por {{count}} personas",
+    "giftMessageReceived": "Recibiste un mensaje de regalo",
+    "hoursLeft": "Quedan {{hours}}h",
+    "report": "Reportar"
+  },
+  "onboarding": {
+    "slide1Title": "Publica anónimamente",
+    "slide2Title": "Escucha a otros",
+    "slide3Title": "Sé realizado",
+    "slide4Title": "Por qué importa",
+    "slide4Subtitle": "WhispList promete un espacio de cuidado para compartir sueños y preocupaciones sin juicio.",
+    "skip": "Saltar",
+    "skipOnboarding": "Saltar introducción",
+    "agree1": "Acepto los",
+    "terms": " Términos de Servicio ",
+    "and": "y",
+    "privacy": " Política de Privacidad",
+    "getStarted": "Comenzar"
+  },
+  "tabs": {
+    "home": "Inicio",
+    "feed": "Feed",
+    "journal": "Diario",
+    "profile": "Perfil",
+    "inbox": "Bandeja",
+    "settings": "Ajustes"
+  },
+  "notFound": {
+    "title": "404 - No encontrado"
+  },
+  "inbox": {
+    "justNow": "justo ahora"
+  }
+}

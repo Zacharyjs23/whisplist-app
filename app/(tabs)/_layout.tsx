@@ -3,10 +3,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import useNotifications from '@/hooks/useNotifications';
+import { useTranslation } from '@/contexts/I18nContext';
 
 export default function Layout() {
   const { theme } = useTheme();
   const { unread } = useNotifications();
+  const { t } = useTranslation();
 
   return (
     <Tabs
@@ -30,7 +32,7 @@ export default function Layout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: t('tabs.home'),
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="home-outline" color={color} size={size} />
           ),
@@ -39,7 +41,7 @@ export default function Layout() {
       <Tabs.Screen
         name="feed"
         options={{
-          title: 'Feed',
+          title: t('tabs.feed'),
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="layers-outline" color={color} size={size} />
           ),
@@ -48,7 +50,7 @@ export default function Layout() {
       <Tabs.Screen
         name="journal"
         options={{
-          title: 'Journal',
+          title: t('tabs.journal'),
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="book-outline" color={color} size={size} />
           ),
@@ -57,7 +59,7 @@ export default function Layout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: t('tabs.profile'),
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="person-circle-outline" color={color} size={size} />
           ),
@@ -66,7 +68,7 @@ export default function Layout() {
       <Tabs.Screen
         name="inbox"
         options={{
-          title: 'Inbox',
+          title: t('tabs.inbox'),
           tabBarBadge: unread > 0 ? unread : undefined,
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="notifications-outline" color={color} size={size} />
@@ -76,7 +78,7 @@ export default function Layout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
+          title: t('tabs.settings'),
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="settings-outline" color={color} size={size} />
           ),

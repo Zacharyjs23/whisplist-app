@@ -12,21 +12,10 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import ThemedButton from '@/components/ThemedButton';
 import { trackEvent } from '@/helpers/analytics';
+import { useTranslation } from '@/contexts/I18nContext';
 
 const { width } = Dimensions.get('window');
 
-const slides = [
-  { key: '1', title: 'Post anonymously', emoji: '🤫' },
-  { key: '2', title: 'Hear others', emoji: '👂' },
-  { key: '3', title: 'Be fulfilled', emoji: '✨' },
-  {
-    key: '4',
-    title: 'Why It Matters',
-    emoji: '❤️',
-    subtitle:
-      'WhispList promises a caring space to share dreams and worries without judgement.',
-  },
-];
 
 export default function Page() {
   const router = useRouter();
@@ -34,6 +23,18 @@ export default function Page() {
   const [index, setIndex] = useState(0);
   const [completed, setCompleted] = useState(false);
   const [accepted, setAccepted] = useState(false);
+  const { t } = useTranslation();
+  const slides = [
+    { key: '1', title: t('onboarding.slide1Title'), emoji: '🤫' },
+    { key: '2', title: t('onboarding.slide2Title'), emoji: '👂' },
+    { key: '3', title: t('onboarding.slide3Title'), emoji: '✨' },
+    {
+      key: '4',
+      title: t('onboarding.slide4Title'),
+      emoji: '❤️',
+      subtitle: t('onboarding.slide4Subtitle'),
+    },
+  ];
   const viewConfigRef = useRef({ viewAreaCoveragePercentThreshold: 50 });
   const scrollX = useRef(new Animated.Value(0)).current;
 
@@ -64,9 +65,9 @@ export default function Page() {
         onPress={handleDone}
         style={styles.skipButton}
         accessibilityRole="button"
-        accessibilityLabel="Skip Onboarding"
+        accessibilityLabel={t('onboarding.skipOnboarding')}
       >
-        <Text style={[styles.skipText, { color: theme.tint }]}>Skip</Text>
+        <Text style={[styles.skipText, { color: theme.tint }]}>{t('onboarding.skip')}</Text>
       </TouchableOpacity>
       <Animated.FlatList
         data={slides}
@@ -139,27 +140,27 @@ export default function Page() {
               onPress={() => setAccepted(!accepted)}
               style={[styles.acceptText, { color: theme.text }]}
             >
-              I agree to the
+              {t('onboarding.agree1')}
               <Text
                 onPress={() => router.push('/terms')}
                 style={{ textDecorationLine: 'underline' }}
               >
-                {' Terms of Service '}
+                {t('onboarding.terms')}
               </Text>
-              and
+              {t('onboarding.and')}
               <Text
                 onPress={() => router.push('/privacy')}
                 style={{ textDecorationLine: 'underline' }}
               >
-                {' Privacy Policy'}
+                {t('onboarding.privacy')}
               </Text>
             </Text>
           </View>
           <ThemedButton
-            title="Get Started"
+            title={t('onboarding.getStarted')}
             onPress={handleDone}
             disabled={!accepted}
-            accessibilityLabel="Get Started"
+            accessibilityLabel={t('onboarding.getStarted')}
             accessibilityRole="button"
           />
         </>

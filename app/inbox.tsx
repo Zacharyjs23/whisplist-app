@@ -3,10 +3,12 @@ import { FlatList, View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import useNotifications from '@/hooks/useNotifications';
 import { formatDistanceToNow } from 'date-fns';
+import { useTranslation } from '@/contexts/I18nContext';
 
 export default function InboxPage() {
   const { theme } = useTheme();
   const { items, markAllRead } = useNotifications();
+  const { t } = useTranslation();
 
   useEffect(() => {
     markAllRead();
@@ -21,7 +23,7 @@ export default function InboxPage() {
           ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), {
               addSuffix: true,
             })
-          : 'just now'}
+          : t('inbox.justNow')}
       </Text>
     </View>
   );
