@@ -56,9 +56,11 @@ import {
   RefreshControl,
   ScrollView,
   Modal,
-  Linking,
+  Linking as RNLinking,
+  Share,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { useTheme } from '@/contexts/ThemeContext';
 import { BarChart } from 'react-native-chart-kit';
 import ReportDialog from '../../components/ReportDialog';
@@ -539,6 +541,16 @@ export default function Page() {
     setConfirmGift({ link });
   }, []);
 
+  const handleShare = useCallback(async () => {
+    if (!wish?.id) return;
+    const wishUrl = Linking.createURL(`/wish/${wish.id}`);
+    try {
+      await Share.share({ message: wishUrl });
+    } catch (err) {
+      logger.warn('Failed to share wish', err);
+    }
+  }, [wish?.id]);
+
   const handleSendMoney = useCallback(
     (amount: number) => {
       if (!wish || !wish.userId) return;
@@ -833,9 +845,24 @@ export default function Page() {
                     },
                   ]}
                 >
-                  <Text style={[styles.wishCategory, { color: theme.tint }]}>
-                    {typeInfo[t].emoji} #{wish.category}
-                  </Text>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={[styles.wishCategory, { color: theme.tint }]}>
+                      {typeInfo[t].emoji} #{wish.category}
+                    </Text>
+                    <TouchableOpacity onPress={handleShare} hitSlop={HIT_SLOP}>
+                      <Ionicons
+                        name="share-outline"
+                        size={20}
+                        color={theme.tint}
+                      />
+                    </TouchableOpacity>
+                  </View>
                   <Text style={[styles.wishText, { color: theme.text }]}>
                     {wish.text}
                   </Text>
@@ -1196,7 +1223,7 @@ export default function Page() {
             <TouchableOpacity
               onPress={() => {
                 trackEvent('open_fulfillment_link');
-                Linking.openURL(wish.fulfillmentLink!);
+                RNLinking.openURL(wish.fulfillmentLink!);
               }}
               style={{ marginTop: 8 }}
             >

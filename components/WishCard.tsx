@@ -5,7 +5,10 @@ import {
   Text,
   TouchableOpacity,
   Animated,
+  Share,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSavedWishes } from '@/contexts/SavedWishesContext';
@@ -131,6 +134,16 @@ export const WishCard: React.FC<{
     [wish.id, user?.uid],
   );
 
+  const handleShare = useCallback(async () => {
+    if (!wish.id) return;
+    const wishUrl = Linking.createURL(`/wish/${wish.id}`);
+    try {
+      await Share.share({ message: wishUrl });
+    } catch (err) {
+      logger.warn('Failed to share wish', err);
+    }
+  }, [wish.id]);
+
   return (
     <Animated.View
       style={[
@@ -178,13 +191,22 @@ export const WishCard: React.FC<{
           <Image source={{ uri: wish.imageUrl }} style={styles.preview} />
         )}
       </TouchableOpacity>
-      <ReactionBar
-        wish={wish}
-        userReaction={userReaction}
-        onReact={handleReact}
-        onToggleSave={() => wish.id && toggleSave(wish.id)}
-        isSaved={!!wish.id && !!saved[wish.id]}
-      />
+      <View style={styles.actionRow}>
+        <ReactionBar
+          wish={wish}
+          userReaction={userReaction}
+          onReact={handleReact}
+          onToggleSave={() => wish.id && toggleSave(wish.id)}
+          isSaved={!!wish.id && !!saved[wish.id]}
+        />
+        <TouchableOpacity
+          onPress={handleShare}
+          style={styles.shareButton}
+          testID="share-button"
+        >
+          <Ionicons name="share-outline" size={20} color={theme.tint} />
+        </TouchableOpacity>
+      </View>
       {isBoosted && (
         <Text style={[styles.boostLabel, { color: theme.tint }]}>
           ⏳ Boost expires in {timeLeft}
@@ -265,6 +287,16 @@ const styles = StyleSheet.create({
   },
   reportButton: {
     marginTop: 4,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  shareButton: {
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 6,
   },
 });
 
