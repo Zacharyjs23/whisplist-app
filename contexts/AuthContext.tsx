@@ -58,6 +58,7 @@ interface Profile {
   giftsReceived?: number;
   referralDisplayName?: string;
   developerMode?: boolean;
+  isDev?: boolean;
   acceptedTermsAt?: any;
 }
 

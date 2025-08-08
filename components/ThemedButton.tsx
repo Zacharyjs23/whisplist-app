@@ -2,21 +2,26 @@ import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 
-interface ThemedButtonProps {
+export type ThemedButtonProps = {
   title: string;
-  onPress: () => void;
+  onPress: () => void | Promise<void>;
   disabled?: boolean;
-}
+} & React.ComponentProps<typeof TouchableOpacity> & {
+  accessibilityLabel?: string;
+  accessibilityRole?: string;
+};
 
-export default function ThemedButton({ title, onPress, disabled }: ThemedButtonProps) {
+export default function ThemedButton({ title, onPress, disabled, style, ...rest }: ThemedButtonProps) {
   const { theme } = useTheme();
   return (
     <TouchableOpacity
       onPress={onPress}
       disabled={disabled}
+      {...rest}
       style={[
         styles.button,
         { backgroundColor: theme.tint, opacity: disabled ? 0.6 : 1 },
+        style,
       ]}
       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
     >

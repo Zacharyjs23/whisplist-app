@@ -1,10 +1,5 @@
-import { Platform } from 'react-native';
 import { initializeApp } from 'firebase/app';
-import {
-  getAuth,
-  initializeAuth,
-  getReactNativePersistence,
-} from 'firebase/auth';
+import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
@@ -19,24 +14,12 @@ const firebaseConfig = {
   measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-if (!firebaseConfig.apiKey) {
-  console.error('Firebase config appears to be missing. Check environment variables.');
-}
-
 const app = initializeApp(firebaseConfig);
 
-let auth;
-if (Platform.OS === 'web') {
-  auth = getAuth(app);
-} else {
-  const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-  auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
-  });
-}
+export const auth = getAuth(app);
 
-const db = getFirestore(app);
-const storage = getStorage(app);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
 
 let analytics: Analytics | undefined;
 
@@ -50,4 +33,4 @@ isSupported()
     console.warn('Analytics not supported', err);
   });
 
-export { auth, db, storage, analytics };
+export { analytics };

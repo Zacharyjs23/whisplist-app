@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
+import { createPlayer, type AudioPlayer } from 'expo-audio';
 import {
   getWish,
   listenWishComments,
@@ -28,7 +28,7 @@ import {
   collectionGroup,
   updateDoc,
   setDoc,
-} from 'firebase/firestore'; // ✅ Keep only if used directly in this file
+} from 'firebase/firestore';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -50,6 +50,7 @@ import {
   RefreshControl,
   ScrollView,
   Modal,
+  Linking,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -61,7 +62,16 @@ import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
 import { trackEvent } from '@/helpers/analytics';
 
-const baseTypeInfo = {
+const formatTimeLeft = (d: Date) => {
+  const ms = d.getTime() - Date.now();
+  if (ms <= 0) return '0h';
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  return `${h}h ${m}m`;
+};
+
+type WishType = 'wish' | 'confession' | 'advice' | 'dream';
+const baseTypeInfo: Record<WishType, { emoji: string; color: string }> = {
   wish: { emoji: '💭', color: '#333333' },
   confession: { emoji: '😶\u200d🌫️', color: '#374151' },
   advice: { emoji: '🧠', color: '#064e3b' },
@@ -79,6 +89,7 @@ interface Comment {
   parentId?: string;
   reactions?: Record<string, number>;
   userReactions?: Record<string, string>;
+  nickname?: string;
 }
 
 
@@ -118,6 +129,7 @@ export default function Page() {
   const [verifiedStatus, setVerifiedStatus] = useState<Record<string, boolean>>({});
   const [refreshing, setRefreshing] = useState(false);
   const { user, profile } = useAuth();
+  const t: WishType = (wish?.type as WishType) || 'wish';
   useEffect(() => {
     const loadNickname = async () => {
       const n = await AsyncStorage.getItem('nickname');
@@ -291,22 +303,23 @@ try {
     fetchVerified();
   }, [comments]);
 
-  const toggleAudio = useCallback(() => {
+  const toggleAudio = useCallback(async () => {
     try {
       if (player) {
         if (isPlaying) {
-          player.pause();
+          await player.pauseAsync();
           setIsPlaying(false);
         } else {
-          player.play();
+          await player.playAsync();
           setIsPlaying(true);
         }
         return;
       }
       if (!wish?.audioUrl) return;
-      const p = createAudioPlayer(wish.audioUrl);
+      const p = createPlayer();
+      await p.loadAsync(wish.audioUrl);
       setPlayer(p);
-      p.play();
+      await p.playAsync();
       setIsPlaying(true);
     } catch (err) {
       console.error('❌ Failed to play audio:', err);
@@ -316,7 +329,7 @@ try {
   useEffect(() => {
     return () => {
       if (player) {
-        player.remove();
+        player.pauseAsync().catch(() => {});
       }
       setIsPlaying(false);
     };
@@ -573,7 +586,7 @@ try {
         style={[
           styles.wishBox,
           {
-            backgroundColor: typeInfo[wish.type || 'wish'].color,
+            backgroundColor: typeInfo[t].color,
             borderColor: isBoosted
               ? glowAnim.interpolate({ inputRange: [0, 1], outputRange: ['#facc15', '#fde68a'] })
               : 'transparent',
@@ -582,7 +595,7 @@ try {
         ]}
       >
         <Text style={[styles.wishCategory, { color: theme.tint }]}>
-          {typeInfo[wish.type || 'wish'].emoji} #{wish.category}
+          {typeInfo[t].emoji} #{wish.category}
         </Text>
         <Text style={[styles.wishText, { color: theme.text }]}>{wish.text}</Text>
         {wish.fulfillmentLink && (

@@ -4,8 +4,9 @@ import { router } from 'expo-router';
 import {
   requestRecordingPermissionsAsync,
   setAudioModeAsync,
-  RecordingPresets,
   AudioRecorder,
+  AudioPlayer,
+  createRecorder,
 } from 'expo-audio';
 import * as Audio from 'expo-audio';
 import {
@@ -89,6 +90,7 @@ export default function Page() {
   const [optionA, setOptionA] = useState('');
   const [optionB, setOptionB] = useState('');
   const [recording, setRecording] = useState<AudioRecorder | null>(null);
+  const [player, setPlayer] = useState<AudioPlayer | null>(null);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [includeAudio, setIncludeAudio] = useState(false);
@@ -340,9 +342,8 @@ useEffect(() => {
         shouldPlayInBackground: false,
         shouldRouteThroughEarpiece: false,
       });
-      const rec = new AudioRecorder(RecordingPresets.HIGH_QUALITY);
-      await rec.prepareToRecordAsync();
-      rec.record();
+      const rec = createRecorder();
+      await rec.start();
       setRecording(rec);
       setIsRecording(true);
     } catch (err) {
@@ -353,8 +354,7 @@ useEffect(() => {
   const stopRecording = async () => {
     try {
       if (!recording) return;
-      await recording.stop();
-      const uri = recording.uri;
+      const { uri } = await recording.stop();
       setRecordedUri(uri);
     } catch (err) {
       console.error('❌ Failed to stop recording:', err);
