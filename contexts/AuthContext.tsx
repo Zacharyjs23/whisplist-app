@@ -32,11 +32,12 @@ import {
   resetPassword as resetPasswordService,
   signOut as signOutService,
 } from '../services/auth';
+import * as logger from '@/helpers/logger';
 
 WebBrowser.maybeCompleteAuthSession();
 
 if (!auth || !db) {
-  console.error('Firebase modules are undefined in AuthContext');
+  logger.error('Firebase modules are undefined in AuthContext');
 }
 
 interface AuthContextValue {
@@ -95,7 +96,7 @@ export const AuthProvider = ({
         try {
           await signInAnonymouslyService();
         } catch (err) {
-          console.error('Anonymous sign-in failed', err);
+          logger.error('Anonymous sign-in failed', err);
           setLoading(false);
         }
         return;

@@ -19,6 +19,7 @@ import ConfettiCannon from 'react-native-confetti-cannon';
 import * as Linking from 'expo-linking';
 import { getWish, boostWish } from '../../helpers/wishes';
 import { formatTimeLeft } from '../../helpers/time';
+import * as logger from '@/helpers/logger';
 
 export default function BoostPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -48,7 +49,7 @@ export default function BoostPage() {
       setShowConfirm(true);
       setTimeout(() => setShowConfirm(false), 3000);
     } catch (err) {
-      console.error('Failed to apply free boost', err);
+      logger.error('Failed to apply free boost', err);
     }
   };
 
@@ -102,7 +103,7 @@ export default function BoostPage() {
         setTimeout(() => setShowConfirm(false), 3000);
       }
     } catch (err) {
-      console.error('Failed to create checkout session', err);
+      logger.error('Failed to create checkout session', err);
     } finally {
       setLoading(false);
     }

@@ -40,6 +40,7 @@ import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import * as logger from '@/helpers/logger';
 
 const allCategories = [
   'love',
@@ -59,10 +60,10 @@ export default function Page() {
   const router = useRouter();
 
   if (!db) {
-    console.error('Firebase database undefined in feed page');
+    logger.error('Firebase database undefined in feed page');
   }
   if (user === undefined) {
-    console.error('AuthContext returned undefined user');
+    logger.error('AuthContext returned undefined user');
   }
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [filteredWishes, setFilteredWishes] = useState<Wish[]>([]);
@@ -140,12 +141,12 @@ export default function Page() {
           setLeaderboard(topCreators);
           setWhispOfDay(spotlight);
         } catch (err) {
-          console.warn('Failed to load highlights', err);
+          logger.warn('Failed to load highlights', err);
         }
       })();
       return unsubscribe;
     } catch (err) {
-      console.error('Failed to listen for trending wishes', err);
+      logger.error('Failed to listen for trending wishes', err);
       return () => {};
     }
   }, []);
@@ -158,7 +159,7 @@ export default function Page() {
     }
     getFollowingIds(user.uid)
       .then(setFollowingIds)
-      .catch((err) => console.warn('Failed to load following ids', err));
+      .catch((err) => logger.warn('Failed to load following ids', err));
   }, [user]);
 
   const fetchWishes = useCallback(() => {
@@ -208,7 +209,7 @@ export default function Page() {
             });
             setFilteredWishes(filtered);
           } catch (err) {
-            console.error('❌ Failed to load personalized wishes:', err);
+            logger.error('❌ Failed to load personalized wishes:', err);
             setError('Failed to load wishes');
           } finally {
             setLoading(false);
@@ -246,7 +247,7 @@ export default function Page() {
             });
             setFilteredWishes(filtered);
           } catch (err) {
-            console.error('❌ Failed to filter wishes:', err);
+            logger.error('❌ Failed to filter wishes:', err);
             setError('Failed to load wishes');
           } finally {
             setLoading(false);
@@ -277,7 +278,7 @@ export default function Page() {
           });
           setFilteredWishes(filtered);
         } catch (err) {
-          console.error('❌ Failed to load wishes:', err);
+          logger.error('❌ Failed to load wishes:', err);
           setError('Failed to load wishes');
         } finally {
           setLoading(false);
@@ -285,7 +286,7 @@ export default function Page() {
       })();
       return () => {};
     } catch (err) {
-      console.error('❌ Failed to load wishes:', err);
+      logger.error('❌ Failed to load wishes:', err);
       setError('Failed to load wishes');
       setLoading(false);
       return () => {};
@@ -427,7 +428,7 @@ export default function Page() {
         setFilteredWishes(filtered);
       }
     } catch (err) {
-      console.error('❌ Failed to refresh wishes:', err);
+      logger.error('❌ Failed to refresh wishes:', err);
     } finally {
       setRefreshing(false);
     }
@@ -458,7 +459,7 @@ export default function Page() {
       })) as Wish[];
       setFilteredWishes((prev) => [...prev, ...more]);
     } catch (err) {
-      console.error('Failed to load more wishes', err);
+      logger.error('Failed to load more wishes', err);
     }
   }, [lastVisible]);
 
@@ -483,7 +484,7 @@ export default function Page() {
         timestamp: serverTimestamp(),
       });
     } catch (err) {
-      console.error('❌ Failed to submit report:', err);
+      logger.error('❌ Failed to submit report:', err);
     } finally {
       setReportVisible(false);
       setReportTarget(null);
@@ -676,7 +677,7 @@ export default function Page() {
       </SafeAreaView>
     );
   } catch (err) {
-    console.error('Error rendering feed page', err);
+    logger.error('Error rendering feed page', err);
     return null;
   }
 }

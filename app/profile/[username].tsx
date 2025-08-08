@@ -25,6 +25,7 @@ import { db } from '../../firebase';
 import { followUser, unfollowUser } from '../../helpers/followers';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Wish } from '../../types/Wish';
+import * as logger from '@/helpers/logger';
 
 export default function Page() {
   const { username } = useLocalSearchParams<{ username: string }>();
@@ -67,7 +68,7 @@ export default function Page() {
             );
             setIsFollowing(followSnap.exists());
           } catch (err) {
-            console.warn('Failed to fetch follow status', err);
+            logger.warn('Failed to fetch follow status', err);
           }
         }
         const q = query(
@@ -85,7 +86,7 @@ export default function Page() {
         })) as Wish[];
         setWishes(list);
       } catch (err) {
-        console.warn('Failed to load profile', err);
+        logger.warn('Failed to load profile', err);
         setPrivateProfile(true);
       } finally {
         setLoading(false);

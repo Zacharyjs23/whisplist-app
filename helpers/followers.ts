@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Wish } from '../types/Wish';
+import * as logger from './logger';
 
 /**
  * Firestore `in` queries only accept up to 10 values. This helper splits an
@@ -35,7 +36,7 @@ export async function followUser(currentUser: string, targetUser: string) {
       setDoc(followingRef, { createdAt: serverTimestamp() }),
     ]);
   } catch (error) {
-    console.error('Error following user', error);
+    logger.error('Error following user', error);
     throw error;
   }
 }
@@ -46,7 +47,7 @@ export async function unfollowUser(currentUser: string, targetUser: string) {
   try {
     await Promise.all([deleteDoc(followerRef), deleteDoc(followingRef)]);
   } catch (error) {
-    console.error('Error unfollowing user', error);
+    logger.error('Error unfollowing user', error);
     throw error;
   }
 }
@@ -92,19 +93,19 @@ export function listenFollowingWishes(
                 .sort((a, b) => (b as any).timestamp - (a as any).timestamp);
               cb(merged as Wish[]);
             } catch (err) {
-              console.error('Error processing following wishes snapshot', err);
+              logger.error('Error processing following wishes snapshot', err);
               onError?.(err);
             }
           },
           (err) => {
-            console.error('Error listening to following wishes', err);
+            logger.error('Error listening to following wishes', err);
             onError?.(err);
           },
         );
         unsubs.push(unsub);
       });
     } catch (err) {
-      console.error('Error fetching following ids', err);
+      logger.error('Error fetching following ids', err);
       onError?.(err);
     }
   })();
@@ -141,7 +142,7 @@ export async function getFollowingWishes(userId: string): Promise<Wish[]> {
       .sort((a, b) => (b as any).timestamp - (a as any).timestamp)
       .slice(0, 20);
   } catch (error) {
-    console.error('Error getting following wishes', error);
+    logger.error('Error getting following wishes', error);
     throw error;
   }
 }

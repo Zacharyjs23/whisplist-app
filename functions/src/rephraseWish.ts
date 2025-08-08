@@ -1,4 +1,5 @@
 import * as functions from 'firebase-functions';
+import * as logger from '../../helpers/logger';
 
 interface RephraseRequest {
   text: string;
@@ -16,7 +17,7 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const hasValidApiKey = typeof OPENAI_API_KEY === 'string' && OPENAI_API_KEY.startsWith('sk-');
 
 if (!hasValidApiKey) {
-  console.error('Invalid or missing OPENAI_API_KEY');
+  logger.error('Invalid or missing OPENAI_API_KEY');
 }
 
 export const rephraseWish = functions.https.onRequest(async (req, res) => {
@@ -54,14 +55,14 @@ export const rephraseWish = functions.https.onRequest(async (req, res) => {
     });
 
     if (response.status === 401) {
-      console.error('Invalid OpenAI API key');
+      logger.error('Invalid OpenAI API key');
       res.status(500).send('Invalid OpenAI API key');
       return;
     }
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('OpenAI API error', response.status, errorText);
+      logger.error('OpenAI API error', response.status, errorText);
       res.status(response.status).send('OpenAI API error');
       return;
     }
@@ -70,7 +71,7 @@ export const rephraseWish = functions.https.onRequest(async (req, res) => {
     const suggestion = data.choices?.[0]?.message?.content?.trim() || null;
     res.json({ suggestion });
   } catch (err) {
-    console.error('rephraseWish error', err);
+    logger.error('rephraseWish error', err);
     res.status(500).send('error');
   }
 });

@@ -12,6 +12,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import * as logger from './logger';
 
 export type Comment<Extra extends Record<string, unknown> = {}> = {
   id: string;
@@ -47,17 +48,17 @@ export function listenWishComments<Extra extends Record<string, unknown> = {}>(
           }));
           cb(data as Comment<Extra>[]);
         } catch (err) {
-          console.error('Error processing wish comments snapshot', err);
+          logger.error('Error processing wish comments snapshot', err);
           onError?.(err);
         }
       },
       (err) => {
-        console.error('Error listening to wish comments', err);
+        logger.error('Error listening to wish comments', err);
         onError?.(err);
       },
     );
   } catch (err) {
-    console.error('Error setting up wish comments listener', err);
+    logger.error('Error setting up wish comments listener', err);
     onError?.(err);
     return () => {};
   }
@@ -74,7 +75,7 @@ export async function addComment<Extra extends Record<string, unknown> = {}>(
       ...data,
     });
   } catch (err) {
-    console.error('Error adding comment', err);
+    logger.error('Error adding comment', err);
     onError?.(err);
     throw err;
   }
@@ -113,7 +114,7 @@ export async function updateCommentReaction<Extra extends Record<string, unknown
 
     return await updateDoc(ref, { reactions, userReactions });
   } catch (err) {
-    console.error('Error updating comment reaction', err);
+    logger.error('Error updating comment reaction', err);
     onError?.(err);
     throw err;
   }
@@ -139,7 +140,7 @@ export async function getWishComments<Extra extends Record<string, unknown> = {}
       return comment;
     });
   } catch (err) {
-    console.error('Error fetching wish comments', err);
+    logger.error('Error fetching wish comments', err);
     onError?.(err);
     throw err;
   }

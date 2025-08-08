@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DAILY_QUOTE_ENABLED } from '@/constants/featureFlags';
+import * as logger from '@/helpers/logger';
 
 const QUOTES = [
   'Believe in yourself!',
@@ -19,7 +20,7 @@ export default function useDailyQuote() {
           Alert.alert('Motivation', q);
         }
       } catch (err) {
-        console.warn('Failed to load daily quote', err);
+        logger.warn('Failed to load daily quote', err);
       }
     };
 
