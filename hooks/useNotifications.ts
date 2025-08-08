@@ -6,6 +6,7 @@ import {
   orderBy,
   updateDoc,
   doc,
+  Timestamp,
 } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '../firebase';
@@ -14,7 +15,7 @@ export interface NotificationItem {
   id: string;
   type: string;
   message: string;
-  timestamp: any;
+  timestamp: Timestamp | null;
   read?: boolean;
 }
 

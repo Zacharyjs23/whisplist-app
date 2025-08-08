@@ -146,15 +146,15 @@ export default function Page() {
   const isActiveWish =
     isBoosted || (wish?.likes || 0) > 5 || wish?.active === true;
   const [timeLeft, setTimeLeft] = useState(
-    isBoosted && wish?.boostedUntil?.toDate
-      ? formatTimeLeft(wish.boostedUntil.toDate())
+    isBoosted && wish?.boostedUntil
+      ? formatTimeLeft(wish.boostedUntil!.toDate())
       : '',
   );
   const glowAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    if (isBoosted && wish?.boostedUntil?.toDate) {
+    if (isBoosted && wish?.boostedUntil) {
       const update = () =>
-        setTimeLeft(formatTimeLeft(wish.boostedUntil.toDate()));
+        setTimeLeft(formatTimeLeft(wish.boostedUntil!.toDate()));
       update();
       const id = setInterval(update, 60000);
       const loop = Animated.loop(

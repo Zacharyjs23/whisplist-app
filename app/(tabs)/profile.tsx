@@ -128,11 +128,7 @@ export default function Page() {
         ...(d.data() as Omit<Wish, 'id'>),
       })) as Wish[];
       const more = mapped.filter(
-        (w) =>
-          !w.expiresAt ||
-          ((w.expiresAt as any).toDate
-            ? (w.expiresAt as any).toDate()
-            : w.expiresAt) > new Date(),
+        (w) => !w.expiresAt || w.expiresAt.toDate() > new Date(),
       );
       setPostedList((prev) => [...prev, ...more]);
       setError(null);
@@ -160,11 +156,7 @@ export default function Page() {
           ...(d.data() as Omit<Wish, 'id'>),
         })) as Wish[];
         const list = mapped.filter(
-          (w) =>
-            !w.expiresAt ||
-            ((w.expiresAt as any).toDate
-              ? (w.expiresAt as any).toDate()
-              : w.expiresAt) > new Date(),
+          (w) => !w.expiresAt || w.expiresAt.toDate() > new Date(),
         );
         setPostedList(list);
         setError(null);
@@ -175,10 +167,10 @@ export default function Page() {
             w.boostedUntil.toDate() > new Date(),
         );
         setBoostCount(active.length);
-        if (active.length > 0) {
-          active.sort((a, b) =>
-            a.boostedUntil.toDate() < b.boostedUntil.toDate() ? 1 : -1,
-          );
+          if (active.length > 0) {
+            active.sort((a, b) =>
+              a.boostedUntil!.toDate() < b.boostedUntil!.toDate() ? 1 : -1,
+            );
           setLatestBoost(active[0]);
         } else {
           setLatestBoost(null);
