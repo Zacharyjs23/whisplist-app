@@ -1,13 +1,8 @@
 // app/(tabs)/index.tsx — Full Home Screen with SafeArea, StatusBar, and Wish Logic
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
-import {
-  requestRecordingPermissionsAsync,
-  setAudioModeAsync,
-  RecordingPresets,
-  AudioRecorder,
-} from 'expo-audio';
-import * as Audio from 'expo-audio';
+import { createRecorder, type AudioRecorder } from 'expo-audio';
+import * as ExpoAudio from 'expo-audio';
 import {
   addWish,
   getFollowingIds,
@@ -327,22 +322,21 @@ useEffect(() => {
 
   const startRecording = async () => {
     try {
-      const { granted } = await requestRecordingPermissionsAsync();
+      const { granted } = await (ExpoAudio as any).requestRecordingPermissionsAsync();
       if (!granted) {
         Alert.alert('Permission required', 'Microphone access is needed to record');
         return;
       }
-      await setAudioModeAsync({
+      await (ExpoAudio as any).setAudioModeAsync({
         allowsRecording: true,
-        interruptionMode: (Audio as any).INTERRUPTION_MODE_IOS_DO_NOT_MIX,
+        interruptionMode: (ExpoAudio as any).INTERRUPTION_MODE_IOS_DO_NOT_MIX,
         playsInSilentMode: true,
-        interruptionModeAndroid: (Audio as any).INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
+        interruptionModeAndroid: (ExpoAudio as any).INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
         shouldPlayInBackground: false,
         shouldRouteThroughEarpiece: false,
       });
-      const rec = new AudioRecorder(RecordingPresets.HIGH_QUALITY);
-      await rec.prepareToRecordAsync();
-      rec.record();
+      const rec = createRecorder();
+      await rec.start();
       setRecording(rec);
       setIsRecording(true);
     } catch (err) {
@@ -353,8 +347,7 @@ useEffect(() => {
   const stopRecording = async () => {
     try {
       if (!recording) return;
-      await recording.stop();
-      const uri = recording.uri;
+      const { uri } = await recording.stop();
       setRecordedUri(uri);
     } catch (err) {
       console.error('❌ Failed to stop recording:', err);

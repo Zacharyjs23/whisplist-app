@@ -83,7 +83,12 @@ export default function Page() {
           title: 'WhispList',
           body: 'Time to post your wish for today!',
         },
-        trigger: { hour: 9, minute: 0, repeats: true },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+          hour: 9,
+          minute: 0,
+          repeats: true,
+        },
       });
       await AsyncStorage.setItem('dailyPromptReminderId', newId);
     }
@@ -102,9 +107,14 @@ export default function Page() {
         )
       );
       setPostLastDoc(snap.docs[snap.docs.length - 1] || postLastDoc);
-      const more = snap.docs
-        .map(d => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) }))
-        .filter(w => !w.expiresAt || (w.expiresAt.toDate ? w.expiresAt.toDate() : w.expiresAt) > new Date()) as Wish[];
+      const mapped = snap.docs.map(
+        d => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })
+      ) as Wish[];
+      const more = mapped.filter(
+        w =>
+          !w.expiresAt ||
+          ((w.expiresAt as any).toDate ? (w.expiresAt as any).toDate() : w.expiresAt) > new Date()
+      );
       setPostedList(prev => [...prev, ...more]);
       setError(null);
     } catch (err) {
@@ -126,9 +136,14 @@ export default function Page() {
           )
         );
         setPostLastDoc(snap.docs[snap.docs.length - 1] || null);
-        const list = snap.docs
-          .map(d => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) }))
-          .filter(w => !w.expiresAt || (w.expiresAt.toDate ? w.expiresAt.toDate() : w.expiresAt) > new Date()) as Wish[];
+        const mapped = snap.docs.map(
+          d => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })
+        ) as Wish[];
+        const list = mapped.filter(
+          w =>
+            !w.expiresAt ||
+            ((w.expiresAt as any).toDate ? (w.expiresAt as any).toDate() : w.expiresAt) > new Date()
+        );
         setPostedList(list);
         setError(null);
         const active = list.filter(
@@ -243,7 +258,7 @@ export default function Page() {
         const wishes: Wish[] = [];
         for (const id of Array.from(ids)) {
           const wSnap = await getDocs(query(collection(db, 'wishes'), where('__name__', '==', id)));
-          wSnap.forEach(d => wishes.push({ id: d.id, ...(d.data() as Omit<Wish,'id'>) }));
+          wSnap.forEach(d => wishes.push({ id: d.id, ...(d.data() as Omit<Wish,'id'>) } as Wish));
         }
         wishes.sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0));
         setGiftedList(wishes);
@@ -261,7 +276,7 @@ export default function Page() {
       for (const id of Object.keys(saved)) {
         const docSnap = await getDocs(query(collection(db, 'wishes'), where('__name__', '==', id)));
         docSnap.forEach(d => {
-          list.push({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) });
+          list.push({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) } as Wish);
         });
       }
       list.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
