@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
@@ -34,7 +35,8 @@ export default function usePushNotifications() {
       }
       if (status !== 'granted') return;
 
-      const { data } = await Notifications.getExpoPushTokenAsync();
+      const projectId = Constants?.expoConfig?.extra?.eas?.projectId;
+      const { data } = await Notifications.getExpoPushTokenAsync({ projectId });
       setToken(data);
       try {
         await updateDoc(doc(db, 'users', user.uid), { fcmToken: data });
