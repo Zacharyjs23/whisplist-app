@@ -60,7 +60,7 @@ export default function Page() {
     return (
       <TouchableOpacity
         key={name}
-        onPress={() => setTheme(name)}
+        onPress={() => void setTheme(name)}
         style={[
           styles.themeItem,
           {
@@ -543,7 +543,7 @@ export default function Page() {
             </ScrollView>
             <Picker
               selectedValue={theme.name}
-              onValueChange={(value) => setTheme(value as ThemeName)}
+              onValueChange={(value) => void setTheme(value as ThemeName)}
               style={[
                 styles.picker,
                 { backgroundColor: theme.input, color: theme.text },
