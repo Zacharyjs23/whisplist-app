@@ -28,6 +28,7 @@ import {
   collectionGroup,
   limit,
   startAfter,
+  Timestamp,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
@@ -49,7 +50,7 @@ export default function Page() {
   >([]);
   const [boostImpact, setBoostImpact] = useState({ likes: 0, comments: 0 });
   const [giftStats, setGiftStats] = useState({ count: 0, total: 0 });
-  const [giftMessages, setGiftMessages] = useState<{ text: string; ts: any }[]>(
+  const [giftMessages, setGiftMessages] = useState<{ text: string; ts: Timestamp }[]>(
     [],
   );
   const [savedList, setSavedList] = useState<Wish[]>([]);
@@ -274,7 +275,7 @@ export default function Page() {
       );
       let count = 0;
       let total = 0;
-      const msgs: { text: string; ts: any }[] = [];
+      const msgs: { text: string; ts: Timestamp }[] = [];
       const ids = new Set<string>();
       snap.forEach((d) => {
         count += 1;
