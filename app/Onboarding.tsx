@@ -49,7 +49,7 @@ export default function Page() {
     trackEvent('view_onboarding');
   }, []);
 
-  const handleDone = async () => {
+  const handleDone = async (): Promise<void> => {
     if (completed) return;
     setCompleted(true);
     await AsyncStorage.setItem('hasSeenOnboarding', 'true');

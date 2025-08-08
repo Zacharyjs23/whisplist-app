@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
+import { createPlayer, type AudioPlayer } from 'expo-audio';
 import {
   getWish,
   listenWishComments,
@@ -50,6 +50,7 @@ import {
   RefreshControl,
   ScrollView,
   Modal,
+  Linking,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -68,6 +69,16 @@ const baseTypeInfo = {
   dream: { emoji: '🌙', color: '#312e81' },
 };
 
+type WishType = 'wish' | 'confession' | 'advice' | 'dream';
+
+const formatTimeLeft = (d: Date) => {
+  const ms = d.getTime() - Date.now();
+  if (ms <= 0) return '0h';
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  return `${h}h ${m}m`;
+};
+
 interface Comment {
   id: string;
   text: string;
@@ -79,6 +90,7 @@ interface Comment {
   parentId?: string;
   reactions?: Record<string, number>;
   userReactions?: Record<string, string>;
+  nickname?: string;
 }
 
 
@@ -96,6 +108,7 @@ export default function Page() {
     wish: { emoji: '💭', color: theme.input },
   }), [theme]);
   const [wish, setWish] = useState<Wish | null>(null);
+  const t: WishType = (wish?.type as WishType) || 'wish';
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
   const [replyTo, setReplyTo] = useState<string | null>(null);
@@ -291,22 +304,23 @@ try {
     fetchVerified();
   }, [comments]);
 
-  const toggleAudio = useCallback(() => {
+  const toggleAudio = useCallback(async () => {
     try {
       if (player) {
         if (isPlaying) {
-          player.pause();
+          await player.pauseAsync();
           setIsPlaying(false);
         } else {
-          player.play();
+          await player.playAsync();
           setIsPlaying(true);
         }
         return;
       }
       if (!wish?.audioUrl) return;
-      const p = createAudioPlayer(wish.audioUrl);
+      const p = createPlayer();
+      await p.loadAsync(wish.audioUrl);
+      await p.playAsync();
       setPlayer(p);
-      p.play();
       setIsPlaying(true);
     } catch (err) {
       console.error('❌ Failed to play audio:', err);
@@ -316,7 +330,7 @@ try {
   useEffect(() => {
     return () => {
       if (player) {
-        player.remove();
+        (player as any).remove?.();
       }
       setIsPlaying(false);
     };
@@ -573,7 +587,7 @@ try {
         style={[
           styles.wishBox,
           {
-            backgroundColor: typeInfo[wish.type || 'wish'].color,
+            backgroundColor: typeInfo[t].color,
             borderColor: isBoosted
               ? glowAnim.interpolate({ inputRange: [0, 1], outputRange: ['#facc15', '#fde68a'] })
               : 'transparent',
@@ -582,7 +596,7 @@ try {
         ]}
       >
         <Text style={[styles.wishCategory, { color: theme.tint }]}>
-          {typeInfo[wish.type || 'wish'].emoji} #{wish.category}
+          {typeInfo[t].emoji} #{wish.category}
         </Text>
         <Text style={[styles.wishText, { color: theme.text }]}>{wish.text}</Text>
         {wish.fulfillmentLink && (

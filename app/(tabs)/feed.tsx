@@ -36,6 +36,8 @@ import { useTheme } from '@/contexts/ThemeContext';
 
 const allCategories = ['love', 'health', 'career', 'general', 'money', 'friendship', 'fitness'];
 
+type Pref = { categories: string[]; type?: string };
+
 export default function Page() {
   const { user } = useAuth();
   const { theme } = useTheme();
@@ -63,8 +65,8 @@ export default function Page() {
   const [lastVisible, setLastVisible] = useState<any | null>(null);
   const [lastDoc, setLastDoc] = useState<any | null>(null);
 
-  const loadPersonalPrefs = useCallback(async () => {
-    if (!user) return { categories: [], type: undefined as string | undefined };
+  const loadPersonalPrefs = useCallback(async (): Promise<Pref> => {
+    if (!user) return { categories: [], type: undefined };
     const snap = await getDocs(
       query(
         collection(db, 'wishes'),
@@ -81,7 +83,7 @@ export default function Page() {
       if (data.type) typeCounts[data.type] = (typeCounts[data.type] || 0) + 1;
     });
     const favType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
-    const pref = { categories: Array.from(cats), type: favType };
+    const pref: Pref = { categories: Array.from(cats), type: favType };
     await AsyncStorage.setItem('forYouPref', JSON.stringify(pref));
     return pref;
   }, [user]);
@@ -141,7 +143,7 @@ export default function Page() {
         (async () => {
           try {
             const stored = await AsyncStorage.getItem('forYouPref');
-            let pref = stored ? JSON.parse(stored) : { categories: [], type: undefined };
+            let pref: Pref = stored ? JSON.parse(stored) : { categories: [], type: undefined };
             const fresh = await loadPersonalPrefs();
             if (fresh.categories.length) pref = fresh;
             const snap = await getDocs(
@@ -187,10 +189,12 @@ export default function Page() {
         ? listenTrendingWishes((all: Wish[]) => {
             try {
               const filtered = all.filter((wish) => {
-                const inCategory =
-                  activeTab === 'trending' || !selectedCategory || wish.category === selectedCategory;
+                const show =
+                  activeTab === 'trending'
+                    ? (!selectedCategory || wish.category === selectedCategory)
+                    : true;
                 const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
-                return inCategory && inSearch;
+                return show && inSearch;
               });
               setFilteredWishes(filtered);
             } catch (err) {
@@ -212,10 +216,9 @@ export default function Page() {
               setLastVisible(snap.docs[snap.docs.length - 1] || null);
               const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
               const filtered = all.filter((wish) => {
-                const inCategory =
-                  activeTab === 'trending' || !selectedCategory || wish.category === selectedCategory;
+                const show = !selectedCategory || wish.category === selectedCategory;
                 const inSearch = wish.text.toLowerCase().includes(searchTerm.toLowerCase());
-                return inCategory && inSearch;
+                return show && inSearch;
               });
               setFilteredWishes(filtered);
             } catch (err) {

@@ -198,7 +198,9 @@ export async function getWhispOfTheDay(): Promise<Wish | null> {
   const list = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) })) as Wish[];
   const filtered = list.filter(w => {
     const boost = w.boostedUntil && w.boostedUntil.toDate && w.boostedUntil.toDate() > new Date();
-    const reacts = w.reactions && Object.values(w.reactions).reduce((s, v) => s + (v || 0), 0) > 0;
+    const reacts =
+      !!w.reactions &&
+      Object.values(w.reactions).reduce<number>((sum, v) => sum + (v ?? 0), 0) > 0;
     return boost || reacts;
   });
   if (filtered.length === 0) return null;

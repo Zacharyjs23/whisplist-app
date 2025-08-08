@@ -41,7 +41,20 @@ import {
 
 export default function Page() {
   const { theme, setTheme } = useTheme();
-  const { user, profile, updateProfile } = useAuth();
+  type Profile = {
+    displayName?: string;
+    bio?: string;
+    photoURL?: string;
+    publicProfileEnabled?: boolean;
+    giftingEnabled?: boolean;
+    stripeAccountId?: string;
+    referralDisplayName?: string;
+    developerMode?: boolean;
+    boostCredits?: number;
+    isDev?: boolean;
+  };
+  const { user, profile: profileData, updateProfile, pickImage, signOut } = useAuth();
+  const profile = profileData as Profile | null;
   const router = useRouter();
 
   const themeOptions = Object.keys(Colors) as ThemeName[];
@@ -260,7 +273,7 @@ export default function Page() {
   };
 
   const permissionsInfo = async () => {
-    const mic = await Audio.getRecordingPermissionsAsync();
+    const mic = await (Audio as any).getRecordingPermissionsAsync();
     const notif = await Notifications.getPermissionsAsync();
     Alert.alert('Permissions', `Microphone: ${mic.status}\nNotifications: ${notif.status}`);
   };
@@ -442,7 +455,12 @@ export default function Page() {
           />
           <ThemedButton title="Submit Feedback" onPress={handleSendFeedback} />
           <ThemedButton title="Export History" onPress={handleExport} />
-          <ThemedButton title="Rate this App" onPress={() => Linking.openURL('https://example.com')} />
+            <ThemedButton
+              title="Rate this App"
+              onPress={() => {
+                Linking.openURL('https://example.com');
+              }}
+            />
           <ThemedButton title="Permissions" onPress={permissionsInfo} />
           <ThemedButton title="Delete My Content" onPress={handleDeleteContent} />
           <ThemedButton title="Reset App Data" onPress={handleReset} />
