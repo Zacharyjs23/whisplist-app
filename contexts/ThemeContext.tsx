@@ -8,15 +8,15 @@ export type Theme = { name: ThemeName } & (typeof Colors)['light'];
 
 interface ThemeContextValue {
   theme: Theme;
-  setTheme: (themeName: ThemeName) => void;
-  toggleTheme: () => void;
+  setTheme: (themeName: ThemeName) => Promise<void>;
+  toggleTheme: () => Promise<void>;
 }
 
 const defaultTheme: Theme = { name: 'light', ...Colors.light };
 const ThemeContext = createContext<ThemeContextValue>({
   theme: defaultTheme,
-  setTheme: () => {},
-  toggleTheme: () => {},
+  setTheme: async () => {},
+  toggleTheme: async () => {},
 });
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -37,13 +37,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
     load();
   }, [systemTheme]);
 
-  const setTheme = async (val: ThemeName) => {
+  const setTheme = async (val: ThemeName): Promise<void> => {
     setThemeName(val);
     await AsyncStorage.setItem('appTheme', val);
   };
 
-  const toggleTheme = () => {
-    setTheme(themeName === 'light' ? 'dark' : 'light');
+  const toggleTheme = async (): Promise<void> => {
+    await setTheme(themeName === 'light' ? 'dark' : 'light');
   };
 
   const theme: Theme = { name: themeName, ...Colors[themeName] };
