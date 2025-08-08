@@ -1,12 +1,12 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
-const { Expo } = require('expo-server-sdk');
+import * as functions from 'firebase-functions';
+import * as admin from 'firebase-admin';
+import { Expo } from 'expo-server-sdk';
 
 admin.initializeApp();
 const db = admin.firestore();
 const expo = new Expo();
 
-async function sendPush(userId, title, body) {
+async function sendPush(userId: string | undefined, title: string, body: string) {
   if (!userId) return null;
   const userRef = db.collection('users').doc(userId);
   const snap = await userRef.get();
@@ -45,7 +45,7 @@ async function sendPush(userId, title, body) {
   return null;
 }
 
-exports.notifyWishLike = functions.firestore
+export const notifyWishLike = functions.firestore
   .document('wishes/{wishId}')
   .onUpdate(async (change) => {
     const before = change.before.data();
@@ -60,7 +60,7 @@ exports.notifyWishLike = functions.firestore
     return null;
   });
 
-exports.notifyWishComment = functions.firestore
+export const notifyWishComment = functions.firestore
   .document('wishes/{wishId}/comments/{commentId}')
   .onCreate(async (snap, context) => {
     const wishId = context.params.wishId;
@@ -93,7 +93,7 @@ exports.notifyWishComment = functions.firestore
     return null;
   });
 
-exports.notifyWishBoost = functions.firestore
+export const notifyWishBoost = functions.firestore
   .document('wishes/{wishId}')
   .onUpdate(async (change) => {
     const before = change.before.data();
@@ -104,12 +104,12 @@ exports.notifyWishBoost = functions.firestore
       after.userId &&
       !after.isAnonymous
     ) {
-      await sendPush(after.userId, 'Your wish was boosted! 🚀', 'Someone boosted your wish.');
+      await sendPush(after.userId, 'Your wish was boosted! \ud83d\ude80', 'Someone boosted your wish.');
     }
     return null;
   });
 
-exports.notifyGiftReceived = functions.firestore
+export const notifyGiftReceived = functions.firestore
   .document('wishes/{wishId}/gifts/{giftId}')
   .onCreate(async (snap, context) => {
     const wishId = context.params.wishId;
@@ -121,7 +121,7 @@ exports.notifyGiftReceived = functions.firestore
     return null;
   });
 
-exports.notifyBoostEnd = functions.pubsub
+export const notifyBoostEnd = functions.pubsub
   .schedule('every 60 minutes')
   .onRun(async () => {
     const now = admin.firestore.Timestamp.now();
@@ -143,18 +143,9 @@ exports.notifyBoostEnd = functions.pubsub
     return null;
   });
 
-exports.cleanupExpiredWishesJob = functions.pubsub
-  .schedule('every 24 hours')
-  .onRun(async () => {
-    const now = admin.firestore.Timestamp.now();
-    const snap = await db.collection('wishes').where('expiresAt', '<=', now).get();
-    const batch = db.batch();
-    snap.docs.forEach((d) => batch.delete(d.ref));
-    await batch.commit();
-    return null;
-  });
-exports.createCheckoutSession = require('./createCheckoutSession').createCheckoutSession;
-exports.createGiftCheckoutSession = require('./createGiftCheckoutSession').createGiftCheckoutSession;
-exports.createStripeAccountLink = require('./createStripeAccountLink').createStripeAccountLink;
-exports.stripeWebhook = require('./stripeWebhook').stripeWebhook;
-exports.rephraseWish = require('./rephraseWish').rephraseWish;
+export { createCheckoutSession } from './createCheckoutSession';
+export { createGiftCheckoutSession } from './createGiftCheckoutSession';
+export { createStripeAccountLink } from './createStripeAccountLink';
+export { stripeWebhook } from './stripeWebhook';
+export { rephraseWish } from './rephraseWish';
+
