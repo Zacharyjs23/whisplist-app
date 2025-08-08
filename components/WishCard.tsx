@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Ionicons } from '@expo/vector-icons';
 import { useSavedWishes } from '@/contexts/SavedWishesContext';
 import type { Wish } from '../types/Wish';
 import { updateWishReaction } from '../helpers/wishes';
@@ -17,6 +16,7 @@ import { db } from '../firebase';
 import { collection, getDocs, doc, onSnapshot } from 'firebase/firestore';
 import { formatTimeLeft } from '../helpers/time';
 import { useAuth } from '@/contexts/AuthContext';
+import ReactionBar, { ReactionKey } from './ReactionBar';
 
 const typeColors: Record<string, string> = {
   dream: '#312e81',
@@ -31,14 +31,6 @@ const moodColors: Record<string, string> = {
   '😄': '#86efac',
 };
 
-const reactionMap = {
-  pray: '🙏',
-  lightbulb: '💡',
-  hug: '🫂',
-  heart: '❤️',
-} as const;
-
-type ReactionKey = keyof typeof reactionMap;
 
 export const WishCard: React.FC<{
   wish: Wish;
@@ -53,15 +45,6 @@ export const WishCard: React.FC<{
   const [hasGiftMsg, setHasGiftMsg] = useState(false);
   const [timeLeft, setTimeLeft] = useState('');
   const [userReaction, setUserReaction] = useState<ReactionKey | null>(null);
-  const reactionScales = useRef(
-    (Object.keys(reactionMap) as ReactionKey[]).reduce(
-      (acc, k) => {
-        acc[k] = new Animated.Value(1);
-        return acc;
-      },
-      {} as Record<ReactionKey, Animated.Value>,
-    ),
-  ).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
 
   const isBoosted =
@@ -195,48 +178,13 @@ export const WishCard: React.FC<{
           <Image source={{ uri: wish.imageUrl }} style={styles.preview} />
         )}
       </TouchableOpacity>
-      <View style={styles.reactionBar}>
-        {(Object.keys(reactionMap) as ReactionKey[]).map((key) => (
-          <Animated.View
-            key={key}
-            style={{ transform: [{ scale: reactionScales[key] }] }}
-          >
-            <TouchableOpacity
-              onPressIn={() =>
-                Animated.spring(reactionScales[key], {
-                  toValue: 1.2,
-                  useNativeDriver: true,
-                }).start()
-              }
-              onPressOut={() =>
-                Animated.spring(reactionScales[key], {
-                  toValue: 1,
-                  useNativeDriver: true,
-                }).start()
-              }
-              onPress={() => handleReact(key)}
-              style={[
-                styles.reactionButton,
-                userReaction === key && { backgroundColor: theme.input },
-              ]}
-            >
-              <Text style={styles.reactionText}>
-                {reactionMap[key]} {wish.reactions?.[key] || 0}
-              </Text>
-            </TouchableOpacity>
-          </Animated.View>
-        ))}
-        <TouchableOpacity
-          onPress={() => wish.id && toggleSave(wish.id)}
-          style={styles.reactionButton}
-        >
-          <Ionicons
-            name={saved[wish.id] ? 'bookmark' : 'bookmark-outline'}
-            size={20}
-            color={theme.tint}
-          />
-        </TouchableOpacity>
-      </View>
+      <ReactionBar
+        wish={wish}
+        userReaction={userReaction}
+        onReact={handleReact}
+        onToggleSave={() => wish.id && toggleSave(wish.id)}
+        isSaved={!!wish.id && !!saved[wish.id]}
+      />
       {isBoosted && (
         <Text style={[styles.boostLabel, { color: theme.tint }]}>
           ⏳ Boost expires in {timeLeft}
@@ -294,16 +242,6 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 10,
     marginTop: 8,
-  },
-  reactionBar: {
-    flexDirection: 'row',
-    marginTop: 8,
-  },
-  reactionButton: {
-    marginRight: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 6,
   },
   reactionText: {
     fontSize: 18,
