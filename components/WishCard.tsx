@@ -103,7 +103,7 @@ export const WishCard: React.FC<{ wish: Wish; onReport?: () => void; followed?: 
       clearInterval(id);
       loop.stop();
     };
-  }, [isBoosted, wish.boostedUntil]);
+  }, [isBoosted, wish.boostedUntil, glowAnim]);
 
   const borderColor = moodColors[wish.mood || ''] || typeColors[wish.type || ''] || theme.tint;
   const bgTint = `${borderColor}33`;

@@ -10,10 +10,9 @@ import {
   listenWishComments,
   addComment,
   updateCommentReaction,
-  boostWish,
   setFulfillmentLink,
+  createGiftCheckout,
 } from '../../helpers/firestore';
-import { createGiftCheckout } from '../../helpers/firestore';
 
 import {
   addDoc,
@@ -170,7 +169,7 @@ export default function Page() {
     } else {
       setTimeLeft('');
     }
-  }, [isBoosted, wish?.boostedUntil]);
+  }, [isBoosted, wish?.boostedUntil, glowAnim]);
   const canBoost =
     user &&
     wish?.userId === user.uid &&
@@ -282,7 +281,7 @@ try {
       );
     };
     fetchStatus();
-  }, [comments, wish]);
+  }, [comments, publicStatus, wish]);
 
   useEffect(() => {
     const fetchVerified = async () => {
@@ -302,7 +301,7 @@ try {
       );
     };
     fetchVerified();
-  }, [comments]);
+  }, [comments, verifiedStatus]);
 
   const toggleAudio = useCallback(async () => {
     try {
@@ -362,7 +361,7 @@ try {
     } finally {
       setPostingComment(false);
     }
-  }, [comment, id, replyTo, wish, user, profile, useProfileComment, nickname]);
+  }, [comment, id, replyTo, user, profile, useProfileComment, nickname]);
 
 
   const handleReact = useCallback(async (commentId: string, emoji: string) => {
@@ -464,7 +463,7 @@ try {
     setRefreshing(true);
     await fetchWish();
     setRefreshing(false);
-  }, [fetchWish]);
+  }, [fetchWish, id]);
 
 
   const renderCommentItem = useCallback(
@@ -502,7 +501,7 @@ try {
                 onPress={() => router.push(`/profile/${item.displayName}`)}
                 hitSlop={HIT_SLOP}
               >
-                <Text style={[styles.nickname, { color: theme.text + '99' }]}> // theme fix
+                <Text style={[styles.nickname, { color: theme.text + '99' }]}> {/* theme fix */}
                   {item.displayName}
                   {verifiedStatus[item.userId || ''] ? ' \u2705 Verified' : ''}
                 </Text>
@@ -514,7 +513,7 @@ try {
               <Text style={[styles.nickname, { color: theme.tint }]}> (author)</Text>
             )}
             <Text style={[styles.comment, { color: theme.text }]}>{item.text}</Text>
-            <Text style={[styles.timestamp, { color: theme.text + '99' }]}> // theme fix
+            <Text style={[styles.timestamp, { color: theme.text + '99' }]}> {/* theme fix */}
               {item.timestamp?.seconds
                 ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), { addSuffix: true })
                 : 'Just now'}
@@ -553,7 +552,18 @@ try {
         </View>
       );
     },
-    [comments, handleReact, user, isActiveWish]
+    [
+      comments,
+      handleReact,
+      user,
+      isActiveWish,
+      publicStatus,
+      router,
+      theme.text,
+      theme.tint,
+      verifiedStatus,
+      wish?.userId,
+    ]
   );
 
   const renderComment = useCallback(({ item }: { item: Comment }) => renderCommentItem(item), [renderCommentItem]);
