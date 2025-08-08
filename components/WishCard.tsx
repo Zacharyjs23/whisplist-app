@@ -101,16 +101,16 @@ export const WishCard: React.FC<{
     return unsub;
   }, [user?.uid, wish.id]);
 
-  useEffect(() => {
-    if (!isBoosted || !wish.boostedUntil?.toDate) {
-      setTimeLeft('');
-      glowAnim.setValue(0);
-      return;
-    }
-    const update = () =>
-      setTimeLeft(formatTimeLeft(wish.boostedUntil.toDate()));
-    update();
-    const id = setInterval(update, 60000);
+    useEffect(() => {
+      if (!isBoosted || !wish.boostedUntil) {
+        setTimeLeft('');
+        glowAnim.setValue(0);
+        return;
+      }
+      const update = () =>
+        setTimeLeft(formatTimeLeft(wish.boostedUntil!.toDate()));
+      update();
+      const id = setInterval(update, 60000);
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(glowAnim, {
@@ -130,7 +130,7 @@ export const WishCard: React.FC<{
       clearInterval(id);
       loop.stop();
     };
-  }, [isBoosted, wish.boostedUntil, glowAnim]);
+    }, [isBoosted, wish.boostedUntil, glowAnim]);
 
   const borderColor =
     moodColors[wish.mood || ''] || typeColors[wish.type || ''] || theme.tint;
@@ -256,9 +256,7 @@ export const WishCard: React.FC<{
         <Text style={{ color: theme.tint, marginTop: 4 }}>
           ⏳{' '}
           {(() => {
-            const ts = wish.expiresAt.toDate
-              ? wish.expiresAt.toDate()
-              : new Date(wish.expiresAt);
+            const ts = wish.expiresAt.toDate();
             const diff = ts.getTime() - Date.now();
             const hrs = Math.max(0, Math.ceil(diff / 3600000));
             return `${hrs}h left`;

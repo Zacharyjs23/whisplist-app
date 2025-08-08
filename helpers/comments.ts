@@ -9,6 +9,7 @@ import {
   getDoc,
   updateDoc,
   getDocs,
+  Timestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -19,7 +20,7 @@ export interface Comment {
   displayName?: string;
   photoURL?: string;
   isAnonymous?: boolean;
-  timestamp?: any;
+  timestamp?: Timestamp | null;
   parentId?: string;
   reactions?: Record<string, number>;
   userReactions?: Record<string, string>;
@@ -44,7 +45,10 @@ export function listenWishComments(
   });
 }
 
-export async function addComment(wishId: string, data: Omit<Comment, 'id'>) {
+export async function addComment(
+  wishId: string,
+  data: Omit<Comment, 'id' | 'timestamp'>,
+) {
   return addDoc(collection(db, 'wishes', wishId, 'comments'), {
     timestamp: serverTimestamp(),
     ...data,

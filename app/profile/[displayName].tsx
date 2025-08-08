@@ -200,9 +200,9 @@ export default function Page() {
             item.boostedUntil &&
             item.boostedUntil.toDate &&
             item.boostedUntil.toDate() > new Date();
-          const timeLeft = isBoosted
-            ? formatTimeLeft(item.boostedUntil.toDate())
-            : '';
+            const timeLeft = isBoosted
+              ? formatTimeLeft(item.boostedUntil!.toDate())
+              : '';
           return (
             <View style={[styles.wishItem, { backgroundColor: theme.input }]}>
               <Text style={styles.categoryText}>

@@ -1,3 +1,5 @@
+import type { Timestamp } from 'firebase/firestore';
+
 export interface Wish {
   id: string;
   text: string;
@@ -11,7 +13,7 @@ export interface Wish {
   displayName?: string;
   photoURL?: string;
   isAnonymous?: boolean;
-  boostedUntil?: any;
+  boostedUntil?: Timestamp | null;
   boosted?: string;
   audioUrl?: string;
   imageUrl?: string;
@@ -50,6 +52,6 @@ export interface Wish {
   /**
    * Timestamp when this wish should disappear
    */
-  expiresAt?: any;
+  expiresAt?: Timestamp | null;
   [key: string]: any;
 }

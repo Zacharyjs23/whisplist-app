@@ -30,6 +30,7 @@ import {
   collectionGroup,
   limit,
   startAfter,
+  Timestamp,
 } from 'firebase/firestore';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -565,7 +566,9 @@ export default function Page() {
         ...(audioUrl && { audioUrl }),
         ...(imageUrl && { imageUrl }),
         ...(autoDelete && {
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          expiresAt: Timestamp.fromDate(
+            new Date(Date.now() + 24 * 60 * 60 * 1000),
+          ),
         }),
       });
 
@@ -694,9 +697,7 @@ export default function Page() {
     (wish) =>
       wish.text.toLowerCase().includes(searchTerm.toLowerCase()) &&
       (filterType === 'all' || wish.type === filterType) &&
-      (!wish.expiresAt ||
-        (wish.expiresAt.toDate ? wish.expiresAt.toDate() : wish.expiresAt) >
-          new Date()),
+      (!wish.expiresAt || wish.expiresAt.toDate() > new Date()),
   );
 
   const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
@@ -731,9 +732,9 @@ export default function Page() {
     }, [item.id]);
 
     useEffect(() => {
-      if (isBoosted && item.boostedUntil?.toDate) {
+      if (isBoosted && item.boostedUntil) {
         const update = () =>
-          setTimeLeft(formatTimeLeft(item.boostedUntil.toDate()));
+          setTimeLeft(formatTimeLeft(item.boostedUntil!.toDate()));
         update();
         const id = setInterval(update, 60000);
         const loop = Animated.loop(
@@ -770,9 +771,7 @@ export default function Page() {
     const canBoost =
       user &&
       item.userId === user.uid &&
-      (!item.boostedUntil ||
-        !item.boostedUntil.toDate ||
-        item.boostedUntil.toDate() < new Date());
+      (!item.boostedUntil || item.boostedUntil.toDate() < new Date());
 
     const openGiftLink = (link: string) => {
       Alert.alert(

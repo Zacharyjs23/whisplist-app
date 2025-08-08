@@ -15,6 +15,7 @@ import {
   where,
   setDoc,
   deleteDoc,
+  Timestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Wish } from '../types/Wish';
@@ -199,7 +200,9 @@ export async function updateWishReaction(
 
 export async function boostWish(id: string, hours: number) {
   const ref = doc(db, 'wishes', id);
-  const boostedUntil = new Date(Date.now() + hours * 60 * 60 * 1000);
+  const boostedUntil = Timestamp.fromDate(
+    new Date(Date.now() + hours * 60 * 60 * 1000),
+  );
   return updateDoc(ref, { boostedUntil });
 }
 
