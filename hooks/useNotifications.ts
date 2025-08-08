@@ -22,6 +22,7 @@ export interface NotificationItem {
 export default function useNotifications() {
   const { user } = useAuth();
   const [items, setItems] = useState<NotificationItem[]>([]);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -29,31 +30,48 @@ export default function useNotifications() {
       collection(db, 'users', user.uid, 'notifications'),
       orderBy('timestamp', 'desc'),
     );
-    const unsub = onSnapshot(q, (snap) => {
-      setItems(
-        snap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as any),
-        })) as NotificationItem[],
-      );
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        try {
+          setItems(
+            snap.docs.map((d) => ({
+              id: d.id,
+              ...(d.data() as any),
+            })) as NotificationItem[],
+          );
+        } catch (err) {
+          console.error('Error processing notifications snapshot', err);
+          setError(err as Error);
+        }
+      },
+      (err) => {
+        console.error('Error listening to notifications', err);
+        setError(err);
+      },
+    );
     return unsub;
   }, [user]);
 
   const markAllRead = async () => {
     if (!user?.uid) return;
-    await Promise.all(
-      items
-        .filter((i) => !i.read)
-        .map((i) =>
-          updateDoc(doc(db, 'users', user.uid, 'notifications', i.id), {
-            read: true,
-          }),
-        ),
-    );
+    try {
+      await Promise.all(
+        items
+          .filter((i) => !i.read)
+          .map((i) =>
+            updateDoc(doc(db, 'users', user.uid, 'notifications', i.id), {
+              read: true,
+            }),
+          ),
+      );
+    } catch (err) {
+      console.error('Error marking notifications read', err);
+      throw err;
+    }
   };
 
   const unread = items.filter((i) => !i.read).length;
 
-  return { items, markAllRead, unread };
+  return { items, markAllRead, unread, error };
 }
