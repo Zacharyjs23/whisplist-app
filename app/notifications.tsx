@@ -1,28 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { FlatList, View, Text, StyleSheet } from 'react-native';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { db } from '../firebase';
 import { formatDistanceToNow } from 'date-fns';
-
-interface Item { id: string; type: string; message: string; timestamp: any; }
+import useNotifications, { NotificationItem } from '@/hooks/useNotifications';
 
 export default function NotificationsPage() {
-  const { user } = useAuth();
   const { theme } = useTheme();
-  const [items, setItems] = useState<Item[]>([]);
+  const { items } = useNotifications();
 
-  useEffect(() => {
-    if (!user?.uid) return;
-    const q = query(collection(db, 'notifications', user.uid, 'items'), orderBy('timestamp', 'desc'));
-    const unsub = onSnapshot(q, snap => {
-      setItems(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })) as Item[]);
-    });
-    return unsub;
-  }, [user]);
-
-  const renderItem = ({ item }: { item: Item }) => (
+  const renderItem = ({ item }: { item: NotificationItem }) => (
     <View style={[styles.item, { backgroundColor: theme.input }]}>
         <Text style={[styles.text, { color: theme.text }]}> 
           {/* theme fix */}
