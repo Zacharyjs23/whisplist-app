@@ -20,7 +20,7 @@ import { collection, getDocs, doc, onSnapshot } from 'firebase/firestore';
 import { formatTimeLeft } from '../helpers/time';
 import { useAuth } from '@/contexts/AuthContext';
 import { ReactionBar, ReactionKey } from './ReactionBar';
-import * as logger from '@/helpers/logger';
+import * as logger from '@/shared/logger';
 import { useTranslation } from '@/contexts/I18nContext';
 
 const typeColors: Record<string, string> = {

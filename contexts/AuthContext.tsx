@@ -32,7 +32,7 @@ import {
   resetPassword as resetPasswordService,
   signOut as signOutService,
 } from '../services/auth';
-import * as logger from '@/helpers/logger';
+import * as logger from '@/shared/logger';
 
 WebBrowser.maybeCompleteAuthSession();
 

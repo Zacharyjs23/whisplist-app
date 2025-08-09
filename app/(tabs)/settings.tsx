@@ -47,7 +47,7 @@ import { db, storage } from '../../firebase';
 import { getAllWishes, getWishesByNickname } from '../../helpers/wishes';
 import { getWishComments } from '../../helpers/comments';
 import type { Profile } from '../../types/Profile';
-import * as logger from '@/helpers/logger';
+import * as logger from '@/shared/logger';
 
 export default function Page() {
   const { theme, setTheme } = useTheme();

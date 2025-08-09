@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Wish } from '../types/Wish';
-import * as logger from './logger';
+import * as logger from '../shared/logger';
 
 /**
  * Firestore `in` queries only accept up to 10 values. This helper splits an

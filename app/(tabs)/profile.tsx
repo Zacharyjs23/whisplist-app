@@ -34,7 +34,7 @@ import {
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useSavedWishes } from '@/contexts/SavedWishesContext';
-import * as logger from '@/helpers/logger';
+import * as logger from '@/shared/logger';
 
 export default function Page() {
   const { user, profile, signOut } = useAuth();
