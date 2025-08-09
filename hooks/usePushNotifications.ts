@@ -38,6 +38,10 @@ export default function usePushNotifications() {
       const projectId = Constants?.expoConfig?.extra?.eas?.projectId;
       const { data } = await Notifications.getExpoPushTokenAsync({ projectId });
       setToken(data);
+      if (!db) {
+        logger.warn('Firebase is unavailable; skipping push token save');
+        return;
+      }
       try {
         await updateDoc(doc(db, 'users', user.uid), { fcmToken: data });
       } catch (err) {
