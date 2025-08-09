@@ -28,6 +28,12 @@ export default function useNotifications() {
 
   useEffect(() => {
     if (!user?.uid) return;
+    if (!db) {
+      const err = new Error('Firestore not initialized');
+      logger.error(err.message);
+      setError(err);
+      return;
+    }
     const notificationsRef = collection(
       db,
       'users',
@@ -63,6 +69,12 @@ export default function useNotifications() {
 
   const markAllRead = async () => {
     if (!user?.uid) return;
+    if (!db) {
+      const err = new Error('Firestore not initialized');
+      logger.error('Error marking notifications read', err);
+      setError(err);
+      return;
+    }
     try {
       await Promise.all(
         items
