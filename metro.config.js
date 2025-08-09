@@ -17,4 +17,8 @@ config.resolver.alias = {
   '@': path.resolve(__dirname),
 };
 
+// Enable support for packages that use the `exports` field in their package.json.
+// This allows Metro to resolve modern ESM-only packages such as `i18next`.
+config.resolver.unstable_enablePackageExports = true;
+
 module.exports = config;
