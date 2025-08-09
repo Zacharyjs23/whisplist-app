@@ -19,6 +19,10 @@ export const rephraseWish = functions.onRequest(async (req, res) => {
       return res.status(400).json({ error: 'invalid_input' });
     }
 
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({ error: 'missing_openai_api_key' });
+    }
+
     const openAiPayload = {
       model: 'gpt-4o-mini',
       temperature: 0.4,
@@ -36,7 +40,7 @@ export const rephraseWish = functions.onRequest(async (req, res) => {
       response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY ?? ''}`,
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(openAiPayload),
