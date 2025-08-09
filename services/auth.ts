@@ -10,22 +10,34 @@ import {
 } from 'firebase/auth';
 import { AuthSessionResult } from 'expo-auth-session';
 
+const authNotInitialized = () =>
+  Promise.reject(new Error('Firebase auth is not initialized'));
+
 export const signUp = (email: string, password: string) =>
-  createUserWithEmailAndPassword(auth, email, password);
+  auth
+    ? createUserWithEmailAndPassword(auth, email, password)
+    : authNotInitialized();
 
 export const signIn = (email: string, password: string) =>
-  signInWithEmailAndPassword(auth, email, password);
+  auth
+    ? signInWithEmailAndPassword(auth, email, password)
+    : authNotInitialized();
 
-export const signInAnonymouslyService = () => signInAnonymously(auth);
+export const signInAnonymouslyService = () =>
+  auth ? signInAnonymously(auth) : authNotInitialized();
 
 export const resetPassword = (email: string) =>
-  sendPasswordResetEmail(auth, email);
+  auth ? sendPasswordResetEmail(auth, email) : authNotInitialized();
 
-export const signOut = () => fbSignOut(auth);
+export const signOut = () => (auth ? fbSignOut(auth) : authNotInitialized());
 
 export const signInWithGoogle = async (
   promptAsync: () => Promise<AuthSessionResult | void>,
 ) => {
+  if (!auth) {
+    return authNotInitialized();
+  }
+
   const res = await promptAsync();
   if (res && 'type' in res && res.type === 'success' && res.authentication?.idToken) {
     const credential = GoogleAuthProvider.credential(res.authentication.idToken);
