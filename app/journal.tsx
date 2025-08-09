@@ -25,7 +25,7 @@ import { addWish } from '../helpers/wishes';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { db } from '../firebase';
-import * as logger from '@/helpers/logger';
+import * as logger from '@/shared/logger';
 
 const prompts = [
   '💭 What\u2019s your biggest wish this week?',

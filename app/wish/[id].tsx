@@ -69,7 +69,7 @@ import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
 import { trackEvent } from '@/helpers/analytics';
-import * as logger from '@/helpers/logger';
+import * as logger from '@/shared/logger';
 
 const baseTypeInfo = {
   wish: { emoji: '💭', color: '#333333' },

@@ -19,7 +19,7 @@ import ConfettiCannon from 'react-native-confetti-cannon';
 import * as Linking from 'expo-linking';
 import { getWish, boostWish } from '../../helpers/wishes';
 import { formatTimeLeft } from '../../helpers/time';
-import * as logger from '@/helpers/logger';
+import * as logger from '@/shared/logger';
 
 export default function BoostPage() {
   const { id } = useLocalSearchParams<{ id: string }>();

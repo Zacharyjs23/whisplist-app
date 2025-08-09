@@ -40,7 +40,7 @@ import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import * as logger from '@/helpers/logger';
+import * as logger from '@/shared/logger';
 
 const allCategories = [
   'love',

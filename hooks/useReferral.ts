@@ -12,7 +12,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import * as logger from '@/helpers/logger';
+import * as logger from '@/shared/logger';
 
 export const useReferral = () => {
   const checkInvite = async () => {

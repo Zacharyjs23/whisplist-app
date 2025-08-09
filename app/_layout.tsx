@@ -3,7 +3,7 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { SavedWishesProvider } from '@/contexts/SavedWishesContext';
 import { I18nProvider } from '@/contexts/I18nContext';
-import * as logger from '@/helpers/logger';
+import * as logger from '@/shared/logger';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import React, { useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';

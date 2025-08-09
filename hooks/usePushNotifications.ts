@@ -6,7 +6,7 @@ import { Platform } from 'react-native';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '../firebase';
-import * as logger from '@/helpers/logger';
+import * as logger from '@/shared/logger';
 
 export default function usePushNotifications() {
   const { user } = useAuth();

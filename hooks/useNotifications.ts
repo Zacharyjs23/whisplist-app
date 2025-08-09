@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '../firebase';
-import * as logger from '@/helpers/logger';
+import * as logger from '@/shared/logger';
 
 export interface NotificationDoc {
   type: string;

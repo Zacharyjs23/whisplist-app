@@ -1,6 +1,6 @@
 import { logEvent } from 'firebase/analytics';
 import { analytics } from '@/firebase';
-import * as logger from './logger';
+import * as logger from '../shared/logger';
 
 export function trackEvent(name: string, params?: Record<string, any>) {
   try {

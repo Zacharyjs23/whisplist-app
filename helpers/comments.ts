@@ -13,7 +13,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import * as logger from './logger';
+import * as logger from '../shared/logger';
 
 export type Comment<
   Extra extends Record<string, unknown> = Record<string, unknown>,

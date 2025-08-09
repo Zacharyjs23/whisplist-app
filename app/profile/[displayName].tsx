@@ -30,7 +30,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
 import type { Wish } from '../../types/Wish';
-import * as logger from '@/helpers/logger';
+import * as logger from '@/shared/logger';
 
 const typeInfo: Record<string, { emoji: string; color: string }> = {
   wish: { emoji: '💭', color: '#1e1e1e' },

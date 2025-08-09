@@ -9,7 +9,7 @@ import {
 } from 'firebase/auth';
 import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
 import { Platform } from 'react-native';
-import * as logger from '@/helpers/logger';
+import * as logger from '@/shared/logger';
 
 const requiredEnvVars = [
   'EXPO_PUBLIC_FIREBASE_API_KEY',

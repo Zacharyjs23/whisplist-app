@@ -64,7 +64,7 @@ import { db, storage } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuth } from '@/contexts/AuthContext';
 import { DAILY_PROMPTS } from '../../constants/prompts';
-import * as logger from '@/helpers/logger';
+import * as logger from '@/shared/logger';
 
 const typeInfo: Record<string, { emoji: string; color: string }> = {
   wish: { emoji: '💭', color: '#1e1e1e' },

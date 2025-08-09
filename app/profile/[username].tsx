@@ -25,7 +25,7 @@ import { db } from '../../firebase';
 import { followUser, unfollowUser } from '../../helpers/followers';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Wish } from '../../types/Wish';
-import * as logger from '@/helpers/logger';
+import * as logger from '@/shared/logger';
 
 export default function Page() {
   const { username } = useLocalSearchParams<{ username: string }>();
