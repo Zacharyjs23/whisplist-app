@@ -17,6 +17,18 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    # then edit .env and fill in the values
    ```
 
+   The app requires the following Firebase environment variables:
+
+   - `EXPO_PUBLIC_FIREBASE_API_KEY`
+   - `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN`
+   - `EXPO_PUBLIC_FIREBASE_PROJECT_ID`
+   - `EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET`
+   - `EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+   - `EXPO_PUBLIC_FIREBASE_APP_ID`
+   - `EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID`
+
+   Missing values will disable Firebase features at runtime.
+
 3. Start the app
 
    ```bash
