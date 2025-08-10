@@ -2,15 +2,15 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
 import * as logger from '../../shared/logger.js';
+import { STRIPE_SECRET_KEY } from './secrets';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2022-11-15',
-});
+let stripe: Stripe;
 
 const db = admin.firestore();
 
-export const createStripeAccountLink = functions.https.onRequest(
-  async (req, res) => {
+export const createStripeAccountLink = functions
+  .runWith({ secrets: [STRIPE_SECRET_KEY] })
+  .https.onRequest(async (req, res) => {
     if (req.method !== 'POST') {
       res.status(405).send('Method not allowed');
       return;
@@ -23,6 +23,12 @@ export const createStripeAccountLink = functions.https.onRequest(
     }
 
     try {
+      if (!stripe) {
+        stripe = new Stripe(STRIPE_SECRET_KEY.value(), {
+          apiVersion: '2022-11-15',
+        });
+      }
+
       const ref = db.collection('users').doc(uid);
       const snap = await ref.get();
       let accountId = snap.get('stripeAccountId');
@@ -42,5 +48,4 @@ export const createStripeAccountLink = functions.https.onRequest(
       logger.error('Error creating account link', err);
       res.status(500).send('Internal error');
     }
-  },
-);
+  });
