@@ -10,10 +10,20 @@ import {
   getDocs,
   where,
   limit,
+  type FirestoreDataConverter,
+  type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Wish } from '../types/Wish';
 import * as logger from '../shared/logger';
+
+const converter: FirestoreDataConverter<Wish> = {
+  toFirestore: ({ id, ...wish }: Wish) => wish,
+  fromFirestore: (
+    snapshot: QueryDocumentSnapshot,
+  ): Wish =>
+    ({ id: snapshot.id, ...(snapshot.data() as Omit<Wish, 'id'>) } as Wish),
+};
 
 /**
  * Firestore `in` queries only accept up to 10 values. This helper splits an
@@ -84,14 +94,17 @@ export function listenFollowingWishes(
           q,
           (snap) => {
             try {
-              chunkResults[index] = snap.docs.map((d) => ({
-                id: d.id,
-                ...(d.data() as Omit<Wish, 'id'>),
-              })) as Wish[];
+              chunkResults[index] = snap.docs.map((d) =>
+                converter.fromFirestore(d),
+              );
               const merged = chunkResults
                 .flat()
-                .sort((a, b) => (b as any).timestamp - (a as any).timestamp);
-              cb(merged as Wish[]);
+                .sort(
+                  (a, b) =>
+                    (b.timestamp?.toMillis() ?? 0) -
+                    (a.timestamp?.toMillis() ?? 0),
+                );
+              cb(merged);
             } catch (err) {
               logger.error('Error processing following wishes snapshot', err);
               onError?.(err);
@@ -133,13 +146,13 @@ export async function getFollowingWishes(userId: string): Promise<Wish[]> {
       ),
     );
     const wishes = snaps.flatMap((snap) =>
-      snap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as Omit<Wish, 'id'>),
-      })),
-    ) as Wish[];
+      snap.docs.map((d) => converter.fromFirestore(d)),
+    );
     return wishes
-      .sort((a, b) => (b as any).timestamp - (a as any).timestamp)
+      .sort(
+        (a, b) =>
+          (b.timestamp?.toMillis() ?? 0) - (a.timestamp?.toMillis() ?? 0),
+      )
       .slice(0, 20);
   } catch (error) {
     logger.error('Error getting following wishes', error);

@@ -16,10 +16,20 @@ import {
   setDoc,
   deleteDoc,
   Timestamp,
+  type FirestoreDataConverter,
+  type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Wish, ReactionType } from '../types/Wish';
 import { getFollowingIds } from './followers';
+
+const converter: FirestoreDataConverter<Wish> = {
+  toFirestore: ({ id, ...wish }: Wish) => wish,
+  fromFirestore: (
+    snapshot: QueryDocumentSnapshot,
+  ): Wish =>
+    ({ id: snapshot.id, ...(snapshot.data() as Omit<Wish, 'id'>) } as Wish),
+};
 
 export interface TopCreator {
   userId: string;
@@ -34,11 +44,8 @@ export function listenTrendingWishes(cb: (wishes: Wish[]) => void) {
     limit(20),
   );
   return onSnapshot(q, (snap) => {
-    const data = snap.docs.map((d) => ({
-      id: d.id,
-      ...(d.data() as Omit<Wish, 'id'>),
-    }));
-    cb(data as Wish[]);
+    const data = snap.docs.map((d) => converter.fromFirestore(d));
+    cb(data);
   });
 }
 
@@ -57,10 +64,7 @@ export function listenWishes(
   let normal: Wish[] = [];
 
   const unsubBoosted = onSnapshot(boostedQuery, (snap) => {
-    boosted = snap.docs.map((d) => ({
-      id: d.id,
-      ...(d.data() as Omit<Wish, 'id'>),
-    })) as Wish[];
+    boosted = snap.docs.map((d) => converter.fromFirestore(d));
     cb([...boosted, ...normal]);
   });
 
@@ -79,10 +83,7 @@ export function listenWishes(
         orderBy('timestamp', 'desc'),
       );
       unsubNormal = onSnapshot(normalQuery, (s) => {
-        normal = s.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as Omit<Wish, 'id'>),
-        })) as Wish[];
+        normal = s.docs.map((d) => converter.fromFirestore(d));
         cb([...boosted, ...normal]);
       });
     });
@@ -104,11 +105,8 @@ export function listenBoostedWishes(cb: (wishes: Wish[]) => void) {
     orderBy('boostedUntil', 'desc'),
   );
   return onSnapshot(q, (snap) => {
-    const data = snap.docs.map((d) => ({
-      id: d.id,
-      ...(d.data() as Omit<Wish, 'id'>),
-    }));
-    cb(data as Wish[]);
+    const data = snap.docs.map((d) => converter.fromFirestore(d));
+    cb(data);
   });
 }
 
@@ -120,7 +118,7 @@ export async function getTopBoostedCreators(
   const snap = await getDocs(q);
   const map: Record<string, { name: string; count: number }> = {};
   snap.forEach((d) => {
-    const data = d.data() as any;
+    const data = converter.fromFirestore(d);
     if (!data.userId) return;
     if (!map[data.userId]) {
       map[data.userId] = { name: data.displayName || 'Anon', count: 0 };
@@ -142,10 +140,7 @@ export async function getWhispOfTheDay(): Promise<Wish | null> {
     limit(50),
   );
   const snap = await getDocs(q);
-  const list = snap.docs.map((d) => ({
-    id: d.id,
-    ...(d.data() as Omit<Wish, 'id'>),
-  })) as Wish[];
+  const list = snap.docs.map((d) => converter.fromFirestore(d));
   const filtered = list.filter((w) => {
     const boost =
       w.boostedUntil &&
@@ -249,7 +244,7 @@ export async function setFulfillmentLink(id: string, link: string) {
 export async function getWish(id: string): Promise<Wish | null> {
   const snap = await getDoc(doc(db, 'wishes', id));
   return snap.exists()
-    ? ({ id: snap.id, ...(snap.data() as Omit<Wish, 'id'>) } as Wish)
+    ? converter.fromFirestore(snap as QueryDocumentSnapshot)
     : null;
 }
 
@@ -292,10 +287,7 @@ export async function getWishesByDisplayName(
     orderBy('timestamp', 'desc'),
   );
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({
-    id: d.id,
-    ...(d.data() as Omit<Wish, 'id'>),
-  })) as Wish[];
+  return snap.docs.map((d) => converter.fromFirestore(d));
 }
 
 export async function getAllWishes(): Promise<Wish[]> {
