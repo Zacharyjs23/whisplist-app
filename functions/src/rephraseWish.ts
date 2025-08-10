@@ -1,12 +1,13 @@
-import * as functions from 'firebase-functions/v2/https';
+import { onRequest } from 'firebase-functions/v2/https';
 import fetch from 'node-fetch';
+import { OPENAI_API_KEY } from './secrets';
 
 interface RephraseRequest {
   text: string;
   tone?: 'gentle' | 'concise' | 'uplifting';
 }
 
-export const rephraseWish = functions.onRequest(async (req, res) => {
+export const rephraseWish = onRequest({ secrets: [OPENAI_API_KEY] }, async (req, res) => {
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
     const { text, tone = 'gentle' } = body as RephraseRequest;
@@ -19,7 +20,7 @@ export const rephraseWish = functions.onRequest(async (req, res) => {
       return res.status(400).json({ error: 'invalid_input' });
     }
 
-    if (!process.env.OPENAI_API_KEY) {
+    if (!OPENAI_API_KEY.value()) {
       return res.status(500).json({ error: 'missing_openai_api_key' });
     }
 
@@ -40,7 +41,7 @@ export const rephraseWish = functions.onRequest(async (req, res) => {
       response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          Authorization: `Bearer ${OPENAI_API_KEY.value()}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(openAiPayload),
