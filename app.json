@@ -18,14 +18,14 @@
     "ios": {
       "icon": "./assets/images/icon.png",
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.whisplist",
+      "bundleIdentifier": "com.zachary.whisplist",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "This app uses the microphone to record wishes and confessions."
       }
     },
     "android": {
       "icon": "./assets/images/icon.png",
-      "package": "com.anonymous.whisplist",
+      "package": "com.zachary.whisplist",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#ffffff"
