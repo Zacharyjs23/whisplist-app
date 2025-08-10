@@ -1,4 +1,5 @@
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthSession } from '@/contexts/AuthSessionContext';
+import { useAuthFlows } from '@/contexts/AuthFlowsContext';
 import { db, storage } from '../firebase';
 import {
   doc,
@@ -11,7 +12,8 @@ import * as ImagePicker from 'expo-image-picker';
 import type { Profile } from '../types/Profile';
 
 export const useProfile = () => {
-  const { user, setAuthError, setProfile } = useAuth();
+  const { user, setProfile } = useAuthSession();
+  const { setAuthError } = useAuthFlows();
 
   const updateProfile = async (data: Partial<Profile>) => {
     try {

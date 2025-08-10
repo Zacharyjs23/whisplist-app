@@ -1,3 +1,11 @@
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  type ReactNode,
+  type ReactElement,
+} from 'react';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -12,9 +20,27 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { useAuthSession } from './AuthSessionContext';
 import * as logger from '@/shared/logger';
 
-export const useReferral = () => {
+interface ReferralContextValue {
+  checkInvite: () => Promise<void>;
+  processReferral: (userId: string) => Promise<void>;
+}
+
+const ReferralContext = createContext<ReferralContextValue>({
+  checkInvite: async () => {},
+  processReferral: async () => {},
+});
+
+export const ReferralProvider = ({
+  children,
+}: {
+  children: ReactNode;
+}): ReactElement => {
+  const { user, profile } = useAuthSession();
+  const processedRef = useRef(false);
+
   const checkInvite = async () => {
     try {
       const url = await Linking.getInitialURL();
@@ -60,6 +86,23 @@ export const useReferral = () => {
     }
   };
 
-  return { checkInvite, processReferral };
+  useEffect(() => {
+    void checkInvite();
+  }, []);
+
+  useEffect(() => {
+    if (user && profile && !processedRef.current) {
+      processedRef.current = true;
+      void processReferral(user.uid);
+    }
+  }, [user, profile]);
+
+  return (
+    <ReferralContext.Provider value={{ checkInvite, processReferral }}>
+      {children}
+    </ReferralContext.Provider>
+  );
 };
+
+export const useReferral = () => useContext(ReferralContext);
 

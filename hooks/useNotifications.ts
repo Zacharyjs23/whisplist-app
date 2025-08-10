@@ -8,7 +8,7 @@ import {
   doc,
   Timestamp,
 } from 'firebase/firestore';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { db } from '../firebase';
 import * as logger from '@/shared/logger';
 
@@ -22,7 +22,7 @@ export interface NotificationDoc {
 export type NotificationItem = NotificationDoc & { id: string };
 
 export default function useNotifications() {
-  const { user } = useAuth();
+  const { user } = useAuthSession();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [error, setError] = useState<Error | null>(null);
 

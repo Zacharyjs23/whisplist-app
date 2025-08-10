@@ -9,7 +9,7 @@ import {
   deleteDoc,
   serverTimestamp,
 } from 'firebase/firestore';
-import { useAuth } from './AuthContext';
+import { useAuthSession } from './AuthSessionContext';
 import { db } from '../firebase';
 
 interface SavedContextValue {
@@ -25,7 +25,7 @@ const SavedWishesContext = createContext<SavedContextValue>({
 export const SavedWishesProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const { user } = useAuth();
+  const { user } = useAuthSession();
   const [saved, setSaved] = useState<Record<string, boolean>>({});
 
   useEffect(() => {

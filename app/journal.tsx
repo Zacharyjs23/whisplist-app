@@ -22,7 +22,7 @@ import {
   getDocs,
 } from 'firebase/firestore';
 import { addWish } from '../helpers/wishes';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { db } from '../firebase';
 import * as logger from '@/shared/logger';
@@ -34,7 +34,7 @@ const prompts = [
 ];
 
 export default function JournalPage() {
-  const { user } = useAuth();
+  const { user } = useAuthSession();
   const { theme } = useTheme();
   const [prompt, setPrompt] = useState('');
   const [entry, setEntry] = useState('');

@@ -12,7 +12,7 @@ import {
   Animated,
   Modal,
 } from 'react-native';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useTheme } from '@/contexts/ThemeContext';
 import ConfettiCannon from 'react-native-confetti-cannon';
@@ -23,7 +23,7 @@ import * as logger from '@/shared/logger';
 
 export default function BoostPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { user, profile } = useAuth();
+  const { user, profile } = useAuthSession();
   const { updateProfile } = useProfile();
   const router = useRouter();
   const { theme } = useTheme();

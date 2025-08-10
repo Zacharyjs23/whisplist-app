@@ -4,12 +4,12 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { doc, updateDoc } from 'firebase/firestore';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { db } from '../firebase';
 import * as logger from '@/shared/logger';
 
 export default function usePushNotifications() {
-  const { user } = useAuth();
+  const { user } = useAuthSession();
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {

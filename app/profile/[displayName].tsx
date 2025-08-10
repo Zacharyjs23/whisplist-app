@@ -26,7 +26,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { formatTimeLeft } from '../../helpers/time';
 import { db } from '../../firebase';
 import { followUser, unfollowUser } from '../../helpers/followers';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
 import type { Wish } from '../../types/Wish';
@@ -49,7 +49,7 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
-  const { user } = useAuth();
+  const { user } = useAuthSession();
 
   useEffect(() => {
     const load = async () => {

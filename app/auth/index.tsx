@@ -1,4 +1,5 @@
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthSession } from '@/contexts/AuthSessionContext';
+import { useAuthFlows } from '@/contexts/AuthFlowsContext';
 import { useRouter, Link } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -12,8 +13,8 @@ import { useTheme } from '@/contexts/ThemeContext';
 
 export default function Page() {
   const router = useRouter();
+  const { user } = useAuthSession();
   const {
-    user,
     signIn,
     signUp,
     signInWithGoogle,
@@ -21,7 +22,7 @@ export default function Page() {
     resetPassword,
     authError,
     setAuthError,
-  } = useAuth();
+  } = useAuthFlows();
   const { theme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

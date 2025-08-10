@@ -1,5 +1,7 @@
 import { AppContainer } from '@/components/AppContainer';
-import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { AuthSessionProvider, useAuthSession } from '@/contexts/AuthSessionContext';
+import { AuthFlowsProvider } from '@/contexts/AuthFlowsContext';
+import { ReferralProvider } from '@/contexts/ReferralContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { SavedWishesProvider } from '@/contexts/SavedWishesContext';
 import { I18nProvider } from '@/contexts/I18nContext';
@@ -9,7 +11,7 @@ import React, { useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 function LayoutInner() {
-  const { loading } = useAuth();
+  const { loading } = useAuthSession();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -34,16 +36,20 @@ function LayoutInner() {
 
 export default function Layout() {
   return (
-    <AuthProvider>
-      <I18nProvider>
-        <ThemeProvider>
-          <SavedWishesProvider>
-            <AppContainer>
-              <LayoutInner />
-            </AppContainer>
-          </SavedWishesProvider>
-        </ThemeProvider>
-      </I18nProvider>
-    </AuthProvider>
+    <AuthSessionProvider>
+      <AuthFlowsProvider>
+        <ReferralProvider>
+          <I18nProvider>
+            <ThemeProvider>
+              <SavedWishesProvider>
+                <AppContainer>
+                  <LayoutInner />
+                </AppContainer>
+              </SavedWishesProvider>
+            </ThemeProvider>
+          </I18nProvider>
+        </ReferralProvider>
+      </AuthFlowsProvider>
+    </AuthSessionProvider>
   );
 }

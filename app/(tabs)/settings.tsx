@@ -2,7 +2,7 @@ import { ThemedText } from '@/components/ThemedText';
 import ThemedButton from '@/components/ThemedButton';
 import { useTheme, ThemeName } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { useProfile } from '@/hooks/useProfile';
 // Ionicons is used for the collapsible section chevrons
 import { Ionicons } from '@expo/vector-icons';
@@ -51,7 +51,7 @@ import * as logger from '@/shared/logger';
 
 export default function Page() {
   const { theme, setTheme } = useTheme();
-  const { user, profile: profileData } = useAuth();
+  const { user, profile: profileData } = useAuthSession();
   const { updateProfile } = useProfile();
   const profile = profileData as (Profile & { isDev?: boolean }) | null;
   const router = useRouter();
