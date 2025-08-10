@@ -62,7 +62,7 @@ import { Picker } from '@react-native-picker/picker';
 import ReportDialog from '../../components/ReportDialog';
 import { db, storage } from '../../firebase';
 import type { Wish } from '../../types/Wish';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { DAILY_PROMPTS } from '../../constants/prompts';
 import * as logger from '@/shared/logger';
 
@@ -135,7 +135,7 @@ export default function Page() {
     giftTotal: 0,
   });
   const promptOpacity = useRef(new Animated.Value(0)).current;
-  const { user, profile } = useAuth();
+  const { user, profile } = useAuthSession();
   const stripeEnabled = profile?.giftingEnabled && profile?.stripeAccountId;
   const [enableExternalGift, setEnableExternalGift] = useState(!stripeEnabled);
   const [lastDoc, setLastDoc] = useState<any | null>(null);

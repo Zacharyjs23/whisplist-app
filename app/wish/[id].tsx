@@ -67,7 +67,7 @@ import ReportDialog from '../../components/ReportDialog';
 import FulfillmentLinkDialog from '../../components/FulfillmentLinkDialog';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { trackEvent } from '@/helpers/analytics';
 import * as logger from '@/shared/logger';
 
@@ -142,7 +142,7 @@ export default function Page() {
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState('');
   const [editCategory, setEditCategory] = useState('');
-  const { user, profile } = useAuth();
+  const { user, profile } = useAuthSession();
   useEffect(() => {
     const loadNickname = async () => {
       const n = await AsyncStorage.getItem('nickname');

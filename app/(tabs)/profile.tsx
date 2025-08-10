@@ -17,7 +17,8 @@ import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
 import { Colors } from '@/constants/Colors';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthSession } from '@/contexts/AuthSessionContext';
+import { useAuthFlows } from '@/contexts/AuthFlowsContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
@@ -37,7 +38,8 @@ import { useSavedWishes } from '@/contexts/SavedWishesContext';
 import * as logger from '@/shared/logger';
 
 export default function Page() {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile } = useAuthSession();
+  const { signOut } = useAuthFlows();
   const { updateProfile, pickImage } = useProfile();
   const router = useRouter();
   const [displayName, setDisplayName] = useState(profile?.displayName || '');

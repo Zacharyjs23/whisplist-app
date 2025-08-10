@@ -18,7 +18,7 @@ import { updateWishReaction } from '../helpers/wishes';
 import { db } from '../firebase';
 import { collection, getDocs, doc, onSnapshot } from 'firebase/firestore';
 import { formatTimeLeft } from '../helpers/time';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { ReactionBar, ReactionKey } from './ReactionBar';
 import * as logger from '@/shared/logger';
 import { useTranslation } from '@/contexts/I18nContext';
@@ -45,7 +45,7 @@ export const WishCard: React.FC<{
   const { theme } = useTheme();
   const router = useRouter();
   const { saved, toggleSave } = useSavedWishes();
-  const { user } = useAuth();
+  const { user } = useAuthSession();
   const [giftCount, setGiftCount] = useState(0);
   const [hasGiftMsg, setHasGiftMsg] = useState(false);
   const [timeLeft, setTimeLeft] = useState('');

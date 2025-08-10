@@ -38,7 +38,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import * as logger from '@/shared/logger';
 
@@ -55,7 +55,7 @@ const allCategories = [
 type Pref = { categories: string[]; type?: string };
 
 export default function Page() {
-  const { user } = useAuth();
+  const { user } = useAuthSession();
   const { theme } = useTheme();
   const router = useRouter();
 

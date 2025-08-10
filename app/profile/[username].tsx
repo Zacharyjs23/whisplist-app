@@ -23,7 +23,7 @@ import {
 import { useTheme } from '@/contexts/ThemeContext';
 import { db } from '../../firebase';
 import { followUser, unfollowUser } from '../../helpers/followers';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthSession } from '@/contexts/AuthSessionContext';
 import type { Wish } from '../../types/Wish';
 import * as logger from '@/shared/logger';
 
@@ -38,7 +38,7 @@ export default function Page() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [lastDoc, setLastDoc] = useState<any | null>(null);
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user } = useAuthSession();
 
   useEffect(() => {
     const load = async () => {
