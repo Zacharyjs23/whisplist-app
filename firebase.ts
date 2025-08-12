@@ -1,6 +1,10 @@
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getFirestore } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+} from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import {
   getAuth,
@@ -29,7 +33,29 @@ export const auth =
     : initializeAuth(app, {
         persistence: getReactNativePersistence(AsyncStorage),
       });
-export const db = getFirestore(app);
+let db;
+try {
+  db = initializeFirestore(app, { localCache: persistentLocalCache() });
+  // For multi-tab support, import persistentMultipleTabManager from 'firebase/firestore'
+  // and pass it to persistentLocalCache as:
+  // persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+} catch (error) {
+  logger.error('Failed to initialize Firestore:', error, {
+    userId: auth.currentUser?.uid,
+    severity: 'high',
+  });
+  if (__DEV__) {
+    const message = `Failed to initialize Firestore: ${error}`;
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(message, ToastAndroid.LONG);
+    } else {
+      Alert.alert('Firestore Error', message);
+    }
+  }
+  db = getFirestore(app);
+}
+
+export { db };
 export const storage = getStorage(app);
 
 let analytics: Analytics | undefined;
