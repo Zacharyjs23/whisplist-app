@@ -505,7 +505,7 @@ export default function Page() {
                 },
               ]}
               placeholder="Send feedback"
-              placeholderTextColor="#888"
+              placeholderTextColor={theme.placeholder}
               value={feedback}
               onChangeText={setFeedback}
               multiline

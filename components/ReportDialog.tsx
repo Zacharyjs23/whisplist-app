@@ -45,7 +45,7 @@ export default function ReportDialog({
           <TextInput
             style={styles.input}
             placeholder={t('report.reasonPlaceholder')}
-            placeholderTextColor={c.text + '99'} // theme fix
+            placeholderTextColor={c.placeholder}
             value={reason}
             onChangeText={setReason}
           />

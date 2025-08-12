@@ -292,7 +292,7 @@ export default function JournalPage() {
           { backgroundColor: theme.input, color: theme.text },
         ]}
         placeholder="Write your thoughts"
-        placeholderTextColor={theme.text + '99'} // theme fix
+        placeholderTextColor={theme.placeholder}
         value={entry}
         onChangeText={setEntry}
         multiline
@@ -321,7 +321,7 @@ export default function JournalPage() {
                   ? item.text.slice(0, 80) + '...'
                   : item.text}
             </Text>
-            <Text style={[styles.entryDate, { color: theme.text + '99' }]}>
+            <Text style={[styles.entryDate, { color: theme.placeholder }]}> 
               {/* theme fix */}
               {item.timestamp?.seconds
                 ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), {

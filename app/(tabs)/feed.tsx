@@ -575,7 +575,7 @@ export default function Page() {
                     { backgroundColor: theme.input, color: theme.text },
                   ]}
                   placeholder="Search wishes..."
-                  placeholderTextColor="#aaa"
+                  placeholderTextColor={theme.placeholder}
                   value={searchTerm}
                   onChangeText={setSearchTerm}
                 />
@@ -596,6 +596,7 @@ export default function Page() {
                         <Text
                           style={[
                             styles.toggleText,
+                            { color: theme.placeholder },
                             activeTab === tab && styles.activeToggleText,
                           ]}
                         >
@@ -658,7 +659,7 @@ export default function Page() {
               ) : error ? (
                 <Text style={styles.errorText}>{error}</Text>
               ) : (
-                <Text style={styles.noResults}>
+                <Text style={[styles.noResults, { color: theme.placeholder }]}>
                   No wishes yet in this category. Be the first to post ✨
                 </Text>
               )
@@ -722,9 +723,7 @@ const styles = StyleSheet.create({
   activeToggle: {
     backgroundColor: '#8b5cf6',
   },
-  toggleText: {
-    color: '#aaa',
-  },
+  toggleText: {},
   activeToggleText: {
     color: '#fff',
     fontWeight: 'bold',
@@ -804,7 +803,6 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   noResults: {
-    color: '#ccc',
     textAlign: 'center',
     marginTop: 20,
   },

@@ -62,7 +62,7 @@ export default function FulfillmentLinkDialog({
           <TextInput
             style={styles.input}
             placeholder={t('fulfillment.linkPlaceholder')}
-            placeholderTextColor={theme.text + '99'} // theme fix
+            placeholderTextColor={theme.placeholder}
             value={link}
             onChangeText={setLink}
           />

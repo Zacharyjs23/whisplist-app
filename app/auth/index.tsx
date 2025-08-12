@@ -84,7 +84,7 @@ export default function Page() {
           { backgroundColor: theme.input, color: theme.text },
         ]}
         placeholder="Email"
-        placeholderTextColor={theme.text + '99'} // theme fix
+        placeholderTextColor={theme.placeholder}
         value={email}
         onChangeText={setEmail}
       />
@@ -94,7 +94,7 @@ export default function Page() {
           { backgroundColor: theme.input, color: theme.text },
         ]}
         placeholder="Password"
-        placeholderTextColor={theme.text + '99'} // theme fix
+        placeholderTextColor={theme.placeholder}
         secureTextEntry
         value={password}
         onChangeText={setPassword}

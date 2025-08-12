@@ -17,7 +17,7 @@ export default function InboxPage() {
   const renderItem = ({ item }: any) => (
     <View style={[styles.item, { backgroundColor: theme.input }]}>
       <Text style={[styles.text, { color: theme.text }]}>{item.message}</Text>
-      <Text style={[styles.time, { color: theme.text + '99' }]}>
+      <Text style={[styles.time, { color: theme.placeholder }]}>
         {/* theme fix */}
         {item.timestamp?.seconds
           ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), {

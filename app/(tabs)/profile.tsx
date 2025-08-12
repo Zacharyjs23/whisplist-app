@@ -439,7 +439,7 @@ export default function Page() {
         value={displayName}
         onChangeText={setDisplayName}
         placeholder="Display Name"
-        placeholderTextColor={theme.text}
+        placeholderTextColor={theme.placeholder}
       />
 
       <Text style={styles.label}>Bio</Text>
@@ -448,7 +448,7 @@ export default function Page() {
         value={bio}
         onChangeText={setBio}
         placeholder="Bio"
-        placeholderTextColor={theme.text}
+        placeholderTextColor={theme.placeholder}
         multiline
       />
       <TouchableOpacity
