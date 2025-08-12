@@ -6,6 +6,7 @@ import {
   Dimensions,
   Animated,
   TouchableOpacity,
+  ViewToken,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
@@ -38,13 +39,15 @@ export default function Page() {
   const viewConfigRef = useRef({ viewAreaCoveragePercentThreshold: 50 });
   const scrollX = useRef(new Animated.Value(0)).current;
 
-  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
-    if (viewableItems.length > 0) {
-      const idx = viewableItems[0].index || 0;
-      setIndex(idx);
-      trackEvent('view_onboarding_slide', { slideIndex: idx });
-    }
-  }).current;
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      if (viewableItems.length > 0) {
+        const idx = viewableItems[0].index || 0;
+        setIndex(idx);
+        trackEvent('view_onboarding_slide', { slideIndex: idx });
+      }
+    },
+  ).current;
 
   useEffect(() => {
     trackEvent('view_onboarding');
