@@ -5,6 +5,12 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function wishOwner(wishId) {
+      return signedIn() &&
+        get(/databases/$(database)/documents/wishes/$(wishId)).data.userId ==
+        request.auth.uid;
+    }
+
   // User profile documents
   // Anyone can read a public profile. Writes remain restricted to the owner
   match /users/{uid} {
@@ -55,8 +61,9 @@ service cloud.firestore {
       }
 
       match /gifts/{giftId} {
-        allow read: if true;
-        allow write: if signedIn();
+        allow read: if wishOwner(wishId) || (signedIn() && request.auth.uid == resource.data.recipientId);
+        allow create: if wishOwner(wishId) || (signedIn() && request.auth.uid == request.resource.data.recipientId);
+        allow update, delete: if wishOwner(wishId) || (signedIn() && request.auth.uid == resource.data.recipientId);
       }
 
       // Reactions stored under each wish
@@ -70,10 +77,6 @@ service cloud.firestore {
       }
     }
 
-    match /gifts/{giftId} {
-      allow write: if signedIn();
-      allow read: if signedIn();
-    }
 
     // Referral records for tracking invites
     match /referrals/{referralId} {
