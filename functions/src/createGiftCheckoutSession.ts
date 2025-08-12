@@ -7,6 +7,7 @@ import { STRIPE_SECRET_KEY } from './secrets';
 let stripe: Stripe;
 
 const db = admin.firestore();
+const MAX_AMOUNT = 10_000; // $10k limit to prevent unreasonable charges
 
 export const createGiftCheckoutSession = functions
   .runWith({ secrets: [STRIPE_SECRET_KEY] })
@@ -17,8 +18,21 @@ export const createGiftCheckoutSession = functions
     }
 
     const { wishId, amount, recipientId, successUrl, cancelUrl } = req.body;
-    if (!wishId || !amount || !recipientId || !successUrl || !cancelUrl) {
+    if (
+      !wishId ||
+      amount === undefined ||
+      amount === null ||
+      !recipientId ||
+      !successUrl ||
+      !cancelUrl
+    ) {
       res.status(400).send('Missing parameters');
+      return;
+    }
+
+    const numAmount = Number(amount);
+    if (!Number.isFinite(numAmount) || numAmount <= 0 || numAmount > MAX_AMOUNT) {
+      res.status(400).send('Invalid amount');
       return;
     }
 
@@ -43,14 +57,14 @@ export const createGiftCheckoutSession = functions
           {
             price_data: {
               currency: 'usd',
-              unit_amount: Math.round(amount * 100),
+              unit_amount: Math.round(numAmount * 100),
               product_data: { name: 'WhispList Gift' },
             },
             quantity: 1,
           },
         ],
         payment_intent_data: {
-          application_fee_amount: Math.round(amount * 100 * 0.1),
+          application_fee_amount: Math.round(numAmount * 100 * 0.1),
           transfer_data: { destination: stripeAccountId },
         },
         metadata: { wishId, recipientId },
@@ -63,7 +77,7 @@ export const createGiftCheckoutSession = functions
         .doc(wishId)
         .collection('gifts')
         .doc(session.id)
-        .set({ amount, recipientId, status: 'pending' });
+        .set({ amount: numAmount, recipientId, status: 'pending' });
 
       res.json({ url: session.url });
     } catch (err) {
