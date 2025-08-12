@@ -2,7 +2,7 @@ import { logEvent } from 'firebase/analytics';
 import { analytics, auth } from '@/firebase';
 import * as logger from '../shared/logger';
 
-export function trackEvent(name: string, params?: Record<string, any>) {
+export function trackEvent(name: string, params?: Record<string, unknown>) {
   try {
     if (analytics) {
       logEvent(analytics, name, params);

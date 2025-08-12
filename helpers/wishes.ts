@@ -18,6 +18,7 @@ import {
   Timestamp,
   type FirestoreDataConverter,
   type QueryDocumentSnapshot,
+  type QuerySnapshot,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Wish, ReactionType } from '../types/Wish';
@@ -190,7 +191,9 @@ export async function updateWishReaction(
   const reactRef = doc(db, 'reactions', id, 'users', user);
   const snap = await getDoc(reactRef);
   const prev = snap.exists() ? (snap.data().emoji as ReactionType) : null;
-  const updates: Record<string, any> = {};
+  type ReactionUpdateKey = `reactions.${ReactionType}`;
+  type ReactionUpdates = { [K in ReactionUpdateKey]?: ReturnType<typeof increment> };
+  const updates: ReactionUpdates = {};
   if (prev) updates[`reactions.${prev}`] = increment(-1);
   if (prev === emoji) {
     await Promise.all([deleteDoc(reactRef), updateDoc(wishRef, updates)]);
@@ -306,41 +309,19 @@ export async function getWishesByDisplayName(
 
 export async function getAllWishes(): Promise<Wish[]> {
   const wishes: Wish[] = [];
-  let last: any = null;
+  let last: QueryDocumentSnapshot<Wish> | null = null;
   while (true) {
-    const q = last
-      ? query(
-          collection(db, 'wishes'),
-          orderBy('timestamp'),
-          startAfter(last),
-          limit(20),
-        )
-      : query(collection(db, 'wishes'), orderBy('timestamp'), limit(20));
-    const snap = await getDocs(q);
-    snap.docs.forEach((d) => {
-      const data = d.data();
-      wishes.push({
-        id: d.id,
-        text: data.text,
-        category: data.category,
-        type: data.type,
-        likes: data.likes,
-        boostedUntil: data.boostedUntil,
-        audioUrl: data.audioUrl,
-        imageUrl: data.imageUrl,
-        giftLink: data.giftLink,
-        giftType: data.giftType,
-        giftLabel: data.giftLabel,
-        fulfillmentLink: data.fulfillmentLink,
-        isPoll: data.isPoll,
-        optionA: data.optionA,
-        optionB: data.optionB,
-        votesA: data.votesA,
-        votesB: data.votesB,
-      });
+    const col = collection(db, 'wishes').withConverter(converter);
+    const snapshot: QuerySnapshot<Wish> = await getDocs(
+      last
+        ? query(col, orderBy('timestamp'), startAfter(last), limit(20))
+        : query(col, orderBy('timestamp'), limit(20)),
+    );
+    snapshot.docs.forEach((d) => {
+      wishes.push(d.data());
     });
-    if (snap.docs.length < 20) break;
-    last = snap.docs[snap.docs.length - 1];
+    if (snapshot.docs.length < 20) break;
+    last = snapshot.docs[snapshot.docs.length - 1];
   }
   return wishes;
 }
