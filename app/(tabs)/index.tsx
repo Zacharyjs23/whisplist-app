@@ -1,21 +1,10 @@
 // app/(tabs)/index.tsx — Full Home Screen with SafeArea, StatusBar, and Wish Logic
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
-import { createRecorder, type AudioRecorder } from 'expo-audio';
-import * as ExpoAudio from 'expo-audio';
-import {
-  addWish,
-  createGiftCheckout,
-  cleanupExpiredWishes,
-} from '../../helpers/wishes';
-import {
-  getFollowingIds,
-  followUser,
-  unfollowUser,
-} from '../../helpers/followers';
+import { addWish, createGiftCheckout } from '../../helpers/wishes';
+import { followUser, unfollowUser } from '../../helpers/followers';
 import { formatTimeLeft } from '../../helpers/time';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import * as ImagePicker from 'expo-image-picker';
 import * as WebBrowser from 'expo-web-browser';
 import {
   addDoc,
@@ -23,16 +12,13 @@ import {
   serverTimestamp,
   getDocs,
   query,
-  orderBy,
   where,
   doc,
   getDoc,
   collectionGroup,
-  limit,
-  startAfter,
   Timestamp,
 } from 'firebase/firestore';
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
@@ -65,6 +51,9 @@ import type { Wish } from '../../types/Wish';
 import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { DAILY_PROMPTS } from '../../constants/prompts';
 import * as logger from '@/shared/logger';
+import { useWishComposer } from '@/hooks/useWishComposer';
+import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import { useFeedLoader } from '@/hooks/useFeedLoader';
 
 const typeInfo: Record<string, { emoji: string; color: string }> = {
   wish: { emoji: '💭', color: '#1e1e1e' },
@@ -93,38 +82,63 @@ const MAX_LINK_LENGTH = 2000;
 const sanitizeInput = (text: string) => text.replace(/[<>]/g, '').trim();
 
 export default function Page() {
-  const [wish, setWish] = useState('');
-  const [postType, setPostType] = useState<
-    'wish' | 'confession' | 'advice' | 'dream'
-  >('wish');
-  const [wishList, setWishList] = useState<Wish[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user, profile } = useAuthSession();
+  const stripeEnabled = profile?.giftingEnabled && profile?.stripeAccountId;
+  const {
+    wish,
+    setWish,
+    postType,
+    setPostType,
+    isPoll,
+    setIsPoll,
+    optionA,
+    setOptionA,
+    optionB,
+    setOptionB,
+    selectedImage,
+    pickImage,
+    giftLink,
+    setGiftLink,
+    giftType,
+    setGiftType,
+    giftLabel,
+    setGiftLabel,
+    posting,
+    setPosting,
+    postConfirm,
+    setPostConfirm,
+    autoDelete,
+    setAutoDelete,
+    rephrasing,
+    handleRephrase,
+    updateStreak,
+    useProfilePost,
+    setUseProfilePost,
+    showAdvanced,
+    setShowAdvanced,
+    enableExternalGift,
+    setEnableExternalGift,
+    resetComposer,
+  } = useWishComposer(stripeEnabled);
+  const {
+    recordedUri,
+    isRecording,
+    includeAudio,
+    setIncludeAudio,
+    startRecording,
+    stopRecording,
+    reset: resetRecorder,
+  } = useAudioRecorder();
+  const { wishList, loading, error, refreshing, onRefresh, loadMore } =
+    useFeedLoader(user);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<
     'all' | 'wish' | 'confession' | 'advice' | 'dream'
   >('all');
   const [reportVisible, setReportVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [isPoll, setIsPoll] = useState(false);
-  const [optionA, setOptionA] = useState('');
-  const [optionB, setOptionB] = useState('');
-  const [recording, setRecording] = useState<AudioRecorder | null>(null);
-  const [recordedUri, setRecordedUri] = useState<string | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [includeAudio, setIncludeAudio] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [giftLink, setGiftLink] = useState('');
-  const [giftType, setGiftType] = useState('');
-  const [giftLabel, setGiftLabel] = useState('');
-  const [posting, setPosting] = useState(false);
-  const [postConfirm, setPostConfirm] = useState(false);
-  const [autoDelete, setAutoDelete] = useState(false);
-  const [rephrasing, setRephrasing] = useState(false);
   const { theme } = useTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
-  const [useProfilePost, setUseProfilePost] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
   const [stripeAccounts, setStripeAccounts] = useState<
     Record<string, string | null>
@@ -139,11 +153,6 @@ export default function Page() {
     giftTotal: 0,
   });
   const promptOpacity = useRef(new Animated.Value(0)).current;
-  const { user, profile } = useAuthSession();
-  const stripeEnabled = profile?.giftingEnabled && profile?.stripeAccountId;
-  const [enableExternalGift, setEnableExternalGift] = useState(!stripeEnabled);
-  const [lastDoc, setLastDoc] = useState<any | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   if (!db || !storage) {
     logger.error('Firebase modules undefined in index page', { db, storage });
@@ -153,70 +162,6 @@ export default function Page() {
   }
 
   const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
-
-  useEffect(() => {
-    cleanupExpiredWishes();
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (recording) {
-        recording
-          .stop()
-          .catch((err) =>
-            logger.warn('Failed to stop recording on unmount', err),
-          );
-        setRecording(null);
-        setRecordedUri(null);
-        setIsRecording(false);
-        setIncludeAudio(false);
-      }
-    };
-  }, [recording]);
-
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const following = user ? await getFollowingIds(user.uid) : [];
-        const now = new Date();
-        const boostedSnap = await getDocs(
-          query(
-            collection(db, 'wishes'),
-            where('boostedUntil', '>', now),
-            orderBy('boostedUntil', 'desc'),
-          ),
-        );
-        const boosted = boostedSnap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as Omit<Wish, 'id'>),
-        })) as Wish[];
-        let normal: Wish[] = [];
-        if (following.length) {
-          const q = query(
-            collection(db, 'wishes'),
-            where('userId', 'in', following),
-            orderBy('timestamp', 'desc'),
-            limit(20),
-          );
-          const snap = await getDocs(q);
-          setLastDoc(snap.docs[snap.docs.length - 1] || null);
-          normal = snap.docs.map((d) => ({
-            id: d.id,
-            ...(d.data() as Omit<Wish, 'id'>),
-          })) as Wish[];
-        }
-        setWishList([...boosted, ...normal]);
-        setError(null);
-      } catch (err) {
-        logger.warn('Failed to load wishes', err);
-        setError("Couldn't load data. Check your connection and try again.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [user]);
 
   useEffect(() => {
     const loadImpact = async () => {
@@ -394,87 +339,6 @@ export default function Page() {
     loadPromptAndStreak();
   }, [promptOpacity]);
 
-  const startRecording = async () => {
-    try {
-      const { granted } = await (
-        ExpoAudio as any
-      ).requestRecordingPermissionsAsync();
-      if (!granted) {
-        Alert.alert(
-          'Permission required',
-          'Microphone access is needed to record',
-        );
-        return;
-      }
-      await (ExpoAudio as any).setAudioModeAsync({
-        allowsRecording: true,
-        interruptionMode: (ExpoAudio as any).INTERRUPTION_MODE_IOS_DO_NOT_MIX,
-        playsInSilentMode: true,
-        interruptionModeAndroid: (ExpoAudio as any)
-          .INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
-        shouldPlayInBackground: false,
-        shouldRouteThroughEarpiece: false,
-      });
-      const rec = createRecorder();
-      await rec.start();
-      setRecording(rec);
-      setIsRecording(true);
-    } catch (err) {
-      logger.error('❌ Failed to start recording:', err);
-    }
-  };
-
-  const stopRecording = async () => {
-    try {
-      if (!recording) return;
-      const { uri } = await recording.stop();
-      setRecordedUri(uri);
-    } catch (err) {
-      logger.error('❌ Failed to stop recording:', err);
-    } finally {
-      setIsRecording(false);
-      setRecording(null);
-    }
-  };
-
-  const pickImage = async () => {
-    const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!granted) {
-      Alert.alert(
-        'Permission required',
-        'Media access is needed to select images',
-      );
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
-    });
-    if (!result.canceled && result.assets.length > 0) {
-      setSelectedImage(result.assets[0].uri);
-    }
-  };
-
-  const updateStreak = async () => {
-    const today = new Date().toISOString().split('T')[0];
-    const lastDate = await AsyncStorage.getItem('lastPostedDate');
-    let streak = parseInt(
-      (await AsyncStorage.getItem('streakCount')) || '0',
-      10,
-    );
-    if (lastDate === today) return;
-    if (lastDate) {
-      const diff =
-        (new Date(today).getTime() - new Date(lastDate).getTime()) / 86400000;
-      streak = diff === 1 ? streak + 1 : 1;
-    } else {
-      streak = 1;
-    }
-    await AsyncStorage.setItem('lastPostedDate', today);
-    await AsyncStorage.setItem('streakCount', streak.toString());
-    setStreakCount(streak);
-  };
-
   /**
    * Allow the user to fetch a new prompt for the current day.
    * The date remains the same but the prompt text and recent list update.
@@ -501,49 +365,6 @@ export default function Page() {
       Alert.alert(msg);
     }
   };
-
-  const handleRephrase = async () => {
-    if (wish.trim() === '') return;
-    const originalWishText = wish;
-    setRephrasing(true);
-    try {
-      const url = `https://us-central1-${process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID}.cloudfunctions.net/rephraseWish`;
-      let attempt = 0;
-      let response: Response | null = null;
-      while (attempt < 3) {
-        response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: originalWishText }),
-        });
-        if (response.status !== 429) break;
-        await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt++)));
-      }
-      if (!response || !response.ok) throw new Error('rephrase_failed');
-      const data = await response.json();
-      const suggestion = data.text?.trim();
-      if (suggestion) {
-        setWish(suggestion);
-        const msg = '✨ Wish rephrased';
-        if (Platform.OS === 'android') {
-          ToastAndroid.show(msg, ToastAndroid.SHORT);
-        } else {
-          Alert.alert(msg);
-        }
-      }
-    } catch (err) {
-      logger.error('AI rephrase failed', err);
-      const msg = 'Service is busy. Please try again later.';
-      if (Platform.OS === 'android') {
-        ToastAndroid.show(msg, ToastAndroid.SHORT);
-      } else {
-        Alert.alert(msg);
-      }
-    } finally {
-      setRephrasing(false);
-    }
-  };
-
   const handlePostWish = async () => {
     const sanitizedWish = sanitizeInput(wish);
     const sanitizedLink = sanitizeInput(giftLink);
@@ -636,20 +457,11 @@ export default function Page() {
         logger.error('Failed to save reflection history', err);
       }
 
-      setWish('');
-      setOptionA('');
-      setOptionB('');
-      setIsPoll(false);
-      setRecordedUri(null);
-      setIncludeAudio(false);
-      setSelectedImage(null);
-      setGiftLink('');
-      setGiftType('');
-      setGiftLabel('');
-      setEnableExternalGift(!stripeEnabled);
-      setPostType('wish');
+      resetRecorder();
+      resetComposer();
       setPostConfirm(true);
-      await updateStreak();
+      const streak = await updateStreak();
+      setStreakCount(streak);
     } catch (error) {
       logger.error('❌ Failed to post wish:', error);
     } finally {
@@ -674,75 +486,6 @@ export default function Page() {
     }
   };
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      const followingIds = user ? await getFollowingIds(user.uid) : [];
-
-      const now = new Date();
-      const boostedSnap = await getDocs(
-        query(
-          collection(db, 'wishes'),
-          where('boostedUntil', '>', now),
-          orderBy('boostedUntil', 'desc'),
-        ),
-      );
-      const boosted = boostedSnap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as Omit<Wish, 'id'>),
-      })) as Wish[];
-
-      let normal: Wish[] = [];
-      if (user && followingIds.length) {
-        const normalSnap = await getDocs(
-          query(
-            collection(db, 'wishes'),
-            where('userId', 'in', followingIds),
-            orderBy('timestamp', 'desc'),
-            limit(20),
-          ),
-        );
-        setLastDoc(normalSnap.docs[normalSnap.docs.length - 1] || null);
-        normal = normalSnap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as Omit<Wish, 'id'>),
-        })) as Wish[];
-      }
-      setWishList([...boosted, ...normal]);
-      setError(null);
-    } catch (err) {
-      logger.error('❌ Failed to refresh wishes:', err);
-      setError("Couldn't load data. Check your connection and try again.");
-    } finally {
-      setRefreshing(false);
-    }
-  }, [user]);
-
-  const loadMore = useCallback(async () => {
-    if (!lastDoc) return;
-    try {
-      const followingIds = user ? await getFollowingIds(user.uid) : [];
-      if (!followingIds.length) return;
-      const snap = await getDocs(
-        query(
-          collection(db, 'wishes'),
-          where('userId', 'in', followingIds),
-          orderBy('timestamp', 'desc'),
-          startAfter(lastDoc),
-          limit(20),
-        ),
-      );
-      setLastDoc(snap.docs[snap.docs.length - 1] || lastDoc);
-      const more = snap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as Omit<Wish, 'id'>),
-      })) as Wish[];
-      setWishList((prev) => [...prev, ...more]);
-    } catch (err) {
-      logger.warn('Failed to load more wishes', err);
-      setError("Couldn't load data. Check your connection and try again.");
-    }
-  }, [lastDoc, user]);
 
   const filteredWishes = wishList.filter(
     (wish) =>
@@ -1283,7 +1026,7 @@ export default function Page() {
                             setIncludeAudio(v);
                             if (!v) {
                               if (isRecording) stopRecording();
-                              setRecordedUri(null);
+                              resetRecorder();
                             }
                           }}
                         />
