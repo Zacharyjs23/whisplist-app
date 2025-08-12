@@ -60,6 +60,8 @@ async function sendPush(
   return null;
 }
 
+export const __test = { sendPush };
+
 export const notifyWishLike = functions.firestore
   .document('wishes/{wishId}')
   .onUpdate(async (change) => {
