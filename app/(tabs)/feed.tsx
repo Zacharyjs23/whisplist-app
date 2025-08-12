@@ -508,7 +508,10 @@ export default function Page() {
         style={[styles.safeArea, { backgroundColor: theme.background }]}
       >
         <StatusBar
-          barStyle="light-content"
+          barStyle=
+            {theme.name === 'dark' || theme.name === 'neon'
+              ? 'light-content'
+              : 'dark-content'}
           backgroundColor={theme.background}
         />
         <KeyboardAvoidingView
@@ -531,7 +534,7 @@ export default function Page() {
                     onPress={() => router.push(`/wish/${whispOfDay.id}`)}
                     style={[styles.spotlight, { backgroundColor: theme.input }]}
                   >
-                    <Text style={styles.sectionTitle}>🌙 Whisp of the Day</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>🌙 Whisp of the Day</Text>
                     <Text
                       style={[styles.spotlightText, { color: theme.text }]}
                       numberOfLines={3}
@@ -542,7 +545,7 @@ export default function Page() {
                 )}
                 {leaderboard.length > 0 && (
                   <View style={styles.leaderboard}>
-                    <Text style={styles.sectionTitle}>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>
                       🌟 Top Boosted Creators This Week
                     </Text>
                     <FlatList
@@ -598,6 +601,7 @@ export default function Page() {
                             styles.toggleText,
                             { color: theme.placeholder },
                             activeTab === tab && styles.activeToggleText,
+                            activeTab === tab && { color: theme.text },
                           ]}
                         >
                           {tab === 'boosted'
@@ -620,7 +624,7 @@ export default function Page() {
                     styles.dropdown,
                     { backgroundColor: theme.input, color: theme.text },
                   ]}
-                  dropdownIconColor="#fff"
+                  dropdownIconColor={theme.text}
                 >
                   <Picker.Item label="All Categories" value={null} />
                   {allCategories.map((cat) => (
@@ -634,19 +638,26 @@ export default function Page() {
 
                 {activeTab === 'trending' && topWishes.length > 0 && (
                   <View style={styles.topSection}>
-                    <Text style={styles.sectionTitle}>
-                      🔥 <Text style={{ color: '#a78bfa' }}>Top Wishes</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                      🔥 <Text style={{ color: theme.tint }}>Top Wishes</Text>
                     </Text>
                     {topWishes.map((wish) => (
                       <View
                         key={wish.id}
                         style={[
                           styles.topWish,
-                          { backgroundColor: theme.input },
+                          {
+                            backgroundColor: theme.input,
+                            shadowColor: theme.text,
+                          },
                         ]}
                       >
-                        <Text style={styles.topWishText}>{wish.text}</Text>
-                        <Text style={styles.likes}>❤️ {wish.likes}</Text>
+                        <Text
+                          style={[styles.topWishText, { color: theme.text }]}
+                        >
+                          {wish.text}
+                        </Text>
+                        <Text style={[styles.likes, { color: theme.tint }]}>❤️ {wish.likes}</Text>
                       </View>
                     ))}
                   </View>
@@ -657,7 +668,9 @@ export default function Page() {
               loading ? (
                 <Skeleton />
               ) : error ? (
-                <Text style={styles.errorText}>{error}</Text>
+                <Text style={[styles.errorText, { color: theme.tint }]}>
+                  {error}
+                </Text>
               ) : (
                 <Text style={[styles.noResults, { color: theme.placeholder }]}>
                   No wishes yet in this category. Be the first to post ✨
@@ -696,14 +709,12 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   title: {
-    color: '#fff',
     fontSize: 24,
     fontWeight: '700',
     marginBottom: 16,
     textAlign: 'center',
   },
   searchInput: {
-    color: '#fff',
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 10,
@@ -720,21 +731,15 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginHorizontal: 4,
   },
-  activeToggle: {
-    backgroundColor: '#8b5cf6',
-  },
   toggleText: {},
   activeToggleText: {
-    color: '#fff',
     fontWeight: 'bold',
   },
   dropdown: {
-    color: '#fff',
     borderRadius: 10,
     marginBottom: 16,
   },
   sectionTitle: {
-    color: '#fff',
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 8,
@@ -747,58 +752,19 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 12,
     elevation: 2,
-    shadowColor: '#000',
     shadowOpacity: 0.2,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 6,
   },
   topWishText: {
-    color: '#fff',
     fontSize: 15,
-  },
-  wishItem: {
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 12,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 4,
-  },
-  wishCategory: {
-    color: '#a78bfa',
-    fontSize: 13,
-    marginBottom: 6,
-    fontWeight: '600',
-  },
-  wishText: {
-    color: '#fff',
-    fontSize: 16,
-  },
-  preview: {
-    width: '100%',
-    height: 200,
-    borderRadius: 10,
-    marginTop: 8,
   },
   likes: {
     marginTop: 8,
-    color: '#f472b6',
     fontSize: 14,
     fontWeight: '500',
   },
-  pollText: {
-    color: '#fff',
-    fontSize: 14,
-  },
-  boostedLabel: {
-    color: '#facc15',
-    fontSize: 12,
-    marginTop: 4,
-  },
   errorText: {
-    color: '#f87171',
     textAlign: 'center',
     marginTop: 20,
   },
