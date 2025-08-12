@@ -129,8 +129,15 @@ export default function Page() {
     stopRecording,
     reset: resetRecorder,
   } = useAudioRecorder();
-  const { wishList, loading, error, refreshing, onRefresh, loadMore } =
-    useFeedLoader(user);
+  const {
+    wishList,
+    loading,
+    error,
+    refreshing,
+    onRefresh,
+    loadMore,
+    lastDoc,
+  } = useFeedLoader(user);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<
     'all' | 'wish' | 'confession' | 'advice' | 'dream'

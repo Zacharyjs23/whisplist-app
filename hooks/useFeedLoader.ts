@@ -141,6 +141,7 @@ export const useFeedLoader = (user: any) => {
     refreshing,
     onRefresh,
     loadMore,
+    lastDoc,
   };
 };
 
