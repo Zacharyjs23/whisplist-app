@@ -1,7 +1,7 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { Expo } from 'expo-server-sdk';
-import * as logger from '../../shared/logger.js';
+import * as logger from '../../shared/logger.ts';
 
 admin.initializeApp();
 const db = admin.firestore();

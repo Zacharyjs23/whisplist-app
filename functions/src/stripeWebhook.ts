@@ -1,7 +1,7 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
-import * as logger from '../../shared/logger.js';
+import * as logger from '../../shared/logger.ts';
 import { STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET } from './secrets';
 
 let stripe: Stripe;
