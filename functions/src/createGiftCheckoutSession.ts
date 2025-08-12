@@ -16,8 +16,8 @@ export const createGiftCheckoutSession = functions
       return;
     }
 
-    const { wishId, amount, recipientId } = req.body;
-    if (!wishId || !amount || !recipientId) {
+    const { wishId, amount, recipientId, successUrl, cancelUrl } = req.body;
+    if (!wishId || !amount || !recipientId || !successUrl || !cancelUrl) {
       res.status(400).send('Missing parameters');
       return;
     }
@@ -54,8 +54,8 @@ export const createGiftCheckoutSession = functions
           transfer_data: { destination: stripeAccountId },
         },
         metadata: { wishId, recipientId },
-        success_url: 'https://example.com/gift/success',
-        cancel_url: 'https://example.com/gift/cancel',
+        success_url: successUrl,
+        cancel_url: cancelUrl,
       });
 
       await db

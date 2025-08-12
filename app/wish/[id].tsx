@@ -1336,6 +1336,8 @@ export default function Page() {
                               confirmGift.wishId,
                               confirmGift.amount,
                               confirmGift.recipientId,
+                              process.env.EXPO_PUBLIC_GIFT_SUCCESS_URL!,
+                              process.env.EXPO_PUBLIC_GIFT_CANCEL_URL!,
                             );
                             if (res.url)
                               await WebBrowser.openBrowserAsync(res.url);

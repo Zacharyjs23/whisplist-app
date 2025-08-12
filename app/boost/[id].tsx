@@ -91,7 +91,13 @@ export default function BoostPage() {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ wishId: id, userId: user.uid }),
+          body: JSON.stringify({
+            wishId: id,
+            userId: user.uid,
+            amount: Number(process.env.EXPO_PUBLIC_BOOST_PRICE),
+            successUrl: process.env.EXPO_PUBLIC_BOOST_SUCCESS_URL,
+            cancelUrl: process.env.EXPO_PUBLIC_BOOST_CANCEL_URL,
+          }),
         },
       );
       const data = await resp.json();
