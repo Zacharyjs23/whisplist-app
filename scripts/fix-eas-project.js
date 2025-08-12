@@ -6,7 +6,7 @@
  */
 const fs = require('fs');
 const { execSync } = require('child_process');
-const logger = require('../shared/logger.js');
+const logger = require('../shared/logger.ts');
 
 const APP_JSON = 'app.json';
 
