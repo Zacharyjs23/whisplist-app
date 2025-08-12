@@ -12,7 +12,10 @@ describe('trackEvent', () => {
     jest.doMock('firebase/analytics', () => ({ logEvent }));
     jest.doMock('@/shared/logger', () => ({ warn }));
     const analyticsInstance = {};
-    jest.doMock('@/firebase', () => ({ analytics: analyticsInstance }));
+    jest.doMock('@/firebase', () => ({
+      analytics: analyticsInstance,
+      auth: { currentUser: { uid: 'user1' } },
+    }));
 
     const { trackEvent } = require('@/helpers/analytics');
     trackEvent('test_event', { foo: 'bar' });
@@ -27,13 +30,19 @@ describe('trackEvent', () => {
 
     jest.doMock('firebase/analytics', () => ({ logEvent }));
     jest.doMock('@/shared/logger', () => ({ warn }));
-    jest.doMock('@/firebase', () => ({ analytics: undefined }));
+    jest.doMock('@/firebase', () => ({
+      analytics: undefined,
+      auth: { currentUser: { uid: 'user1' } },
+    }));
 
     const { trackEvent } = require('@/helpers/analytics');
     trackEvent('test_event');
 
     expect(logEvent).not.toHaveBeenCalled();
-    expect(warn).toHaveBeenCalledWith('Analytics not ready');
+    expect(warn).toHaveBeenCalledWith('Analytics not ready', {
+      userId: 'user1',
+      severity: 'warning',
+    });
   });
 });
 

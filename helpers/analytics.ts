@@ -1,5 +1,5 @@
 import { logEvent } from 'firebase/analytics';
-import { analytics } from '@/firebase';
+import { analytics, auth } from '@/firebase';
 import * as logger from '../shared/logger';
 
 export function trackEvent(name: string, params?: Record<string, any>) {
@@ -7,9 +7,15 @@ export function trackEvent(name: string, params?: Record<string, any>) {
     if (analytics) {
       logEvent(analytics, name, params);
     } else {
-      logger.warn('Analytics not ready');
+      logger.warn('Analytics not ready', {
+        userId: auth.currentUser?.uid,
+        severity: 'warning',
+      });
     }
   } catch (err) {
-    logger.warn('Failed to log analytics event:', err);
+    logger.warn('Failed to log analytics event:', err, {
+      userId: auth.currentUser?.uid,
+      severity: 'error',
+    });
   }
 }

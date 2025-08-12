@@ -1,8 +1,13 @@
 let telemetry = null;
 function emit(level, args) {
+  let meta;
+  const last = args[args.length - 1];
+  if (last && typeof last === 'object' && ('userId' in last || 'severity' in last)) {
+    meta = args.pop();
+  }
   if (telemetry) {
     try {
-      telemetry(level, ...args);
+      telemetry(level, meta, ...args);
     } catch {
       // ignore telemetry errors
     }
