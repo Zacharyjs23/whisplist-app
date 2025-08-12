@@ -125,5 +125,9 @@
   },
   "inbox": {
     "justNow": "justo ahora"
+  },
+  "notifications": {
+    "dailyPromptTitle": "WhispList",
+    "dailyPromptBody": "¡Es hora de publicar tu deseo de hoy!"
   }
 }
