@@ -159,6 +159,22 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
+    return () => {
+      if (recording) {
+        recording
+          .stop()
+          .catch((err) =>
+            logger.warn('Failed to stop recording on unmount', err),
+          );
+        setRecording(null);
+        setRecordedUri(null);
+        setIsRecording(false);
+        setIncludeAudio(false);
+      }
+    };
+  }, [recording]);
+
+  useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
