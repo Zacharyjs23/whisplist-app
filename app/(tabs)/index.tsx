@@ -88,6 +88,10 @@ const pickPromptIndex = (recent: number[]): number => {
   return available[Math.floor(Math.random() * available.length)];
 };
 
+const MAX_WISH_LENGTH = 280;
+const MAX_LINK_LENGTH = 2000;
+const sanitizeInput = (text: string) => text.replace(/[<>]/g, '').trim();
+
 export default function Page() {
   const [wish, setWish] = useState('');
   const [postType, setPostType] = useState<
@@ -525,16 +529,36 @@ export default function Page() {
   };
 
   const handlePostWish = async () => {
-    if (wish.trim() === '') return;
+    const sanitizedWish = sanitizeInput(wish);
+    const sanitizedLink = sanitizeInput(giftLink);
+    const sanitizedGiftType = sanitizeInput(giftType);
+    const sanitizedGiftLabel = sanitizeInput(giftLabel);
+    const sanitizedOptionA = sanitizeInput(optionA);
+    const sanitizedOptionB = sanitizeInput(optionB);
+
+    if (sanitizedWish === '') return;
+    if (sanitizedWish.length > MAX_WISH_LENGTH) {
+      Alert.alert(
+        'Wish too long',
+        `Wish must be ${MAX_WISH_LENGTH} characters or less.`,
+      );
+      return;
+    }
+    if (sanitizedLink.length > MAX_LINK_LENGTH) {
+      Alert.alert(
+        'Link too long',
+        `Link must be ${MAX_LINK_LENGTH} characters or less.`,
+      );
+      return;
+    }
 
     setPosting(true);
     try {
-      if (giftLink.trim() && !/^https?:\/\//.test(giftLink.trim())) {
+      if (sanitizedLink && !/^https?:\/\//.test(sanitizedLink)) {
         Alert.alert(
           'Invalid link',
           'Gift link must start with http:// or https://',
         );
-        setPosting(false);
         return;
       }
       let audioUrl = '';
@@ -554,7 +578,7 @@ export default function Page() {
         imageUrl = await getDownloadURL(imageRef);
       }
       await addWish({
-        text: wish,
+        text: sanitizedWish,
         category: postType,
         type: postType,
         userId: user?.uid,
@@ -562,15 +586,15 @@ export default function Page() {
         photoURL: useProfilePost ? profile?.photoURL || '' : '',
         isAnonymous: !useProfilePost,
         ...(enableExternalGift &&
-          giftLink.trim() && {
-            giftLink: giftLink.trim(),
-            ...(giftType.trim() && { giftType: giftType.trim() }),
-            ...(giftLabel.trim() && { giftLabel: giftLabel.trim() }),
+          sanitizedLink && {
+            giftLink: sanitizedLink,
+            ...(sanitizedGiftType && { giftType: sanitizedGiftType }),
+            ...(sanitizedGiftLabel && { giftLabel: sanitizedGiftLabel }),
           }),
         ...(isPoll && {
           isPoll: true,
-          optionA: optionA.trim(),
-          optionB: optionB.trim(),
+          optionA: sanitizedOptionA,
+          optionB: sanitizedOptionB,
           votesA: 0,
           votesB: 0,
         }),
@@ -586,7 +610,7 @@ export default function Page() {
       try {
         const raw = await AsyncStorage.getItem('reflectionHistory');
         const history = raw ? JSON.parse(raw) : [];
-        history.unshift({ text: wish.trim(), timestamp: Date.now() });
+        history.unshift({ text: sanitizedWish, timestamp: Date.now() });
         if (history.length > 7) history.splice(7);
         await AsyncStorage.setItem(
           'reflectionHistory',
@@ -1140,6 +1164,7 @@ export default function Page() {
                     placeholderTextColor={theme.placeholder}
                     value={wish}
                     onChangeText={setWish}
+                    maxLength={MAX_WISH_LENGTH}
                   />
                   <TouchableOpacity
                     onPress={handleRephrase}
@@ -1275,6 +1300,9 @@ export default function Page() {
                             placeholderTextColor={theme.placeholder}
                             value={giftLink}
                             onChangeText={setGiftLink}
+                            maxLength={MAX_LINK_LENGTH}
+                            autoCapitalize="none"
+                            autoCorrect={false}
                           />
                           <Text style={styles.label}>Gift Type</Text>
                           <TextInput
