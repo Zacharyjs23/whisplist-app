@@ -21,6 +21,7 @@ import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { useAuthFlows } from '@/contexts/AuthFlowsContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useTranslation } from '@/contexts/I18nContext';
 import {
   collection,
   getDocs,
@@ -76,6 +77,7 @@ export default function Page() {
   const prevCredits = useRef<number | null>(profile?.boostCredits ?? null);
   const boostAnim = useRef(new Animated.Value(1)).current;
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
 
   const handleSave = async () => {
@@ -95,6 +97,12 @@ export default function Page() {
   };
 
   const toggleReminder = async (val: boolean) => {
+    if (val) {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== 'granted') {
+        return;
+      }
+    }
     setDailyReminder(val);
     await AsyncStorage.setItem('dailyPromptReminder', val ? 'true' : 'false');
     const id = await AsyncStorage.getItem('dailyPromptReminderId');
@@ -102,8 +110,8 @@ export default function Page() {
     if (val) {
       const newId = await Notifications.scheduleNotificationAsync({
         content: {
-          title: 'WhispList',
-          body: 'Time to post your wish for today!',
+          title: t('notifications.dailyPromptTitle'),
+          body: t('notifications.dailyPromptBody'),
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.CALENDAR,

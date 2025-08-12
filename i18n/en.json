@@ -125,5 +125,9 @@
   },
   "inbox": {
     "justNow": "just now"
+  },
+  "notifications": {
+    "dailyPromptTitle": "WhispList",
+    "dailyPromptBody": "Time to post your wish for today!"
   }
 }
