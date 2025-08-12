@@ -1,4 +1,5 @@
 import { AppContainer } from '@/components/AppContainer';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AuthSessionProvider, useAuthSession } from '@/contexts/AuthSessionContext';
 import { AuthFlowsProvider } from '@/contexts/AuthFlowsContext';
 import { ReferralProvider } from '@/contexts/ReferralContext';
@@ -40,20 +41,22 @@ function LayoutInner() {
 
 export default function Layout() {
   return (
-    <AuthSessionProvider>
-      <AuthFlowsProvider>
-        <ReferralProvider>
-          <I18nProvider>
-            <ThemeProvider>
-              <SavedWishesProvider>
-                <AppContainer>
-                  <LayoutInner />
-                </AppContainer>
-              </SavedWishesProvider>
-            </ThemeProvider>
-          </I18nProvider>
-        </ReferralProvider>
-      </AuthFlowsProvider>
-    </AuthSessionProvider>
+    <ErrorBoundary>
+      <AuthSessionProvider>
+        <AuthFlowsProvider>
+          <ReferralProvider>
+            <I18nProvider>
+              <ThemeProvider>
+                <SavedWishesProvider>
+                  <AppContainer>
+                    <LayoutInner />
+                  </AppContainer>
+                </SavedWishesProvider>
+              </ThemeProvider>
+            </I18nProvider>
+          </ReferralProvider>
+        </AuthFlowsProvider>
+      </AuthSessionProvider>
+    </ErrorBoundary>
   );
 }
