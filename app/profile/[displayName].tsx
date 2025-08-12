@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   collection,
   getDocs,
@@ -7,6 +7,8 @@ import {
   orderBy,
   doc,
   getDoc,
+  limit,
+  startAfter,
 } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
@@ -49,55 +51,84 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [privateProfile, setPrivateProfile] = useState(false);
+  const [lastDoc, setLastDoc] = useState<any | null>(null);
   const { user } = useAuthSession();
+  const router = useRouter();
 
   useEffect(() => {
     const load = async () => {
       if (!displayName) return;
-      const userSnap = await getDocs(
-        query(collection(db, 'users'), where('displayName', '==', displayName)),
-      );
-      if (userSnap.empty) {
-        setProfile(null);
-        setLoading(false);
-        return;
-      }
-      const userDoc = userSnap.docs[0];
-      const userData = userDoc.data();
-      setProfileId(userDoc.id);
-      if (userData.publicProfileEnabled === false) {
-        setProfile(null);
-        setLoading(false);
-        return;
-      }
-      setProfile(userData);
-      if (user && user.uid !== userDoc.id) {
-        try {
-          const followSnap = await getDoc(
-            doc(db, 'users', user.uid, 'following', userDoc.id),
-          );
-          setIsFollowing(followSnap.exists());
-        } catch (err) {
-          logger.warn('Failed to fetch follow status', err);
+      try {
+        const userSnap = await getDocs(
+          query(collection(db, 'users'), where('displayName', '==', displayName)),
+        );
+        if (userSnap.empty) {
+          setPrivateProfile(true);
+          return;
         }
+        const userDoc = userSnap.docs[0];
+        const userData = userDoc.data();
+        setProfileId(userDoc.id);
+        if (userData.publicProfileEnabled === false) {
+          setPrivateProfile(true);
+          return;
+        }
+        setProfile(userData);
+        if (user && user.uid !== userDoc.id) {
+          try {
+            const followSnap = await getDoc(
+              doc(db, 'users', user.uid, 'following', userDoc.id),
+            );
+            setIsFollowing(followSnap.exists());
+          } catch (err) {
+            logger.warn('Failed to fetch follow status', err);
+          }
+        }
+        const wishSnap = await getDocs(
+          query(
+            collection(db, 'wishes'),
+            where('displayName', '==', displayName),
+            where('isAnonymous', '==', false),
+            orderBy('timestamp', 'desc'),
+            limit(20),
+          ),
+        );
+        setLastDoc(wishSnap.docs[wishSnap.docs.length - 1] || null);
+        const list = wishSnap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as Omit<Wish, 'id'>),
+        })) as Wish[];
+        setWishes(list);
+      } catch (err) {
+        logger.warn('Failed to load profile', err);
+        setPrivateProfile(true);
+      } finally {
+        setLoading(false);
       }
-      const wishSnap = await getDocs(
-        query(
-          collection(db, 'wishes'),
-          where('displayName', '==', displayName),
-          where('isAnonymous', '==', false),
-          orderBy('timestamp', 'desc'),
-        ),
-      );
-      const list = wishSnap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as Omit<Wish, 'id'>),
-      })) as Wish[];
-      setWishes(list);
-      setLoading(false);
     };
     load();
   }, [displayName, user]);
+
+  const loadMore = async () => {
+    if (!lastDoc) return;
+    const snap = await getDocs(
+      query(
+        collection(db, 'wishes'),
+        where('displayName', '==', displayName),
+        where('isAnonymous', '==', false),
+        orderBy('timestamp', 'desc'),
+        startAfter(lastDoc),
+        limit(20),
+      ),
+    );
+    setLastDoc(snap.docs[snap.docs.length - 1] || lastDoc);
+    const more = snap.docs.map((d) => ({
+      id: d.id,
+      ...(d.data() as Omit<Wish, 'id'>),
+    })) as Wish[];
+    setWishes((prev) => [...prev, ...more]);
+  };
 
   const handleCopy = async () => {
     if (!displayName) return;
@@ -119,12 +150,10 @@ export default function Page() {
     );
   }
 
-  if (!profile) {
+  if (privateProfile || !profile) {
     return (
-      <View style={[styles.center, { backgroundColor: theme.background }]}>
-        <Text style={[styles.notFound, { color: theme.text }]}>
-          This profile is not available
-        </Text>
+      <View style={[styles.center, { backgroundColor: theme.background }]}> 
+        <Text style={[styles.notFound, { color: theme.text }]}>This user has a private profile.</Text>
       </View>
     );
   }
@@ -192,34 +221,32 @@ export default function Page() {
         data={wishes}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={
-          <Text style={[styles.noResults, { color: theme.text }]}>
-            No public wishes yet
-          </Text>
+          <Text style={[styles.noResults, { color: theme.text }]}>No public wishes yet</Text>
         }
         renderItem={({ item }) => {
           const isBoosted =
             item.boostedUntil &&
             item.boostedUntil.toDate &&
             item.boostedUntil.toDate() > new Date();
-            const timeLeft = isBoosted
-              ? formatTimeLeft(item.boostedUntil!.toDate())
-              : '';
+          const timeLeft = isBoosted
+            ? formatTimeLeft(item.boostedUntil!.toDate())
+            : '';
           return (
-            <View style={[styles.wishItem, { backgroundColor: theme.input }]}>
+            <TouchableOpacity
+              onPress={() => router.push(`/wish/${item.id}`)}
+              style={[styles.wishItem, { backgroundColor: theme.input }]}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <Text style={styles.categoryText}>
                 {typeInfo[item.type || 'wish'].emoji} #{item.category}{' '}
                 {item.audioUrl ? '🔊' : ''}
               </Text>
-              <Text style={[styles.wishText, { color: theme.text }]}>
-                {item.text}
-              </Text>
+              <Text style={[styles.wishText, { color: theme.text }]}>{item.text}</Text>
               {item.imageUrl && (
                 <Image source={{ uri: item.imageUrl }} style={styles.preview} />
               )}
               {isBoosted && (
-                <Text style={[styles.boostedLabel, { color: theme.tint }]}>
-                  ⏳ Time left: {timeLeft}
-                </Text>
+                <Text style={[styles.boostedLabel, { color: theme.tint }]}>⏳ Time left: {timeLeft}</Text>
               )}
               <Text style={[styles.timestamp, { color: theme.text }]}>
                 {item.timestamp?.seconds
@@ -229,9 +256,10 @@ export default function Page() {
                     )
                   : ''}
               </Text>
-            </View>
+            </TouchableOpacity>
           );
         }}
+        onEndReached={loadMore}
         contentContainerStyle={{ paddingBottom: 80 }}
       />
     </View>
