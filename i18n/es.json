@@ -14,7 +14,8 @@
   },
   "common": {
     "cancel": "Cancelar",
-    "ok": "Aceptar"
+    "ok": "Aceptar",
+    "delete": "Eliminar"
   },
   "auth": {
     "errorTitle": "Error de autenticación"
@@ -48,6 +49,76 @@
     "profile": "Perfil",
     "inbox": "Bandeja",
     "settings": "Ajustes"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "sections": {
+      "privacy": "Privacidad y Perfil",
+      "notifications": "Notificaciones",
+      "developer": "Avanzado / Desarrollador",
+      "system": "Sistema y Cuenta",
+      "theme": "Tema"
+    },
+    "privacy": {
+      "anonymize": "Anonimizar nombre de usuario",
+      "publicProfile": "Perfil público habilitado",
+      "stripeGifting": "Habilitar regalos con Stripe"
+    },
+    "notifications": {
+      "dailyQuote": "Frase diaria",
+      "boostNotifications": "Notificaciones de impulso",
+      "commentNotifications": "Notificaciones de comentarios",
+      "referralBonuses": "Bonos por referidos"
+    },
+    "developer": {
+      "developerMode": "Modo desarrollador",
+      "stats": {
+        "totalWishes": "Deseos totales: {{count}}",
+        "totalBoosts": "Impulsos totales: {{count}}",
+        "totalGifts": "Regalos totales: {{count}}",
+        "activeUsers": "Usuarios activos (últimos 7d): {{count}}"
+      }
+    },
+    "system": {
+      "pickAvatar": "Elegir avatar",
+      "earnedBoosts": "Has ganado {{count}} impulsos gratis!",
+      "referFriend": "Referir a un amigo",
+      "defaultCategory": "Categoría predeterminada",
+      "categories": {
+        "general": "General",
+        "love": "Amor",
+        "career": "Carrera",
+        "health": "Salud"
+      },
+      "language": "Idioma",
+      "languages": {
+        "en": "Inglés",
+        "es": "Español"
+      },
+      "feedbackPlaceholder": "Enviar comentarios",
+      "submitFeedback": "Enviar comentarios",
+      "exportHistory": "Exportar historial",
+      "rateApp": "Calificar esta app",
+      "permissions": "Permisos",
+      "deleteContent": "Eliminar mi contenido",
+      "resetData": "Restablecer datos de la app",
+      "aboutDescription": "WhispList promete un lugar seguro y anónimo para compartir tus sueños.",
+      "terms": "Términos de servicio",
+      "privacy": "Política de privacidad"
+    },
+    "alert": {
+      "permissionRequiredTitle": "Se requiere permiso",
+      "permissionRequiredMessage": "Se necesita acceso a medios",
+      "dataCleared": "Datos borrados",
+      "noNickname": "No hay apodo establecido",
+      "feedbackSent": "¡Comentarios enviados!",
+      "deleteAllTitle": "Eliminar todo",
+      "areYouSure": "¿Estás seguro?",
+      "contentDeleted": "Contenido eliminado",
+      "permissionsTitle": "Permisos",
+      "permissionsStatus": "Micrófono: {{mic}}\\nNotificaciones: {{notif}}",
+      "inviteMessage": "¡Únete a mí en WhispList! {{url}}"
+    }
   },
   "notFound": {
     "title": "404 - No encontrado"

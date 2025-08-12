@@ -14,7 +14,8 @@
   },
   "common": {
     "cancel": "Cancel",
-    "ok": "OK"
+    "ok": "OK",
+    "delete": "Delete"
   },
   "auth": {
     "errorTitle": "Authentication Error"
@@ -48,6 +49,76 @@
     "profile": "Profile",
     "inbox": "Inbox",
     "settings": "Settings"
+  },
+  "settings": {
+    "title": "Settings",
+    "sections": {
+      "privacy": "Privacy & Profile",
+      "notifications": "Notifications",
+      "developer": "Advanced / Developer",
+      "system": "System & Account",
+      "theme": "Theme"
+    },
+    "privacy": {
+      "anonymize": "Anonymize Username",
+      "publicProfile": "Public Profile Enabled",
+      "stripeGifting": "Enable Stripe Gifting"
+    },
+    "notifications": {
+      "dailyQuote": "Daily Quote",
+      "boostNotifications": "Boost Notifications",
+      "commentNotifications": "Comment Notifications",
+      "referralBonuses": "Referral Bonuses"
+    },
+    "developer": {
+      "developerMode": "Developer Mode",
+      "stats": {
+        "totalWishes": "Total Wishes: {{count}}",
+        "totalBoosts": "Total Boosts: {{count}}",
+        "totalGifts": "Total Gifts: {{count}}",
+        "activeUsers": "Active Users (past 7d): {{count}}"
+      }
+    },
+    "system": {
+      "pickAvatar": "Pick Avatar",
+      "earnedBoosts": "You've earned {{count}} free boosts!",
+      "referFriend": "Refer a Friend",
+      "defaultCategory": "Default Category",
+      "categories": {
+        "general": "General",
+        "love": "Love",
+        "career": "Career",
+        "health": "Health"
+      },
+      "language": "Language",
+      "languages": {
+        "en": "English",
+        "es": "Spanish"
+      },
+      "feedbackPlaceholder": "Send feedback",
+      "submitFeedback": "Submit Feedback",
+      "exportHistory": "Export History",
+      "rateApp": "Rate this App",
+      "permissions": "Permissions",
+      "deleteContent": "Delete My Content",
+      "resetData": "Reset App Data",
+      "aboutDescription": "WhispList promises a safe, anonymous place to share your dreams.",
+      "terms": "Terms of Service",
+      "privacy": "Privacy Policy"
+    },
+    "alert": {
+      "permissionRequiredTitle": "Permission required",
+      "permissionRequiredMessage": "Media access needed",
+      "dataCleared": "Data cleared",
+      "noNickname": "No nickname set",
+      "feedbackSent": "Feedback sent!",
+      "deleteAllTitle": "Delete All",
+      "areYouSure": "Are you sure?",
+      "contentDeleted": "Content deleted",
+      "permissionsTitle": "Permissions",
+      "permissionsStatus": "Microphone: {{mic}}\\nNotifications: {{notif}}",
+      "inviteMessage": "Join me on WhispList! {{url}}"
+    }
   },
   "notFound": {
     "title": "404 - Not Found"
