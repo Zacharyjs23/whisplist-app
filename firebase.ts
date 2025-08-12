@@ -8,7 +8,7 @@ import {
   getReactNativePersistence,
 } from 'firebase/auth';
 import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
-import { Platform } from 'react-native';
+import { Platform, ToastAndroid, Alert } from 'react-native';
 import * as logger from '@/shared/logger';
 
 const firebaseConfig = {
@@ -41,7 +41,18 @@ if (process.env.EXPO_PUBLIC_ENV === 'production') {
       }
     })
     .catch((error) => {
-      logger.warn('Failed to initialize analytics:', error);
+      logger.error('Failed to initialize analytics:', error, {
+        userId: auth.currentUser?.uid,
+        severity: 'high',
+      });
+      if (__DEV__) {
+        const message = `Failed to initialize analytics: ${error}`;
+        if (Platform.OS === 'android') {
+          ToastAndroid.show(message, ToastAndroid.LONG);
+        } else {
+          Alert.alert('Analytics Error', message);
+        }
+      }
     });
 } else {
   logger.warn('Analytics disabled in non-production environment');
