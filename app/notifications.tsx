@@ -1,12 +1,40 @@
 import React from 'react';
-import { FlatList, View, Text, StyleSheet } from 'react-native';
+import {
+  FlatList,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Platform,
+  ToastAndroid,
+  Alert,
+} from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { formatDistanceToNow } from 'date-fns';
 import useNotifications, { NotificationItem } from '@/hooks/useNotifications';
 
 export default function NotificationsPage() {
   const { theme } = useTheme();
-  const { items } = useNotifications();
+  const { items, markAllRead } = useNotifications();
+
+  const handleClear = async () => {
+    try {
+      await markAllRead();
+      const msg = 'Notifications cleared';
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(msg, ToastAndroid.SHORT);
+      } else {
+        Alert.alert(msg);
+      }
+    } catch {
+      const msg = 'Failed to clear notifications';
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(msg, ToastAndroid.SHORT);
+      } else {
+        Alert.alert(msg);
+      }
+    }
+  };
 
   const renderItem = ({ item }: { item: NotificationItem }) => (
     <View style={[styles.item, { backgroundColor: theme.input }]}>
@@ -37,6 +65,13 @@ export default function NotificationsPage() {
       keyExtractor={(i) => i.id}
       renderItem={renderItem}
       contentContainerStyle={{ paddingBottom: 40 }}
+      ListHeaderComponent={
+        items.length ? (
+          <TouchableOpacity onPress={handleClear} style={styles.clearBtn}>
+            <Text style={[styles.clearText, { color: theme.tint }]}>Mark all read</Text>
+          </TouchableOpacity>
+        ) : null
+      }
     />
   );
 }
@@ -45,4 +80,6 @@ const styles = StyleSheet.create({
   item: { padding: 12, borderRadius: 10, marginBottom: 10 },
   text: { fontSize: 14 },
   time: { fontSize: 12, marginTop: 4 },
+  clearBtn: { alignSelf: 'flex-end', marginBottom: 10 },
+  clearText: { fontSize: 14 },
 });
