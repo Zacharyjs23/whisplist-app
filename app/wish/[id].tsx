@@ -632,7 +632,7 @@ export default function Page() {
                 onPress={() => router.push(`/profile/${item.displayName}`)}
                 hitSlop={HIT_SLOP}
               >
-                <Text style={[styles.nickname, { color: theme.text + '99' }]}>
+                <Text style={[styles.nickname, { color: theme.placeholder }]}>
                   {' '}
                   {/* theme fix */}
                   {item.displayName}
@@ -640,7 +640,7 @@ export default function Page() {
                 </Text>
               </TouchableOpacity>
             ) : (
-              <Text style={[styles.nickname, { color: theme.text + '99' }]}>
+              <Text style={[styles.nickname, { color: theme.placeholder }]}>
                 {item.nickname || 'Anonymous'}
               </Text>
             )}
@@ -693,7 +693,7 @@ export default function Page() {
                 <Text style={[styles.comment, { color: theme.text }]}> 
                   {item.text}
                 </Text>
-                <Text style={[styles.timestamp, { color: theme.text + '99' }]}> 
+                <Text style={[styles.timestamp, { color: theme.placeholder }]}> 
                   {' '}
                   {/* theme fix */}
                   {item.timestamp?.seconds
@@ -781,6 +781,7 @@ export default function Page() {
       router,
       theme.text,
       theme.tint,
+      theme.placeholder,
       verifiedStatus,
       wish?.userId,
       editingCommentId,
@@ -944,7 +945,7 @@ export default function Page() {
                           backgroundGradientFrom: theme.input,
                           backgroundGradientTo: theme.input,
                           color: () => theme.tint,
-                          labelColor: () => theme.text + '99',
+                          labelColor: () => theme.placeholder,
                         }}
                         style={{ marginTop: 10 }}
                       />
@@ -1154,7 +1155,7 @@ export default function Page() {
             </View>
           )}
 
-          <Text style={[styles.label, { color: theme.text + '99' }]}>
+          <Text style={[styles.label, { color: theme.placeholder }]}>
             Comment
           </Text>
           <TextInput
@@ -1163,7 +1164,7 @@ export default function Page() {
               { backgroundColor: theme.input, color: theme.text },
             ]}
             placeholder="Your comment"
-            placeholderTextColor={theme.text + '99'} // theme fix
+            placeholderTextColor={theme.placeholder} // theme fix
             value={comment}
             onChangeText={setComment}
           />
@@ -1174,7 +1175,7 @@ export default function Page() {
                 { backgroundColor: theme.input, color: theme.text },
               ]}
               placeholder="Nickname or emoji"
-              placeholderTextColor={theme.text + '99'} // theme fix
+              placeholderTextColor={theme.placeholder} // theme fix
               value={nickname}
               onChangeText={setNickname}
             />
@@ -1272,7 +1273,7 @@ export default function Page() {
                       },
                     ]}
                     placeholder="Wish text"
-                    placeholderTextColor={theme.text + '99'}
+                    placeholderTextColor={theme.placeholder}
                     value={editText}
                     onChangeText={setEditText}
                   />
@@ -1282,7 +1283,7 @@ export default function Page() {
                       { backgroundColor: theme.input, color: theme.text },
                     ]}
                     placeholder="Category"
-                    placeholderTextColor={theme.text + '99'}
+                    placeholderTextColor={theme.placeholder}
                     value={editCategory}
                     onChangeText={setEditCategory}
                   />
@@ -1391,7 +1392,7 @@ export default function Page() {
                       },
                     ]}
                     placeholder="Add a message (optional)"
-                    placeholderTextColor={theme.text + '99'} // theme fix
+                    placeholderTextColor={theme.placeholder} // theme fix
                     value={thanksMessage}
                     onChangeText={setThanksMessage}
                   />

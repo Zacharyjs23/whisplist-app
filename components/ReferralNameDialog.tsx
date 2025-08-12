@@ -47,7 +47,7 @@ export default function ReferralNameDialog({
           <TextInput
             style={styles.input}
             placeholder={t('referral.namePlaceholder')}
-            placeholderTextColor={c.text + '99'} // theme fix
+            placeholderTextColor={c.placeholder}
             value={name}
             onChangeText={setName}
           />

@@ -1109,7 +1109,7 @@ export default function Page() {
                 <TextInput
                   style={styles.input}
                   placeholder="Search wishes..."
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.placeholder}
                   value={searchTerm}
                   onChangeText={setSearchTerm}
                 />
@@ -1135,7 +1135,7 @@ export default function Page() {
                   <TextInput
                     style={styles.input}
                     placeholder="What's your wish?"
-                    placeholderTextColor="#999"
+                    placeholderTextColor={theme.placeholder}
                     value={wish}
                     onChangeText={setWish}
                   />
@@ -1210,7 +1210,7 @@ export default function Page() {
                           <TextInput
                             style={styles.input}
                             placeholder="Option A"
-                            placeholderTextColor="#999"
+                            placeholderTextColor={theme.placeholder}
                             value={optionA}
                             onChangeText={setOptionA}
                           />
@@ -1218,7 +1218,7 @@ export default function Page() {
                           <TextInput
                             style={styles.input}
                             placeholder="Option B"
-                            placeholderTextColor="#999"
+                            placeholderTextColor={theme.placeholder}
                             value={optionB}
                             onChangeText={setOptionB}
                           />
@@ -1270,7 +1270,7 @@ export default function Page() {
                           <TextInput
                             style={styles.input}
                             placeholder="Gift link (optional)"
-                            placeholderTextColor="#999"
+                            placeholderTextColor={theme.placeholder}
                             value={giftLink}
                             onChangeText={setGiftLink}
                           />
@@ -1278,7 +1278,7 @@ export default function Page() {
                           <TextInput
                             style={styles.input}
                             placeholder="kofi, paypal, etc"
-                            placeholderTextColor="#999"
+                            placeholderTextColor={theme.placeholder}
                             value={giftType}
                             onChangeText={setGiftType}
                           />
@@ -1286,7 +1286,7 @@ export default function Page() {
                           <TextInput
                             style={styles.input}
                             placeholder="Support on Ko-fi"
-                            placeholderTextColor="#999"
+                            placeholderTextColor={theme.placeholder}
                             value={giftLabel}
                             onChangeText={setGiftLabel}
                           />

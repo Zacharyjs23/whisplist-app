@@ -19,7 +19,7 @@ export default function NotificationsPage() {
             : '🎉'}{' '}
         {item.message}
       </Text>
-      <Text style={[styles.time, { color: theme.text + '99' }]}>
+      <Text style={[styles.time, { color: theme.placeholder }]}>
         {/* theme fix */}
         {item.timestamp?.seconds
           ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), {

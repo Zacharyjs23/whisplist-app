@@ -15,6 +15,7 @@ export const Colors = {
     tabIconDefault: '#687076',
     tabIconSelected: tintColorLight,
     input: '#f0f0f0',
+    placeholder: '#11181C99',
   },
   dark: {
     text: '#ECEDEE',
@@ -24,6 +25,7 @@ export const Colors = {
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
     input: '#1e1e1e',
+    placeholder: '#ECEDEE99',
   },
   sunset: {
     text: '#7c2d12',
@@ -33,6 +35,7 @@ export const Colors = {
     tabIconDefault: '#92400e',
     tabIconSelected: '#fb923c',
     input: '#fde68a',
+    placeholder: '#7c2d1299',
   },
   ocean: {
     text: '#083344',
@@ -42,6 +45,7 @@ export const Colors = {
     tabIconDefault: '#164e63',
     tabIconSelected: '#0e7490',
     input: '#a5f3fc',
+    placeholder: '#08334499',
   },
   neon: {
     text: '#F0F0F0',
@@ -51,6 +55,7 @@ export const Colors = {
     tabIconDefault: '#00ffff',
     tabIconSelected: '#ff00ff',
     input: '#333333',
+    placeholder: '#F0F0F099',
   },
   roseQuartz: {
     text: '#403635',
@@ -60,6 +65,7 @@ export const Colors = {
     tabIconDefault: '#8d6a75',
     tabIconSelected: '#bd5d82',
     input: '#f3d7d9',
+    placeholder: '#40363599',
   },
   cyberpunk: {
     text: '#e0e0e0',
@@ -69,6 +75,7 @@ export const Colors = {
     tabIconDefault: '#00ffff',
     tabIconSelected: '#ff00ff',
     input: '#1a1a1a',
+    placeholder: '#e0e0e099',
   },
   cottonCandy: {
     text: '#553c7b',
@@ -78,6 +85,7 @@ export const Colors = {
     tabIconDefault: '#8c5da7',
     tabIconSelected: '#66b2ff',
     input: '#ffdff1',
+    placeholder: '#553c7b99',
   },
   emerald: {
     text: '#064e3b',
@@ -87,6 +95,7 @@ export const Colors = {
     tabIconDefault: '#065f46',
     tabIconSelected: '#059669',
     input: '#a7f3d0',
+    placeholder: '#064e3b99',
   },
   sepia: {
     text: '#4b3413',
@@ -96,5 +105,6 @@ export const Colors = {
     tabIconDefault: '#6b4423',
     tabIconSelected: '#8b5a2b',
     input: '#e8d8c3',
+    placeholder: '#4b341399',
   },
 };
