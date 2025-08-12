@@ -4,6 +4,7 @@ import { useTheme, ThemeName } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
 import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { useProfile } from '@/hooks/useProfile';
+import { useTranslation } from '@/contexts/I18nContext';
 // Ionicons is used for the collapsible section chevrons
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -55,6 +56,7 @@ export default function Page() {
   const { updateProfile } = useProfile();
   const profile = profileData as (Profile & { isDev?: boolean }) | null;
   const router = useRouter();
+  const { t } = useTranslation();
 
   const themeOptions = Object.keys(Colors) as ThemeName[];
 
@@ -198,7 +200,10 @@ export default function Page() {
   const pickAvatar = async () => {
     const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!granted)
-      return Alert.alert('Permission required', 'Media access needed');
+      return Alert.alert(
+        t('settings.alert.permissionRequiredTitle'),
+        t('settings.alert.permissionRequiredMessage'),
+      );
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.7,
@@ -217,11 +222,12 @@ export default function Page() {
 
   const handleReset = async () => {
     await AsyncStorage.clear();
-    Alert.alert('Data cleared');
+    Alert.alert(t('settings.alert.dataCleared'));
   };
 
   const handleExport = async () => {
-    if (!localUser?.nickname) return Alert.alert('No nickname set');
+    if (!localUser?.nickname)
+      return Alert.alert(t('settings.alert.noNickname'));
     const wishes = await getWishesByNickname(localUser?.nickname);
     const comments: any[] = [];
     for (const w of wishes) {
@@ -246,17 +252,22 @@ export default function Page() {
       text: feedback.trim(),
       timestamp: serverTimestamp(),
     });
-    Alert.alert('Feedback sent!');
+    Alert.alert(t('settings.alert.feedbackSent'));
     setFeedback('');
   };
 
   const handleDeleteContent = async () => {
-    if (!localUser?.nickname) return Alert.alert('No nickname set');
+    if (!localUser?.nickname)
+      return Alert.alert(t('settings.alert.noNickname'));
     const confirm = await new Promise<boolean>((resolve) => {
-      Alert.alert('Delete All', 'Are you sure?', [
-        { text: 'Cancel', onPress: () => resolve(false) },
-        { text: 'Delete', onPress: () => resolve(true) },
-      ]);
+      Alert.alert(
+        t('settings.alert.deleteAllTitle'),
+        t('settings.alert.areYouSure'),
+        [
+          { text: t('common.cancel'), onPress: () => resolve(false) },
+          { text: t('common.delete'), onPress: () => resolve(true) },
+        ],
+      );
     });
     if (!confirm) return;
     const wishes = await getWishesByNickname(localUser?.nickname);
@@ -278,7 +289,7 @@ export default function Page() {
         // handled in onError
       }
     }
-    Alert.alert('Content deleted');
+    Alert.alert(t('settings.alert.contentDeleted'));
   };
 
   const handleShareInvite = async () => {
@@ -289,8 +300,11 @@ export default function Page() {
     const mic = await (Audio as any).getRecordingPermissionsAsync();
     const notif = await Notifications.getPermissionsAsync();
     Alert.alert(
-      'Permissions',
-      `Microphone: ${mic.status}\nNotifications: ${notif.status}`,
+      t('settings.alert.permissionsTitle'),
+      t('settings.alert.permissionsStatus', {
+        mic: mic.status,
+        notif: notif.status,
+      }),
     );
   };
 
@@ -299,7 +313,7 @@ export default function Page() {
     await updateProfile({ referralDisplayName: name });
     const refName = name || profile.displayName || '';
     const url = Linking.createURL('/', { queryParams: { ref: refName } });
-    await Share.share({ message: `Join me on WhispList! ${url}` });
+    await Share.share({ message: t('settings.alert.inviteMessage', { url }) });
     setRefDialogVisible(false);
   };
 
@@ -367,16 +381,18 @@ export default function Page() {
             { backgroundColor: theme.background },
           ]}
         >
-          <ThemedText style={styles.title}>Settings</ThemedText>
+          <ThemedText style={styles.title}>{t('settings.title')}</ThemedText>
 
-          <SettingsSection title="Privacy & Profile">
+          <SettingsSection title={t('settings.sections.privacy')}>
             <View style={styles.row}>
-              <ThemedText style={styles.label}>Anonymize Username</ThemedText>
+              <ThemedText style={styles.label}>
+                {t('settings.privacy.anonymize')}
+              </ThemedText>
               <Switch value={anonymize} onValueChange={toggleAnonymize} />
             </View>
             <View style={styles.row}>
               <ThemedText style={styles.label}>
-                Public Profile Enabled
+                {t('settings.privacy.publicProfile')}
               </ThemedText>
               <Switch
                 value={publicProfileEnabled}
@@ -385,19 +401,23 @@ export default function Page() {
             </View>
             <View style={styles.row}>
               <ThemedText style={styles.label}>
-                Enable Stripe Gifting
+                {t('settings.privacy.stripeGifting')}
               </ThemedText>
               <Switch value={stripeEnabled} onValueChange={toggleStripe} />
             </View>
           </SettingsSection>
 
-          <SettingsSection title="Notifications">
+          <SettingsSection title={t('settings.sections.notifications')}>
             <View style={styles.row}>
-              <ThemedText style={styles.label}>Daily Quote</ThemedText>
+              <ThemedText style={styles.label}>
+                {t('settings.notifications.dailyQuote')}
+              </ThemedText>
               <Switch value={dailyQuote} onValueChange={toggleDailyQuote} />
             </View>
             <View style={styles.row}>
-              <ThemedText style={styles.label}>Boost Notifications</ThemedText>
+              <ThemedText style={styles.label}>
+                {t('settings.notifications.boostNotifications')}
+              </ThemedText>
               <Switch
                 value={pushPrefs.wish_boosted}
                 onValueChange={(v) => togglePush('wish_boosted', v)}
@@ -405,7 +425,7 @@ export default function Page() {
             </View>
             <View style={styles.row}>
               <ThemedText style={styles.label}>
-                Comment Notifications
+                {t('settings.notifications.commentNotifications')}
               </ThemedText>
               <Switch
                 value={pushPrefs.new_comment}
@@ -415,13 +435,17 @@ export default function Page() {
           </SettingsSection>
 
           {profile?.isDev === true && (
-            <SettingsSection title="Advanced / Developer">
+            <SettingsSection title={t('settings.sections.developer')}>
               <View style={styles.row}>
-                <ThemedText style={styles.label}>Developer Mode</ThemedText>
+                <ThemedText style={styles.label}>
+                  {t('settings.developer.developerMode')}
+                </ThemedText>
                 <Switch value={devMode} onValueChange={toggleDevMode} />
               </View>
               <View style={styles.row}>
-                <ThemedText style={styles.label}>Referral Bonuses</ThemedText>
+                <ThemedText style={styles.label}>
+                  {t('settings.notifications.referralBonuses')}
+                </ThemedText>
                 <Switch
                   value={pushPrefs.referral_bonus}
                   onValueChange={(v) => togglePush('referral_bonus', v)}
@@ -435,34 +459,52 @@ export default function Page() {
                   ]}
                 >
                   <Text style={{ color: theme.text }}>
-                    Total Wishes: {analytics.wishCount}
+                    {t('settings.developer.stats.totalWishes', {
+                      count: analytics.wishCount,
+                    })}
                   </Text>
                   <Text style={{ color: theme.text }}>
-                    Total Boosts: {analytics.boostCount}
+                    {t('settings.developer.stats.totalBoosts', {
+                      count: analytics.boostCount,
+                    })}
                   </Text>
                   <Text style={{ color: theme.text }}>
-                    Total Gifts: {analytics.giftCount}
+                    {t('settings.developer.stats.totalGifts', {
+                      count: analytics.giftCount,
+                    })}
                   </Text>
                   <Text style={{ color: theme.text }}>
-                    Active Users (past 7d): {analytics.userCount}
+                    {t('settings.developer.stats.activeUsers', {
+                      count: analytics.userCount,
+                    })}
                   </Text>
                 </View>
               )}
             </SettingsSection>
           )}
 
-          <SettingsSection title="System & Account">
-            <ThemedButton title="Pick Avatar" onPress={pickAvatar} />
+          <SettingsSection title={t('settings.sections.system')}>
+            <ThemedButton
+              title={t('settings.system.pickAvatar')}
+              onPress={pickAvatar}
+            />
             {avatarUrl && (
               <Image source={{ uri: avatarUrl }} style={styles.avatar} />
             )}
             {profile?.boostCredits !== undefined && (
               <ThemedText style={styles.section}>
-                You&apos;ve earned {profile.boostCredits} free boosts!
+                {t('settings.system.earnedBoosts', {
+                  count: profile.boostCredits,
+                })}
               </ThemedText>
             )}
-            <ThemedButton title="Refer a Friend" onPress={handleShareInvite} />
-            <ThemedText style={styles.section}>Default Category</ThemedText>
+            <ThemedButton
+              title={t('settings.system.referFriend')}
+              onPress={handleShareInvite}
+            />
+            <ThemedText style={styles.section}>
+              {t('settings.system.defaultCategory')}
+            </ThemedText>
             <Picker
               selectedValue={defaultCategory}
               onValueChange={async (v) => {
@@ -474,12 +516,26 @@ export default function Page() {
                 { backgroundColor: theme.input, color: theme.text },
               ]}
             >
-              <Picker.Item label="General" value="general" />
-              <Picker.Item label="Love" value="love" />
-              <Picker.Item label="Career" value="career" />
-              <Picker.Item label="Health" value="health" />
+              <Picker.Item
+                label={t('settings.system.categories.general')}
+                value="general"
+              />
+              <Picker.Item
+                label={t('settings.system.categories.love')}
+                value="love"
+              />
+              <Picker.Item
+                label={t('settings.system.categories.career')}
+                value="career"
+              />
+              <Picker.Item
+                label={t('settings.system.categories.health')}
+                value="health"
+              />
             </Picker>
-            <ThemedText style={styles.section}>Language</ThemedText>
+            <ThemedText style={styles.section}>
+              {t('settings.system.language')}
+            </ThemedText>
             <Picker
               selectedValue={language}
               onValueChange={async (v) => {
@@ -491,8 +547,14 @@ export default function Page() {
                 { backgroundColor: theme.input, color: theme.text },
               ]}
             >
-              <Picker.Item label="English" value="en" />
-              <Picker.Item label="Spanish" value="es" />
+              <Picker.Item
+                label={t('settings.system.languages.en')}
+                value="en"
+              />
+              <Picker.Item
+                label={t('settings.system.languages.es')}
+                value="es"
+              />
             </Picker>
             <TextInput
               style={[
@@ -504,29 +566,38 @@ export default function Page() {
                   textAlignVertical: 'top',
                 },
               ]}
-              placeholder="Send feedback"
+              placeholder={t('settings.system.feedbackPlaceholder')}
               placeholderTextColor={theme.placeholder}
               value={feedback}
               onChangeText={setFeedback}
               multiline
             />
             <ThemedButton
-              title="Submit Feedback"
+              title={t('settings.system.submitFeedback')}
               onPress={handleSendFeedback}
             />
-            <ThemedButton title="Export History" onPress={handleExport} />
             <ThemedButton
-              title="Rate this App"
+              title={t('settings.system.exportHistory')}
+              onPress={handleExport}
+            />
+            <ThemedButton
+              title={t('settings.system.rateApp')}
               onPress={() => {
                 Linking.openURL('https://example.com');
               }}
             />
-            <ThemedButton title="Permissions" onPress={permissionsInfo} />
             <ThemedButton
-              title="Delete My Content"
+              title={t('settings.system.permissions')}
+              onPress={permissionsInfo}
+            />
+            <ThemedButton
+              title={t('settings.system.deleteContent')}
               onPress={handleDeleteContent}
             />
-            <ThemedButton title="Reset App Data" onPress={handleReset} />
+            <ThemedButton
+              title={t('settings.system.resetData')}
+              onPress={handleReset}
+            />
             <Text
               style={{
                 color: theme.text,
@@ -534,19 +605,19 @@ export default function Page() {
                 textAlign: 'center',
               }}
             >
-              WhispList promises a safe, anonymous place to share your dreams.
+              {t('settings.system.aboutDescription')}
             </Text>
             <ThemedButton
-              title="Terms of Service"
+              title={t('settings.system.terms')}
               onPress={() => router.push('/terms')}
             />
             <ThemedButton
-              title="Privacy Policy"
+              title={t('settings.system.privacy')}
               onPress={() => router.push('/privacy')}
             />
           </SettingsSection>
 
-          <SettingsSection title="Theme">
+          <SettingsSection title={t('settings.sections.theme')}>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
