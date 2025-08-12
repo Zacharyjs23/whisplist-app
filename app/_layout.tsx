@@ -21,10 +21,14 @@ function LayoutInner() {
 
   useEffect(() => {
     const check = async () => {
-      const seen = await AsyncStorage.getItem('hasSeenOnboarding');
-      const accepted = await AsyncStorage.getItem('acceptedTerms');
-      if ((!seen || !accepted) && pathname !== '/Onboarding') {
-        router.replace('/Onboarding');
+      try {
+        const seen = await AsyncStorage.getItem('hasSeenOnboarding');
+        const accepted = await AsyncStorage.getItem('acceptedTerms');
+        if ((!seen || !accepted) && pathname !== '/Onboarding') {
+          router.replace('/Onboarding');
+        }
+      } catch (err) {
+        logger.warn('Failed to load onboarding flags', err);
       }
     };
     check();
