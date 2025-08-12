@@ -54,6 +54,16 @@ npm run reset-project
 
 This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
 
+## Keep your branch up to date
+
+To minimize merge conflicts, rebase your work on top of the latest `main` branch before pushing:
+
+```bash
+git pull --rebase origin main
+```
+
+This rewrites your local commits onto the updated history, avoiding merge commits and keeping the project history linear.
+
 ## Poll Mode
 
 Wishes can optionally include a poll with two text choices. Enable **Poll Mode** on the home screen to add options A and B when posting a wish. Vote results update in real time on the wish detail screen.
