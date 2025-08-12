@@ -8,6 +8,8 @@ jest.mock('firebase/firestore', () => ({
   where: jest.fn(),
   onSnapshot: jest.fn(),
   getDocs: jest.fn(),
+  doc: jest.fn(),
+  deleteDoc: jest.fn(),
 }));
 
 import { getFollowingIds } from '@/helpers/followers';
@@ -17,6 +19,7 @@ import {
   getTopBoostedCreators,
   createBoostCheckout,
   createGiftCheckout,
+  deleteWish,
 } from '@/helpers/wishes';
 import {
   collection,
@@ -26,6 +29,8 @@ import {
   where,
   onSnapshot,
   getDocs,
+  doc,
+  deleteDoc,
 } from 'firebase/firestore';
 
 describe('listenTrendingWishes', () => {
@@ -192,6 +197,27 @@ describe('checkout helpers', () => {
       },
     );
     expect(result).toEqual({ url: 'http://gift' });
+  });
+});
+
+describe('deleteWish', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('deletes wish successfully', async () => {
+    (doc as jest.Mock).mockReturnValue('ref');
+    (deleteDoc as jest.Mock).mockResolvedValue(undefined);
+    await deleteWish('w1');
+    expect(doc).toHaveBeenCalledWith({}, 'wishes', 'w1');
+    expect(deleteDoc).toHaveBeenCalledWith('ref');
+  });
+
+  it('throws on unauthorized deletion', async () => {
+    const err = new Error('denied');
+    (doc as jest.Mock).mockReturnValue('ref');
+    (deleteDoc as jest.Mock).mockRejectedValue(err);
+    await expect(deleteWish('w1')).rejects.toThrow(err);
   });
 });
 

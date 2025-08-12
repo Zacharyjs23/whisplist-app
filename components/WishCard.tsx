@@ -7,6 +7,7 @@ import {
   Animated,
   Share,
   View,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
@@ -14,7 +15,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSavedWishes } from '@/contexts/SavedWishesContext';
 import type { Wish } from '../types/Wish';
-import { updateWishReaction } from '../helpers/wishes';
+import { updateWishReaction, deleteWish } from '../helpers/wishes';
 import { db } from '../firebase';
 import { collection, getDocs, doc, onSnapshot } from 'firebase/firestore';
 import { formatTimeLeft } from '../helpers/time';
@@ -147,6 +148,24 @@ export const WishCard: React.FC<{
     }
   }, [wish.id]);
 
+  const handleDelete = useCallback(() => {
+    if (!wish.id) return;
+    Alert.alert(t('common.delete'), 'Are you sure?', [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteWish(wish.id!);
+          } catch (err) {
+            logger.warn('Failed to delete wish', err);
+          }
+        },
+      },
+    ]);
+  }, [wish.id, t]);
+
   return (
     <Animated.View
       style={[
@@ -233,6 +252,13 @@ export const WishCard: React.FC<{
             return t('wish.hoursLeft', { hours: hrs });
           })()}
         </Text>
+      )}
+      {user?.uid === wish.userId && (
+        <TouchableOpacity onPress={handleDelete} style={styles.reportButton}>
+          <Text style={[styles.reactionText, { color: '#f87171' }]}>
+            {t('common.delete')}
+          </Text>
+        </TouchableOpacity>
       )}
       {onReport && (
         <TouchableOpacity onPress={onReport} style={styles.reportButton}>
