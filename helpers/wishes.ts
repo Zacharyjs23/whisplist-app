@@ -208,13 +208,19 @@ export async function boostWish(id: string, hours: number) {
   return updateDoc(ref, { boostedUntil });
 }
 
-export async function createBoostCheckout(wishId: string, userId: string) {
+export async function createBoostCheckout(
+  wishId: string,
+  userId: string,
+  amount: number,
+  successUrl: string,
+  cancelUrl: string,
+) {
   const resp = await fetch(
     `https://us-central1-${process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID}.cloudfunctions.net/createCheckoutSession`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ wishId, userId }),
+      body: JSON.stringify({ wishId, userId, amount, successUrl, cancelUrl }),
     },
   );
   return (await resp.json()) as { url: string; sessionId: string };
@@ -224,13 +230,21 @@ export async function createGiftCheckout(
   wishId: string,
   amount: number,
   recipientId: string,
+  successUrl: string,
+  cancelUrl: string,
 ) {
   const resp = await fetch(
     `https://us-central1-${process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID}.cloudfunctions.net/createGiftCheckoutSession`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ wishId, amount, recipientId }),
+      body: JSON.stringify({
+        wishId,
+        amount,
+        recipientId,
+        successUrl,
+        cancelUrl,
+      }),
     },
   );
   return (await resp.json()) as { url: string };

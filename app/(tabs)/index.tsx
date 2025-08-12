@@ -811,6 +811,8 @@ export default function Page() {
                 item.id!,
                 amount,
                 item.userId!,
+                process.env.EXPO_PUBLIC_GIFT_SUCCESS_URL!,
+                process.env.EXPO_PUBLIC_GIFT_CANCEL_URL!,
               );
               if (res.url) await WebBrowser.openBrowserAsync(res.url);
             } catch (err) {

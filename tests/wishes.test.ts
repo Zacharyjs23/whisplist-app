@@ -139,14 +139,26 @@ describe('checkout helpers', () => {
       json: async () => ({ url: 'http://boost', sessionId: 'sess' }),
     });
 
-    const result = await createBoostCheckout('wish1', 'user1');
+    const result = await createBoostCheckout(
+      'wish1',
+      'user1',
+      5,
+      'http://success',
+      'http://cancel',
+    );
 
     expect(global.fetch).toHaveBeenCalledWith(
       'https://us-central1-testproj.cloudfunctions.net/createCheckoutSession',
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wishId: 'wish1', userId: 'user1' }),
+        body: JSON.stringify({
+          wishId: 'wish1',
+          userId: 'user1',
+          amount: 5,
+          successUrl: 'http://success',
+          cancelUrl: 'http://cancel',
+        }),
       },
     );
     expect(result).toEqual({ url: 'http://boost', sessionId: 'sess' });
@@ -157,14 +169,26 @@ describe('checkout helpers', () => {
       json: async () => ({ url: 'http://gift' }),
     });
 
-    const result = await createGiftCheckout('wish1', 5, 'user2');
+    const result = await createGiftCheckout(
+      'wish1',
+      5,
+      'user2',
+      'http://gift-success',
+      'http://gift-cancel',
+    );
 
     expect(global.fetch).toHaveBeenCalledWith(
       'https://us-central1-testproj.cloudfunctions.net/createGiftCheckoutSession',
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wishId: 'wish1', amount: 5, recipientId: 'user2' }),
+        body: JSON.stringify({
+          wishId: 'wish1',
+          amount: 5,
+          recipientId: 'user2',
+          successUrl: 'http://gift-success',
+          cancelUrl: 'http://gift-cancel',
+        }),
       },
     );
     expect(result).toEqual({ url: 'http://gift' });

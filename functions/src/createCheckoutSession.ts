@@ -16,8 +16,8 @@ export const createCheckoutSession = functions
       return;
     }
 
-    const { wishId, userId } = req.body;
-    if (!wishId || !userId) {
+    const { wishId, userId, amount, successUrl, cancelUrl } = req.body;
+    if (!wishId || !userId || !amount || !successUrl || !cancelUrl) {
       res.status(400).send('Missing parameters');
       return;
     }
@@ -36,15 +36,15 @@ export const createCheckoutSession = functions
           {
             price_data: {
               currency: 'usd',
-              unit_amount: 50,
+              unit_amount: Math.round(amount * 100),
               product_data: { name: 'WhispList Boost' },
             },
             quantity: 1,
           },
         ],
         metadata: { wishId, userId },
-        success_url: 'https://example.com/success',
-        cancel_url: 'https://example.com/cancel',
+        success_url: successUrl,
+        cancel_url: cancelUrl,
       });
 
       await db.collection('boostPayments').doc(session.id).set({
