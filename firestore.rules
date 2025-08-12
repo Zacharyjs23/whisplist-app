@@ -51,7 +51,8 @@ service cloud.firestore {
       // Everyone (including anonymous) can read wishes
       allow read: if true;
       allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if signedIn() && request.auth.uid == resource.data.userId;
+      allow update: if signedIn() && request.auth.uid == resource.data.userId;
+      allow delete: if wishOwner(wishId);
 
       match /comments/{commentId} {
         // Allow anyone to read comments

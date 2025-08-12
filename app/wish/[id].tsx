@@ -10,6 +10,7 @@ import {
   setFulfillmentLink,
   createGiftCheckout,
   updateWish,
+  deleteWish,
 } from '../../helpers/wishes';
 import {
   listenWishComments,
@@ -33,7 +34,6 @@ import {
   collectionGroup,
   updateDoc,
   setDoc,
-  deleteDoc,
 } from 'firebase/firestore'; // ✅ Keep only if used directly in this file
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -578,7 +578,7 @@ export default function Page() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await deleteDoc(doc(db, 'wishes', id as string));
+            await deleteWish(id as string);
             router.back();
           } catch (err) {
             logger.error('❌ Failed to delete wish:', err);

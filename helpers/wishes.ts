@@ -182,6 +182,11 @@ export async function updateWish(id: string, data: Partial<Wish>) {
   return updateDoc(ref, data);
 }
 
+export async function deleteWish(id: string) {
+  const ref = doc(db, 'wishes', id);
+  return deleteDoc(ref);
+}
+
 export async function updateWishReaction(
   id: string,
   emoji: ReactionType,
