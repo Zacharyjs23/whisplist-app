@@ -72,15 +72,15 @@ export const AuthSessionProvider = ({
         if (!data.acceptedTermsAt) {
           const accepted = await AsyncStorage.getItem('acceptedTerms');
           if (accepted) {
-            const ts = serverTimestamp();
-            await updateDoc(ref, { acceptedTermsAt: ts });
-            data.acceptedTermsAt = ts as unknown as Timestamp;
+            const clientTs = Timestamp.now();
+            await updateDoc(ref, { acceptedTermsAt: serverTimestamp() });
+            data.acceptedTermsAt = clientTs;
           }
         }
         setProfile(data);
       } else {
         const accepted = await AsyncStorage.getItem('acceptedTerms');
-        const ts = serverTimestamp();
+        const clientCreatedAt = Timestamp.now();
         const data: Profile = {
           displayName: u.displayName,
           email: u.email,
@@ -89,11 +89,18 @@ export const AuthSessionProvider = ({
           isAnonymous: u.isAnonymous,
           publicProfileEnabled: true,
           boostCredits: 0,
-          createdAt: serverTimestamp() as unknown as Timestamp,
+          createdAt: clientCreatedAt,
           developerMode: false,
-          acceptedTermsAt: accepted ? (ts as unknown as Timestamp) : undefined,
         };
-        await setDoc(ref, data);
+        const docToWrite: Record<string, unknown> = {
+          ...data,
+          createdAt: serverTimestamp(),
+        };
+        if (accepted) {
+          docToWrite.acceptedTermsAt = serverTimestamp();
+          data.acceptedTermsAt = Timestamp.now();
+        }
+        await setDoc(ref, docToWrite);
         setProfile(data);
       }
       setLoading(false);
@@ -109,4 +116,3 @@ export const AuthSessionProvider = ({
 };
 
 export const useAuthSession = () => useContext(AuthSessionContext);
-

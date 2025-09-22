@@ -11,6 +11,7 @@ import {
   Alert,
   Animated,
   Modal,
+  Platform,
 } from 'react-native';
 import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { useProfile } from '@/hooks/useProfile';
@@ -20,6 +21,8 @@ import * as Linking from 'expo-linking';
 import { getWish, boostWish } from '../../helpers/wishes';
 import { formatTimeLeft } from '../../helpers/time';
 import * as logger from '@/shared/logger';
+
+const CAN_USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 export default function BoostPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -122,12 +125,12 @@ export default function BoostPage() {
         Animated.timing(pulseAnim, {
           toValue: 1.1,
           duration: 700,
-          useNativeDriver: true,
+          useNativeDriver: CAN_USE_NATIVE_DRIVER,
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
           duration: 700,
-          useNativeDriver: true,
+          useNativeDriver: CAN_USE_NATIVE_DRIVER,
         }),
       ]),
     );

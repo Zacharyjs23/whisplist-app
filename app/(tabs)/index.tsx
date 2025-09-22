@@ -1,11 +1,13 @@
 // app/(tabs)/index.tsx — Full Home Screen with SafeArea, StatusBar, and Wish Logic
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
-import { addWish, createGiftCheckout } from '../../helpers/wishes';
-import { followUser, unfollowUser } from '../../helpers/followers';
-import { formatTimeLeft } from '../../helpers/time';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import * as WebBrowser from 'expo-web-browser';
+import type { Href } from 'expo-router';
+import { addWish } from '../../helpers/wishes';
+// import { followUser, unfollowUser } from '../../helpers/followers';
+// import { formatTimeLeft } from '../../helpers/time';
+import { ref, getDownloadURL } from 'firebase/storage';
+import * as Haptics from 'expo-haptics';
+import { DailyQuoteBanner } from '@/components/DailyQuoteBanner';
 import {
   addDoc,
   collection,
@@ -18,33 +20,33 @@ import {
   collectionGroup,
   Timestamp,
 } from 'firebase/firestore';
-import React, { useEffect, useState, useRef } from 'react';
-import { Ionicons } from '@expo/vector-icons';
+import * as React from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   StatusBar as RNStatusBar,
   SafeAreaView,
   StyleSheet,
   Text,
-  TextInput,
-  Switch,
   TouchableOpacity,
-  Image,
   View,
   RefreshControl,
   Modal,
   Animated,
   LayoutAnimation,
   ToastAndroid,
+  AppState,
+  AppStateStatus,
+  NativeScrollEvent,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Picker } from '@react-native-picker/picker';
+import { useTranslation } from '@/contexts/I18nContext';
+// import { Picker } from '@react-native-picker/picker';
 import ReportDialog from '../../components/ReportDialog';
 import { db, storage } from '../../firebase';
 import type { Wish } from '../../types/Wish';
@@ -54,13 +56,23 @@ import * as logger from '@/shared/logger';
 import { useWishComposer } from '@/hooks/useWishComposer';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useFeedLoader } from '@/hooks/useFeedLoader';
+import { UserImpact } from '@/components/UserImpact';
+import { FeedHeader } from '@/components/FeedHeader';
+import type { FilterType } from '@/types/post';
+import WishCardComponent from '@/components/WishCard';
+import { WishComposer } from '@/components/WishComposer';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { SupporterPaywallModal } from '@/components/SupporterPaywallModal';
+import { getLocalDateKey } from '@/helpers/date';
+import { trackEvent } from '@/helpers/analytics';
+import { optimizeImageForUpload } from '@/helpers/image';
+import { uploadResumableWithProgress } from '@/helpers/storage';
+import { enqueuePendingWish, flushPendingWishes as flushPendingWishesHelper, getQueueStatus } from '@/helpers/offlineQueue';
+import { FeedSkeleton } from '@/components/FeedSkeleton';
 
-const typeInfo: Record<string, { emoji: string; color: string }> = {
-  wish: { emoji: '💭', color: '#1e1e1e' },
-  confession: { emoji: '😶\u200d🌫️', color: '#374151' },
-  advice: { emoji: '🧠', color: '#064e3b' },
-  dream: { emoji: '🌙', color: '#312e81' },
-};
+// typeInfo removed; shared WishCard controls its styling
+
+const CAN_USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 /**
  * Pick a random prompt index that is not in the recent list. If all prompts
@@ -83,6 +95,7 @@ const sanitizeInput = (text: string) => text.replace(/[<>]/g, '').trim();
 
 export default function Page() {
   const { user, profile } = useAuthSession();
+  const { t } = useTranslation();
   const stripeEnabled = profile?.giftingEnabled && profile?.stripeAccountId;
   const {
     wish,
@@ -136,30 +149,58 @@ export default function Page() {
     refreshing,
     onRefresh,
     loadMore,
-    lastDoc,
+    loadingMore,
+    hasMore,
+    boostedCount,
+    getNewerCount,
   } = useFeedLoader(user);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<
-    'all' | 'wish' | 'confession' | 'advice' | 'dream'
-  >('all');
-  const [reportVisible, setReportVisible] = useState(false);
-  const [reportTarget, setReportTarget] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const [filterType, setFilterType] = React.useState<FilterType>('all');
+  const [reportVisible, setReportVisible] = React.useState(false);
+  const [reportTarget, setReportTarget] = React.useState<string | null>(null);
   const { theme } = useTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
-  const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
-  const [stripeAccounts, setStripeAccounts] = useState<
+  const [publicStatus, setPublicStatus] = React.useState<Record<string, boolean>>({});
+  const [stripeAccounts, setStripeAccounts] = React.useState<
     Record<string, string | null>
   >({});
-  const [followStatus, setFollowStatus] = useState<Record<string, boolean>>({});
-  const [streakCount, setStreakCount] = useState(0);
-  const [dailyPrompt, setDailyPrompt] = useState('');
-  const [impact, setImpact] = useState({
+  const [followStatus, setFollowStatus] = React.useState<Record<string, boolean>>({});
+  const [streakCount, setStreakCount] = React.useState(0);
+  const [dailyPrompt, setDailyPrompt] = React.useState('');
+  const [impact, setImpact] = React.useState({
     wishes: 0,
     boosts: 0,
     gifts: 0,
     giftTotal: 0,
   });
-  const promptOpacity = useRef(new Animated.Value(0)).current;
+  const [uploadProgress, setUploadProgress] = React.useState<number | null>(null);
+  const [uploadStage, setUploadStage] = React.useState<'audio' | 'image' | null>(null);
+  const [postError, setPostError] = React.useState<string | null>(null);
+  const [persistedAudioUrl, setPersistedAudioUrl] = React.useState('');
+  const [persistedImageUrl, setPersistedImageUrl] = React.useState('');
+  const [draftLoaded, setDraftLoaded] = React.useState(false);
+  const [draftSavedAt, setDraftSavedAt] = React.useState<number | null>(null);
+  const [offlinePostedCount, setOfflinePostedCount] = React.useState(0);
+  const [hasPendingQueue, setHasPendingQueue] = React.useState(false);
+  const [paywallOpen, setPaywallOpen] = React.useState(false);
+
+  const promptOpacity = React.useRef(new Animated.Value(0)).current;
+  const [quoteText, setQuoteText] = React.useState<string | null>(null);
+  const [showQuote, setShowQuote] = React.useState(false);
+  const [quoteStyle, setQuoteStyle] = React.useState<string | null>(null);
+  const [quoteSource, setQuoteSource] = React.useState<string | null>(null);
+  const lastAppState = React.useRef<AppStateStatus>(AppState.currentState);
+  const { isActive: isSupporter } = useSubscription();
+  const listRef = React.useRef<FlatList<Wish> | null>(null);
+  // Work around React 19 + RN typing mismatch for ref on FlatList in some IDEs
+  const FlatListAny = FlatList as unknown as any;
+  const [showScrollTop, setShowScrollTop] = React.useState(false);
+  const [hasNewPosts, setHasNewPosts] = React.useState(false);
+  const [newPostsCount, setNewPostsCount] = React.useState(0);
+  const [headerElevated, setHeaderElevated] = React.useState(false);
+  const newBannerOpacity = React.useRef(new Animated.Value(0)).current;
+  const newBannerTranslate = React.useRef(new Animated.Value(10)).current;
+  const headerPulse = React.useRef(new Animated.Value(0)).current;
 
   if (!db || !storage) {
     logger.error('Firebase modules undefined in index page', { db, storage });
@@ -168,9 +209,286 @@ export default function Page() {
     logger.error('AuthContext returned undefined user');
   }
 
-  const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
+  // const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 
-  useEffect(() => {
+  // Stable renderer for FlatList items (defined at top-level for hooks rule)
+  const renderItem = React.useCallback(
+    ({ item, index }: { item: Wish; index: number }) => {
+      const isFirst = index === 0;
+      const startsRecent = boostedCount > 0 && index === boostedCount;
+      const showBoostedLabel = isFirst && boostedCount > 0;
+      const showRecentLabel = startsRecent;
+      return (
+        <View>
+          {showBoostedLabel ? (
+            <Text style={{ color: theme.placeholder, marginBottom: 6 }}>
+              🚀 Boosted
+            </Text>
+          ) : null}
+          {showRecentLabel ? (
+            <Text style={{ color: theme.placeholder, marginVertical: 8 }}>
+              🕒 Recent
+            </Text>
+          ) : null}
+          <WishCardComponent
+            wish={item}
+            followed={!!followStatus[item.userId || '']}
+            onReport={() => {
+              setReportTarget(item.id);
+              setReportVisible(true);
+            }}
+          />
+        </View>
+      );
+    },
+    [followStatus, boostedCount, theme.placeholder],
+  );
+
+  // Offline queue helpers moved to helpers/offlineQueue
+
+  // Listen for app foreground to pick up a new daily quote from the hook
+  React.useEffect(() => {
+    const loadBanner = async () => {
+      try {
+        const [lastShown, text, dismissedDate, style, source] = await Promise.all([
+          AsyncStorage.getItem('dailyQuote.lastShown'),
+          AsyncStorage.getItem('dailyQuote.textForToday'),
+          AsyncStorage.getItem('dailyQuote.bannerDismissedDate'),
+          AsyncStorage.getItem('dailyQuote.style'),
+          AsyncStorage.getItem('dailyQuote.sourceForToday'),
+        ]);
+        const today = getLocalDateKey();
+        if (lastShown === today && text && dismissedDate !== today) {
+          setQuoteText(text);
+          setShowQuote(true);
+          setQuoteStyle(style);
+          setQuoteSource(source);
+        } else {
+          setShowQuote(false);
+          setQuoteStyle(null);
+          setQuoteSource(null);
+        }
+      } catch (err) {
+        logger.warn('Failed to load daily quote banner', err);
+      }
+    };
+
+    const onChange = (state: AppStateStatus) => {
+      if (lastAppState.current !== 'active' && state === 'active') {
+        void loadBanner();
+        void (async () => {
+          const res = await flushPendingWishesHelper();
+          if (res.posted > 0) setOfflinePostedCount(res.posted);
+          setHasPendingQueue(res.remaining > 0);
+        })();
+        void (async () => {
+          try {
+            const cnt = await getNewerCount();
+            setHasNewPosts(cnt > 0);
+            setNewPostsCount(cnt);
+          } catch {}
+        })();
+      }
+      lastAppState.current = state;
+    };
+
+    const sub = AppState.addEventListener('change', onChange);
+    void loadBanner();
+    return () => sub.remove();
+  }, [getNewerCount]);
+
+  // Poll occasionally for new posts
+  React.useEffect(() => {
+    const id = setInterval(() => {
+      void (async () => {
+        try {
+          const cnt = await getNewerCount();
+          setHasNewPosts(cnt > 0);
+          setNewPostsCount(cnt);
+        } catch {}
+      })();
+    }, 45000);
+    return () => clearInterval(id);
+  }, [getNewerCount]);
+
+  // Animate the new-posts banner in/out
+  React.useEffect(() => {
+    if (hasNewPosts) {
+      Animated.parallel([
+        Animated.timing(newBannerOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: CAN_USE_NATIVE_DRIVER,
+        }),
+        Animated.timing(newBannerTranslate, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: CAN_USE_NATIVE_DRIVER,
+        }),
+      ]).start();
+      // Pulse the sticky header subtly to indicate freshness
+      headerPulse.setValue(0);
+      Animated.sequence([
+        Animated.timing(headerPulse, {
+          toValue: 1,
+          duration: 220,
+          useNativeDriver: CAN_USE_NATIVE_DRIVER,
+        }),
+        Animated.timing(headerPulse, {
+          toValue: 0,
+          duration: 220,
+          useNativeDriver: CAN_USE_NATIVE_DRIVER,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(newBannerOpacity, {
+          toValue: 0,
+          duration: 180,
+          useNativeDriver: CAN_USE_NATIVE_DRIVER,
+        }),
+        Animated.timing(newBannerTranslate, {
+          toValue: 10,
+          duration: 180,
+          useNativeDriver: CAN_USE_NATIVE_DRIVER,
+        }),
+      ]).start();
+    }
+  }, [hasNewPosts, newBannerOpacity, newBannerTranslate, headerPulse]);
+
+  // Initialize queue status on mount
+  React.useEffect(() => {
+    const init = async () => {
+      const s = await getQueueStatus();
+      setHasPendingQueue(s.size > 0);
+    };
+    void init();
+  }, []);
+  // Load pending post to resume after restart
+  React.useEffect(() => {
+    const loadPending = async () => {
+      try {
+        const raw = await AsyncStorage.getItem('pendingPost.v1');
+        if (!raw) return;
+        setDraftLoaded(true);
+        const p = JSON.parse(raw);
+        if (typeof p?.wish === 'string') setWish(p.wish);
+        if (p?.postType) setPostType(p.postType as any);
+        if (typeof p?.isPoll === 'boolean') setIsPoll(p.isPoll);
+        if (typeof p?.optionA === 'string') setOptionA(p.optionA);
+        if (typeof p?.optionB === 'string') setOptionB(p.optionB);
+        if (typeof p?.giftLink === 'string') setGiftLink(p.giftLink);
+        if (typeof p?.giftType === 'string') setGiftType(p.giftType);
+        if (typeof p?.giftLabel === 'string') setGiftLabel(p.giftLabel);
+        if (typeof p?.useProfilePost === 'boolean') setUseProfilePost(p.useProfilePost);
+        if (typeof p?.autoDelete === 'boolean') setAutoDelete(p.autoDelete);
+        if (typeof p?.enableExternalGift === 'boolean') setEnableExternalGift(p.enableExternalGift);
+        if (typeof p?.includeAudio === 'boolean') setIncludeAudio(p.includeAudio);
+        if (typeof p?.persistedAudioUrl === 'string') setPersistedAudioUrl(p.persistedAudioUrl);
+        if (typeof p?.persistedImageUrl === 'string') setPersistedImageUrl(p.persistedImageUrl);
+        if (typeof p?.savedAt === 'number') setDraftSavedAt(p.savedAt);
+      } catch {
+        // ignore
+      }
+    };
+    void loadPending();
+  }, [
+    setWish,
+    setPostType,
+    setIsPoll,
+    setOptionA,
+    setOptionB,
+    setGiftLink,
+    setGiftType,
+    setGiftLabel,
+    setUseProfilePost,
+    setAutoDelete,
+    setEnableExternalGift,
+    setIncludeAudio,
+  ]);
+
+  // Continuously persist draft (lightweight fields only)
+  React.useEffect(() => {
+    const draftEmpty =
+      !wish.trim() &&
+      !selectedImage &&
+      !includeAudio &&
+      !isPoll &&
+      !giftLink.trim() &&
+      !giftType.trim() &&
+      !giftLabel.trim();
+    const save = async () => {
+      try {
+        if (draftEmpty) {
+          await AsyncStorage.removeItem('pendingPost.v1');
+          setDraftLoaded(false);
+          setDraftSavedAt(null);
+          return;
+        }
+        const draft = {
+          wish,
+          postType,
+          isPoll,
+          optionA,
+          optionB,
+          includeAudio,
+          giftLink,
+          giftType,
+          giftLabel,
+          useProfilePost,
+          autoDelete,
+          enableExternalGift,
+          persistedAudioUrl,
+          persistedImageUrl,
+          savedAt: Date.now(),
+        };
+        await AsyncStorage.setItem('pendingPost.v1', JSON.stringify(draft));
+        setDraftLoaded(true);
+        setDraftSavedAt(draft.savedAt);
+      } catch {}
+    };
+    void save();
+  }, [
+    wish,
+    postType,
+    isPoll,
+    optionA,
+    optionB,
+    includeAudio,
+    giftLink,
+    giftType,
+    giftLabel,
+    useProfilePost,
+    autoDelete,
+    enableExternalGift,
+    persistedAudioUrl,
+    persistedImageUrl,
+    selectedImage,
+  ]);
+
+  
+
+  // Gentle haptic when banner becomes visible (kept here to avoid duplication)
+  React.useEffect(() => {
+    if (showQuote) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [showQuote]);
+
+  const dismissQuoteBanner = async () => {
+    try {
+      const today = getLocalDateKey();
+      await AsyncStorage.setItem('dailyQuote.bannerDismissedDate', today);
+      // analytics: quote_dismissed (respect opt-out)
+      const optOut = await AsyncStorage.getItem('analyticsOptOut');
+      if (optOut !== 'true') {
+        const style = quoteStyle || (await AsyncStorage.getItem('dailyQuote.style')) || 'uplifting';
+        const source = quoteSource || (await AsyncStorage.getItem('dailyQuote.sourceForToday')) || 'unknown';
+        trackEvent('quote_dismissed', { style, source });
+      }
+    } catch {}
+    setShowQuote(false);
+  };
+
+  React.useEffect(() => {
     const loadImpact = async () => {
       if (!user?.uid) return;
       try {
@@ -200,20 +518,15 @@ export default function Page() {
     loadImpact();
   }, [user]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const fetchStatus = async () => {
-      const ids = Array.from(
-        new Set(
-          wishList
-            .map((w) => w.userId)
-            .filter(
-              (id): id is string => typeof id === 'string' && id.length > 0,
-            ),
-        ),
-      );
+      const baseIds = wishList
+        .map((w: Wish) => w.userId)
+        .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0);
+      const ids = Array.from<string>(new Set<string>(baseIds));
       try {
         await Promise.all(
-          ids.map(async (id) => {
+          ids.map(async (id: string) => {
             if (
               publicStatus[id] === undefined ||
               stripeAccounts[id] === undefined
@@ -221,7 +534,7 @@ export default function Page() {
               try {
                 const snap = await getDoc(doc(db, 'users', id));
                 if (publicStatus[id] === undefined) {
-                  setPublicStatus((prev) => ({
+                  setPublicStatus((prev: Record<string, boolean>) => ({
                     ...prev,
                     [id]: snap.exists()
                       ? snap.data().publicProfileEnabled !== false
@@ -229,7 +542,7 @@ export default function Page() {
                   }));
                 }
                 if (stripeAccounts[id] === undefined) {
-                  setStripeAccounts((prev) => ({
+                  setStripeAccounts((prev: Record<string, string | null>) => ({
                     ...prev,
                     [id]: snap.exists()
                       ? snap.data().stripeAccountId || null
@@ -239,10 +552,10 @@ export default function Page() {
               } catch (err) {
                 logger.warn('Failed to fetch user', err);
                 if (publicStatus[id] === undefined) {
-                  setPublicStatus((prev) => ({ ...prev, [id]: false }));
+                  setPublicStatus((prev: Record<string, boolean>) => ({ ...prev, [id]: false }));
                 }
                 if (stripeAccounts[id] === undefined) {
-                  setStripeAccounts((prev) => ({ ...prev, [id]: null }));
+                  setStripeAccounts((prev: Record<string, string | null>) => ({ ...prev, [id]: null }));
                 }
               }
             }
@@ -255,30 +568,25 @@ export default function Page() {
     fetchStatus();
   }, [wishList, publicStatus, stripeAccounts]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const fetchFollow = async () => {
       if (!user) return;
-      const ids = Array.from(
-        new Set(
-          wishList
-            .map((w) => w.userId)
-            .filter(
-              (id): id is string => typeof id === 'string' && id !== user.uid,
-            ),
-        ),
-      );
+      const baseIds = wishList
+        .map((w: Wish) => w.userId)
+        .filter((id: unknown): id is string => typeof id === 'string' && id !== user.uid);
+      const ids = Array.from<string>(new Set<string>(baseIds));
       try {
         await Promise.all(
-          ids.map(async (id) => {
+          ids.map(async (id: string) => {
             if (followStatus[id] === undefined) {
               try {
                 const snap = await getDoc(
                   doc(db, 'users', user.uid, 'following', id),
                 );
-                setFollowStatus((prev) => ({ ...prev, [id]: snap.exists() }));
+                setFollowStatus((prev: Record<string, boolean>) => ({ ...prev, [id]: snap.exists() }));
               } catch (err) {
                 logger.warn('Failed to fetch follow status for', id, err);
-                setFollowStatus((prev) => ({ ...prev, [id]: false }));
+                setFollowStatus((prev: Record<string, boolean>) => ({ ...prev, [id]: false }));
               }
             }
           }),
@@ -290,7 +598,7 @@ export default function Page() {
     fetchFollow();
   }, [wishList, user, followStatus]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const showWelcome = async () => {
       try {
         const seen = await AsyncStorage.getItem('seenWelcome');
@@ -308,7 +616,7 @@ export default function Page() {
     showWelcome();
   }, []);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const loadPromptAndStreak = async () => {
       try {
         const today = new Date().toISOString().split('T')[0];
@@ -333,7 +641,7 @@ export default function Page() {
         Animated.timing(promptOpacity, {
           toValue: 1,
           duration: 500,
-          useNativeDriver: true,
+          useNativeDriver: CAN_USE_NATIVE_DRIVER,
         }).start();
 
         const streak = await AsyncStorage.getItem('streakCount');
@@ -363,9 +671,9 @@ export default function Page() {
     Animated.timing(promptOpacity, {
       toValue: 1,
       duration: 300,
-      useNativeDriver: true,
+      useNativeDriver: CAN_USE_NATIVE_DRIVER,
     }).start();
-    const msg = "✨ That's a deep one.";
+    const msg = t('composer.deepPrompt', "✨ That's a deep one.");
     if (Platform.OS === 'android') {
       ToastAndroid.show(msg, ToastAndroid.SHORT);
     } else {
@@ -383,43 +691,64 @@ export default function Page() {
     if (sanitizedWish === '') return;
     if (sanitizedWish.length > MAX_WISH_LENGTH) {
       Alert.alert(
-        'Wish too long',
-        `Wish must be ${MAX_WISH_LENGTH} characters or less.`,
+        t('composer.wishTooLongTitle', 'Wish too long'),
+        t('composer.wishTooLong', { max: MAX_WISH_LENGTH }),
       );
       return;
     }
     if (sanitizedLink.length > MAX_LINK_LENGTH) {
       Alert.alert(
-        'Link too long',
-        `Link must be ${MAX_LINK_LENGTH} characters or less.`,
+        t('composer.linkTooLongTitle', 'Link too long'),
+        t('composer.linkTooLong', { max: MAX_LINK_LENGTH }),
       );
       return;
     }
 
     setPosting(true);
+    setPostError(null);
+    // Predeclare so we can persist in catch
+    let audioUrl = persistedAudioUrl || '';
+    let imageUrl = persistedImageUrl || '';
     try {
       if (sanitizedLink && !/^https?:\/\//.test(sanitizedLink)) {
         Alert.alert(
-          'Invalid link',
-          'Gift link must start with http:// or https://',
+          t('composer.invalidLinkTitle', 'Invalid link'),
+          t('composer.invalidLink'),
         );
         return;
       }
-      let audioUrl = '';
-      let imageUrl = '';
-      if (includeAudio && recordedUri) {
+      if (includeAudio && recordedUri && !audioUrl) {
         const resp = await fetch(recordedUri);
         const blob = await resp.blob();
         const storageRef = ref(storage, `audio/${Date.now()}.m4a`);
-        await uploadBytes(storageRef, blob);
+        setUploadProgress(0);
+        setUploadStage('audio');
+        await uploadResumableWithProgress(storageRef, blob, undefined, (pct) =>
+          setUploadProgress(pct),
+        );
         audioUrl = await getDownloadURL(storageRef);
+        setPersistedAudioUrl(audioUrl);
+        setUploadProgress(null);
+        setUploadStage(null);
       }
-      if (selectedImage) {
-        const resp = await fetch(selectedImage);
+      if (selectedImage && !imageUrl) {
+        const optimizedUri = await optimizeImageForUpload(selectedImage, {
+          maxWidth: isSupporter ? 2048 : 1600,
+          compress: isSupporter ? 0.85 : 0.7,
+          format: 'jpeg',
+        });
+        const resp = await fetch(optimizedUri);
         const blob = await resp.blob();
         const imageRef = ref(storage, `images/${Date.now()}`);
-        await uploadBytes(imageRef, blob);
+        setUploadProgress(0);
+        setUploadStage('image');
+        await uploadResumableWithProgress(imageRef, blob, undefined, (pct) =>
+          setUploadProgress(pct),
+        );
         imageUrl = await getDownloadURL(imageRef);
+        setPersistedImageUrl(imageUrl);
+        setUploadProgress(null);
+        setUploadStage(null);
       }
       await addWish({
         text: sanitizedWish,
@@ -467,12 +796,98 @@ export default function Page() {
       resetRecorder();
       resetComposer();
       setPostConfirm(true);
+      setUploadProgress(null);
       const streak = await updateStreak();
       setStreakCount(streak);
+      try {
+        trackEvent('post_success', {
+          offline: false,
+          has_image: !!imageUrl,
+          has_audio: !!audioUrl,
+          text_length: sanitizedWish.length,
+          link_length: sanitizedLink.length,
+        });
+      } catch {}
+      // Clear pending draft on success
+      try {
+        await AsyncStorage.removeItem('pendingPost.v1');
+      } catch {}
+      setPersistedAudioUrl('');
+      setPersistedImageUrl('');
+      setDraftSavedAt(null);
     } catch (error) {
       logger.error('❌ Failed to post wish:', error);
+      const message = (error as any)?.message || t('errors.uploadFailed', 'Upload failed. Please try again.');
+      setPostError(message);
+      // Enqueue pending wish for background retry
+      try {
+        const payload = {
+          text: sanitizedWish,
+          category: postType,
+          type: postType,
+          userId: user?.uid,
+          displayName: useProfilePost ? profile?.displayName || '' : '',
+          photoURL: useProfilePost ? profile?.photoURL || '' : '',
+          isAnonymous: !useProfilePost,
+          ...(enableExternalGift &&
+            sanitizedLink && {
+              giftLink: sanitizedLink,
+              ...(sanitizedGiftType && { giftType: sanitizedGiftType }),
+              ...(sanitizedGiftLabel && { giftLabel: sanitizedGiftLabel }),
+            }),
+          ...(isPoll && {
+            isPoll: true,
+            optionA: sanitizedOptionA,
+            optionB: sanitizedOptionB,
+            votesA: 0,
+            votesB: 0,
+          }),
+          ...(persistedAudioUrl && { audioUrl: persistedAudioUrl }),
+          ...(persistedImageUrl && { imageUrl: persistedImageUrl }),
+          ...(autoDelete && {
+            expiresAt: Timestamp.fromDate(
+              new Date(Date.now() + 24 * 60 * 60 * 1000),
+            ),
+          }),
+        } as any;
+        await enqueuePendingWish(payload);
+      } catch {}
+      // Analytics
+      try {
+        trackEvent('post_failed', {
+          has_image: !!persistedImageUrl,
+          has_audio: !!persistedAudioUrl,
+          text_length: sanitizedWish.length,
+          link_length: sanitizedLink.length,
+          error: (error as any)?.message,
+        });
+      } catch {}
+      // Save draft for later resume
+      try {
+        const draft = {
+          wish: sanitizedWish,
+          postType,
+          isPoll,
+          optionA: sanitizedOptionA,
+          optionB: sanitizedOptionB,
+          includeAudio,
+          giftLink: sanitizedLink,
+          giftType: sanitizedGiftType,
+          giftLabel: sanitizedGiftLabel,
+          useProfilePost,
+          autoDelete,
+          enableExternalGift,
+          persistedAudioUrl: audioUrl,
+          persistedImageUrl: imageUrl,
+          savedAt: Date.now(),
+        };
+        await AsyncStorage.setItem('pendingPost.v1', JSON.stringify(draft));
+        setDraftSavedAt(draft.savedAt);
+      } catch {}
     } finally {
       setPosting(false);
+      setUploadProgress(null);
+      setUploadStage(null);
     }
   };
 
@@ -494,13 +909,18 @@ export default function Page() {
   };
 
 
-  const filteredWishes = wishList.filter(
-    (wish) =>
-      wish.text.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      (filterType === 'all' || wish.type === filterType) &&
-      (!wish.expiresAt || wish.expiresAt.toDate() > new Date()),
-  );
+  const filteredWishes = React.useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q && filterType === 'all') return wishList;
+    return wishList.filter(
+      (wish: Wish) =>
+        (!q || wish.text.toLowerCase().includes(q)) &&
+        (filterType === 'all' || wish.type === filterType) &&
+        (!wish.expiresAt || wish.expiresAt.toDate() > new Date()),
+    );
+  }, [wishList, searchTerm, filterType]);
 
+/*
   const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
     const [timeLeft, setTimeLeft] = useState('');
     const [giftCount, setGiftCount] = useState(0);
@@ -575,6 +995,10 @@ export default function Page() {
       (!item.boostedUntil || item.boostedUntil.toDate() < new Date());
 
     const openGiftLink = (link: string) => {
+      if (Platform.OS === 'ios') {
+        Alert.alert('Gifts unavailable', 'Gifting is not available on iOS.');
+        return;
+      }
       Alert.alert(
         'How gifting works',
         'You will be taken to an external site to send your gift.',
@@ -592,6 +1016,10 @@ export default function Page() {
 
     const sendMoney = async (amount: number) => {
       if (!item.id || !item.userId) return;
+      if (Platform.OS === 'ios') {
+        Alert.alert('Gifts unavailable', 'Gifting is not available on iOS.');
+        return;
+      }
       Alert.alert('How gifting works', 'Your payment is processed securely.', [
         {
           text: 'Continue',
@@ -812,6 +1240,7 @@ export default function Page() {
       </Animated.View>
     );
   };
+*/
 
   try {
     return (
@@ -837,22 +1266,28 @@ export default function Page() {
                   textAlign: 'center',
                 }}
               >
-                💭 Your wish has been sent into the world.
+                {t('postConfirm.sent', '💭 Your wish has been sent into the world.')}
               </Text>
               <TouchableOpacity
                 onPress={() => {
                   setPostConfirm(false);
-                  router.push('/feed');
+                  router.push('/feed' as Href);
                 }}
                 style={{ marginBottom: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel={t('postConfirm.viewFeed', 'View in Feed')}
               >
                 <Text style={{ color: theme.tint, textAlign: 'center' }}>
-                  View in Feed
+                  {t('postConfirm.viewFeed', 'View in Feed')}
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setPostConfirm(false)}>
+              <TouchableOpacity
+                onPress={() => setPostConfirm(false)}
+                accessibilityRole="button"
+                accessibilityLabel={t('postConfirm.postAnother', 'Post another wish')}
+              >
                 <Text style={{ color: theme.tint, textAlign: 'center' }}>
-                  Post another wish
+                  {t('postConfirm.postAnother', 'Post another wish')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -866,362 +1301,397 @@ export default function Page() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.container}
         >
-          <FlatList
-            data={filteredWishes}
-            keyExtractor={(item) => item.id}
+          <FlatListAny
+            ref={listRef}
+            data={[{ __type: 'filters' } as any, ...filteredWishes]}
+            keyExtractor={(item: any, index: number) => (item.__type === 'filters' ? '__filters__' : item.id)}
             onEndReached={loadMore}
+            onEndReachedThreshold={0.5}
+            initialNumToRender={10}
+            windowSize={5}
+            maxToRenderPerBatch={10}
+            updateCellsBatchingPeriod={50}
+            removeClippedSubviews
+            keyboardShouldPersistTaps="handled"
+            maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+            stickyHeaderIndices={[0]}
+            scrollEventThrottle={16}
+            onScroll={({ nativeEvent }: { nativeEvent: NativeScrollEvent }) => {
+              const y = nativeEvent.contentOffset.y;
+              if (!showScrollTop && y > 300) setShowScrollTop(true);
+              else if (showScrollTop && y <= 300) setShowScrollTop(false);
+              if (!headerElevated && y > 8) setHeaderElevated(true);
+              else if (headerElevated && y <= 8) setHeaderElevated(false);
+            }}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
             contentContainerStyle={styles.contentContainer}
             ListHeaderComponent={
               <>
+                {showQuote && quoteText ? (
+                  <DailyQuoteBanner
+                    visible={showQuote}
+                    text={quoteText}
+                    styleName={quoteStyle || undefined}
+                    onDismiss={dismissQuoteBanner}
+                    onTurnOffToday={dismissQuoteBanner}
+                    onOpenSettings={() => router.push('/settings' as Href)}
+                  />
+                ) : null}
                 <Text style={styles.title}>WhispList ✨</Text>
-                {error && (
-                  <Text
-                    style={{
-                      color: theme.tint,
-                      textAlign: 'center',
-                      marginBottom: 8,
-                    }}
-                  >
-                    {error}
-                  </Text>
+                {hasPendingQueue && (
+                  <View style={{ backgroundColor: theme.input, padding: 8, borderRadius: 999, alignSelf: 'center', marginBottom: 10 }}>
+                    <Text style={{ color: theme.text }}>
+                      {t('offline.pendingQueue', 'Posting saved wishes in background…')}
+                    </Text>
+                  </View>
                 )}
-                <Text style={styles.subtitle}>
-                  Post a wish and see what dreams grow 🌱
-                </Text>
+                {offlinePostedCount > 0 && (
+                  <View style={{ backgroundColor: theme.input, padding: 10, borderRadius: 8, marginBottom: 10 }}>
+                    <Text style={{ color: theme.text, textAlign: 'center' }}>
+                      {offlinePostedCount === 1
+                        ? t('offline.postedOne', 'Your saved wish was posted.')
+                        : t('offline.postedCount', { count: offlinePostedCount })}
+                    </Text>
+                  </View>
+                )}
+                {error && (
+                  <View style={{ backgroundColor: theme.input, padding: 10, borderRadius: 8, marginBottom: 10 }}>
+                    <Text style={{ color: theme.text, textAlign: 'center', marginBottom: 8 }}>
+                      {error}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={onRefresh}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('common.retry', 'Retry loading')}
+                      style={{ alignSelf: 'center', backgroundColor: theme.tint, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6 }}
+                    >
+                      <Text style={{ color: theme.background, fontWeight: '600' }}>{t('common.retry', 'Retry')}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                <Text style={styles.subtitle}>{t('home.subtitle')}</Text>
                 {streakCount > 0 && (
                   <Text style={styles.streak}>
                     🔥 You’ve posted {streakCount} days in a row!
                   </Text>
                 )}
 
-                <Text style={styles.label}>Search</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Search wishes..."
-                  placeholderTextColor={theme.placeholder}
-                  value={searchTerm}
-                  onChangeText={setSearchTerm}
+                <WishComposer
+                  wish={wish}
+                  setWish={setWish}
+                  dailyPrompt={dailyPrompt}
+                  onRefreshPrompt={requestNewPrompt}
+                  rephrasing={rephrasing}
+                  onRephrase={() => {
+                    if (!isSupporter) { setPaywallOpen(true); return; }
+                    void handleRephrase();
+                  }}
+                  postType={postType}
+                  setPostType={setPostType}
+                  showAdvanced={showAdvanced}
+                  setShowAdvanced={(v: boolean) => {
+                    LayoutAnimation.configureNext(
+                      LayoutAnimation.Presets.easeInEaseOut,
+                    );
+                    setShowAdvanced(v);
+                  }}
+                  isPoll={isPoll}
+                  setIsPoll={setIsPoll}
+                  optionA={optionA}
+                  setOptionA={setOptionA}
+                  optionB={optionB}
+                  setOptionB={setOptionB}
+                  includeAudio={includeAudio}
+                  setIncludeAudio={setIncludeAudio}
+                  isRecording={isRecording}
+                  startRecording={startRecording}
+                  stopRecording={stopRecording}
+                  resetRecorder={resetRecorder}
+                  stripeEnabled={!!stripeEnabled}
+                  enableExternalGift={enableExternalGift}
+                  setEnableExternalGift={setEnableExternalGift}
+                  giftLink={giftLink}
+                  setGiftLink={setGiftLink}
+                  giftType={giftType}
+                  setGiftType={setGiftType}
+                  giftLabel={giftLabel}
+                  setGiftLabel={setGiftLabel}
+                  useProfilePost={useProfilePost}
+                  setUseProfilePost={setUseProfilePost}
+                  autoDelete={autoDelete}
+                  setAutoDelete={setAutoDelete}
+                  selectedImage={selectedImage}
+                  pickImage={pickImage}
+                  posting={posting}
+                  uploadProgress={uploadProgress}
+                  uploadStage={uploadStage}
+                  errorText={postError}
+                  onRetry={handlePostWish}
+                  isDraftLoaded={draftLoaded}
+                  draftSavedAt={draftSavedAt}
+                  hasPendingQueue={hasPendingQueue}
+                  onSaveDraft={async () => {
+                    try {
+                      const draft = {
+                        wish,
+                        postType,
+                        isPoll,
+                        optionA,
+                        optionB,
+                        includeAudio,
+                        giftLink,
+                        giftType,
+                        giftLabel,
+                        useProfilePost,
+                        autoDelete,
+                        enableExternalGift,
+                        persistedAudioUrl,
+                        persistedImageUrl,
+                        manual: true,
+                        savedAt: Date.now(),
+                      };
+                      await AsyncStorage.setItem('pendingPost.v1', JSON.stringify(draft));
+                      setDraftLoaded(true);
+                      setDraftSavedAt(draft.savedAt);
+                      try {
+                        trackEvent('draft_saved', {
+                          has_image: !!(selectedImage || persistedImageUrl),
+                          has_audio: !!(recordedUri || persistedAudioUrl),
+                          text_length: wish.length,
+                        });
+                      } catch {}
+                      if (Platform.OS === 'android') {
+                        ToastAndroid.show(t('composer.draftSaved', 'Draft saved'), ToastAndroid.SHORT);
+                      } else {
+                        Alert.alert(t('composer.draftSaved', 'Draft saved'));
+                      }
+                    } catch {}
+                  }}
+                  onDiscardDraft={async () => {
+                    const proceed = await new Promise<boolean>((resolve) => {
+                      Alert.alert(t('composer.discardConfirmTitle', 'Discard draft?'), t('composer.discardConfirmMessage', 'This will remove your saved draft.'), [
+                        { text: t('common.cancel', 'Cancel'), style: 'cancel', onPress: () => resolve(false) },
+                        { text: t('composer.discardDraft', 'Discard'), style: 'destructive', onPress: () => resolve(true) },
+                      ]);
+                    });
+                    if (!proceed) return;
+                    try {
+                      await AsyncStorage.removeItem('pendingPost.v1');
+                    } catch {}
+                    setPersistedAudioUrl('');
+                    setPersistedImageUrl('');
+                    setDraftLoaded(false);
+                    setDraftSavedAt(null);
+                    resetRecorder();
+                    resetComposer();
+                    setPostError(null);
+                    try {
+                      trackEvent('draft_discarded', {
+                        had_image: !!(selectedImage || persistedImageUrl),
+                        had_audio: !!(recordedUri || persistedAudioUrl),
+                        text_length: wish.length,
+                      });
+                    } catch {}
+                  }}
+                  onSubmit={handlePostWish}
+                  maxWishLength={MAX_WISH_LENGTH}
+                  maxLinkLength={MAX_LINK_LENGTH}
+                />
+                <SupporterPaywallModal
+                  visible={paywallOpen}
+                  onClose={() => setPaywallOpen(false)}
+                  onSubscribe={() => {
+                    setPaywallOpen(false);
+                    router.push('/(tabs)/settings/subscriptions' as Href);
+                  }}
+                  perks={[
+                    t('subscriptions.benefits.rephrase', 'Rephrase assistant'),
+                    t('subscriptions.benefits.badge', 'Supporter badge'),
+                    t('subscriptions.benefits.image', 'Higher image quality'),
+                    t('subscriptions.benefits.early', 'Early access to features'),
+                  ]}
                 />
 
-                <Text style={styles.label}>Filter by Type</Text>
-                <Picker
-                  selectedValue={filterType}
-                  onValueChange={(val) => setFilterType(val)}
-                  style={styles.input}
-                  dropdownIconColor="#fff"
-                >
-                  <Picker.Item label="All" value="all" />
-                  <Picker.Item label="Wish 💭" value="wish" />
-                  <Picker.Item label="Confession 😶‍🌫️" value="confession" />
-                  <Picker.Item label="Advice Request 🧠" value="advice" />
-                  <Picker.Item label="Dream 🌙" value="dream" />
-                </Picker>
-
-                <View style={styles.formCard}>
-                  <Text style={styles.sectionTitle}>
-                    💭 What’s your wish today?
-                  </Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="What's your wish?"
-                    placeholderTextColor={theme.placeholder}
-                    value={wish}
-                    onChangeText={setWish}
-                    maxLength={MAX_WISH_LENGTH}
-                  />
-                  <TouchableOpacity
-                    onPress={handleRephrase}
-                    style={[styles.button, { marginBottom: 10 }]}
-                    disabled={rephrasing || wish.trim() === ''}
-                  >
-                    <Text style={styles.buttonText}>
-                      {rephrasing ? 'Thinking...' : '✨ Help me rephrase this'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  {dailyPrompt !== '' && (
-                    <>
-                      <Text style={styles.promptTitle}>Daily Prompt ✨</Text>
-                      <Animated.View
-                        style={[styles.promptCard, { opacity: promptOpacity }]}
-                      >
-                        <Text style={styles.promptText}>{dailyPrompt}</Text>
-                      </Animated.View>
-                      <TouchableOpacity onPress={requestNewPrompt}>
-                        <Text style={{ color: theme.tint }}>
-                          🔁 Give me a different prompt
-                        </Text>
-                      </TouchableOpacity>
-                    </>
-                  )}
-
-                  <Text style={styles.label}>Post Type</Text>
-                  <Picker
-                    selectedValue={postType}
-                    onValueChange={(val) => setPostType(val)}
-                    style={styles.input}
-                    dropdownIconColor="#fff"
-                  >
-                    <Picker.Item label="Wish 💭" value="wish" />
-                    <Picker.Item label="Confession 😶‍🌫️" value="confession" />
-                    <Picker.Item label="Advice Request 🧠" value="advice" />
-                    <Picker.Item label="Dream 🌙" value="dream" />
-                  </Picker>
-
-                  <TouchableOpacity
-                    onPress={() => {
-                      LayoutAnimation.configureNext(
-                        LayoutAnimation.Presets.easeInEaseOut,
-                      );
-                      setShowAdvanced(!showAdvanced);
-                    }}
-                  >
-                    <Text style={styles.sectionTitle}>
-                      Advanced Options {showAdvanced ? '▲' : '▼'}
-                    </Text>
-                  </TouchableOpacity>
-                  {showAdvanced && (
-                    <>
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          marginBottom: 10,
-                        }}
-                      >
-                        <Text style={{ color: theme.text, marginRight: 8 }}>
-                          Poll Mode
-                        </Text>
-                        <Switch value={isPoll} onValueChange={setIsPoll} />
-                      </View>
-                      {isPoll && (
-                        <>
-                          <Text style={styles.label}>Option A</Text>
-                          <TextInput
-                            style={styles.input}
-                            placeholder="Option A"
-                            placeholderTextColor={theme.placeholder}
-                            value={optionA}
-                            onChangeText={setOptionA}
-                          />
-                          <Text style={styles.label}>Option B</Text>
-                          <TextInput
-                            style={styles.input}
-                            placeholder="Option B"
-                            placeholderTextColor={theme.placeholder}
-                            value={optionB}
-                            onChangeText={setOptionB}
-                          />
-                        </>
-                      )}
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          marginBottom: 10,
-                        }}
-                      >
-                        <Text style={{ color: theme.text, marginRight: 8 }}>
-                          Include Audio
-                        </Text>
-                        <Switch
-                          value={includeAudio}
-                          onValueChange={(v) => {
-                            setIncludeAudio(v);
-                            if (!v) {
-                              if (isRecording) stopRecording();
-                              resetRecorder();
-                            }
-                          }}
-                        />
-                      </View>
-                      {stripeEnabled && (
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            marginBottom: 10,
-                          }}
-                        >
-                          <Text style={{ color: theme.text, marginRight: 8 }}>
-                            Add External Gift Option
-                          </Text>
-                          <Switch
-                            value={enableExternalGift}
-                            onValueChange={setEnableExternalGift}
-                          />
-                        </View>
-                      )}
-                      {(!stripeEnabled || enableExternalGift) && (
-                        <>
-                          <Text style={styles.label}>
-                            Add a gift link (e.g., Venmo, wishlist)
-                          </Text>
-                          <TextInput
-                            style={styles.input}
-                            placeholder="Gift link (optional)"
-                            placeholderTextColor={theme.placeholder}
-                            value={giftLink}
-                            onChangeText={setGiftLink}
-                            maxLength={MAX_LINK_LENGTH}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                          />
-                          <Text style={styles.label}>Gift Type</Text>
-                          <TextInput
-                            style={styles.input}
-                            placeholder="kofi, paypal, etc"
-                            placeholderTextColor={theme.placeholder}
-                            value={giftType}
-                            onChangeText={setGiftType}
-                          />
-                          <Text style={styles.label}>Gift Label</Text>
-                          <TextInput
-                            style={styles.input}
-                            placeholder="Support on Ko-fi"
-                            placeholderTextColor={theme.placeholder}
-                            value={giftLabel}
-                            onChangeText={setGiftLabel}
-                          />
-                        </>
-                      )}
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          marginBottom: 10,
-                        }}
-                      >
-                        <Text style={{ color: theme.text, marginRight: 8 }}>
-                          Post with profile
-                        </Text>
-                        <Switch
-                          value={useProfilePost}
-                          onValueChange={setUseProfilePost}
-                        />
-                      </View>
-                    </>
-                  )}
-
-                  {/* Poll Mode Switch and Inputs removed, handled above */}
-
-                  {/* Auto-delete after 24h */}
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      marginBottom: 10,
-                    }}
-                  >
-                    <Text style={{ color: '#fff', marginRight: 8 }}>
-                      Auto-delete after 24h
-                    </Text>
-                    <Switch value={autoDelete} onValueChange={setAutoDelete} />
-                  </View>
-
-                  {/* Audio Recording Button */}
-                  {includeAudio && (
-                    <TouchableOpacity
-                      style={[
-                        styles.recButton,
-                        {
-                          backgroundColor: isRecording ? '#ef4444' : '#22c55e',
-                        },
-                      ]}
-                      onPress={isRecording ? stopRecording : startRecording}
-                      hitSlop={HIT_SLOP}
-                    >
-                      <Text style={styles.buttonText}>
-                        {isRecording ? 'Stop Recording' : 'Record Audio'}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-
-                  {selectedImage && (
-                    <Image
-                      source={{ uri: selectedImage }}
-                      style={styles.preview}
-                    />
-                  )}
-                  <TouchableOpacity
-                    style={styles.button}
-                    onPress={pickImage}
-                    hitSlop={HIT_SLOP}
-                  >
-                    <Text style={styles.buttonText}>
-                      {selectedImage ? 'Change Image' : 'Attach Image'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <Pressable
-                    style={[
-                      styles.button,
-                      { opacity: wish.trim() === '' || posting ? 0.5 : 1 },
-                    ]}
-                    onPress={handlePostWish}
-                    disabled={wish.trim() === '' || posting}
-                    hitSlop={HIT_SLOP}
-                  >
-                    {posting ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.buttonText}>Post Wish</Text>
-                    )}
-                  </Pressable>
-
-                  <TouchableOpacity
-                    onPress={() => router.push('/auth')}
-                    style={styles.authButton}
-                  >
-                    <Text style={styles.authButtonText}>Go to Auth</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.formCard}>
-                  <Text style={styles.sectionTitle}>Your Impact</Text>
-                  <Text style={styles.info}>
-                    🔥 You’ve posted {impact.wishes} wishes
-                  </Text>
-                  <Text style={styles.info}>
-                    🌟 Boosted {impact.boosts} — earned{' '}
-                    {impact.wishes > 0 ? impact.boosts * 9 : 0} likes
-                  </Text>
-                  <Text style={styles.info}>
-                    🎁 Received {impact.gifts} gifts — ${impact.giftTotal}
-                  </Text>
-                </View>
+                <UserImpact impact={impact} />
               </>
             }
             ListEmptyComponent={
               loading ? (
-                <ActivityIndicator
-                  size="large"
-                  color="#a78bfa"
-                  style={{ marginTop: 20 }}
-                />
+                <View style={{ marginTop: 12 }}>
+                  <FeedSkeleton />
+                </View>
               ) : (
-                <Text style={styles.noResults}>
-                  No wishes yet in this category. Be the first to post ✨
-                </Text>
+                <View style={{ alignItems: 'center', marginTop: 24 }}>
+                  <Text style={styles.noResults}>
+                    {t('home.noResults', 'No wishes yet. Try exploring or following more people!')}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => router.push('/explore' as Href)}
+                    style={{ marginTop: 12, backgroundColor: theme.tint, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('home.explore', 'Explore wishes')}
+                  >
+                    <Text style={{ color: theme.background, fontWeight: '600' }}>
+                      {t('home.explore', 'Explore wishes')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               )
             }
             ListFooterComponent={
-              lastDoc ? (
-                <TouchableOpacity
-                  onPress={loadMore}
-                  style={{ marginVertical: 20 }}
-                >
-                  <Text style={{ color: theme.tint, textAlign: 'center' }}>
-                    Load More
-                  </Text>
-                </TouchableOpacity>
+              loadingMore ? (
+                <ActivityIndicator size="small" color={theme.tint} style={{ marginVertical: 16 }} />
+              ) : !hasMore && filteredWishes.length > 0 ? (
+                <Text style={{ color: theme.placeholder, textAlign: 'center', marginVertical: 16 }}>
+                  {t('home.caughtUp', "You're all caught up ✨")}
+                </Text>
               ) : null
             }
-            renderItem={({ item }) => <WishCard item={item} />}
+            renderItem={({ item, index }: { item: any; index: number }) => {
+              if ((item as any).__type === 'filters') {
+                return (
+                  <Animated.View
+                    style={[
+                      {
+                        backgroundColor: theme.background,
+                        paddingTop: 6,
+                        paddingBottom: 6,
+                        borderBottomColor: theme.input,
+                        borderBottomWidth: StyleSheet.hairlineWidth,
+                      },
+                      Platform.OS === 'web'
+                        ? ({
+                            boxShadow: headerElevated
+                              ? '0px 3px 10px rgba(0,0,0,0.12)'
+                              : 'none',
+                          } as const)
+                        : {
+                            shadowColor: '#000',
+                            shadowOpacity: headerElevated ? 0.08 : 0,
+                            shadowRadius: headerElevated ? 10 : 0,
+                            shadowOffset: {
+                              width: 0,
+                              height: headerElevated ? 3 : 0,
+                            },
+                            elevation: headerElevated ? 3 : 0,
+                          },
+                    ]}
+                  >
+                    <Animated.View
+                      {...(Platform.OS === 'web' ? {} : { pointerEvents: 'none' })}
+                      style={[
+                        StyleSheet.absoluteFill,
+                        {
+                          backgroundColor: theme.tint,
+                          opacity: headerPulse.interpolate({ inputRange: [0, 1], outputRange: [0, 0.08] }),
+                        },
+                        Platform.OS === 'web' && ({ pointerEvents: 'none' } as const),
+                      ]}
+                    />
+                    <FeedHeader
+                      searchTerm={searchTerm}
+                      setSearchTerm={setSearchTerm}
+                      filterType={filterType}
+                      setFilterType={setFilterType}
+                    />
+                    <Animated.View
+                      style={{
+                        opacity: newBannerOpacity,
+                        transform: [{ translateY: newBannerTranslate }],
+                        display: hasNewPosts ? 'flex' : 'none',
+                      }}
+                    >
+                      <View
+                        style={[
+                          {
+                            alignSelf: 'center',
+                            marginTop: 6,
+                            backgroundColor: theme.tint,
+                            borderRadius: 999,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                          },
+                          Platform.OS === 'web'
+                            ? ({ boxShadow: '0px 4px 12px rgba(0,0,0,0.1)' } as const)
+                            : {
+                                shadowColor: '#000',
+                                shadowOpacity: 0.15,
+                                shadowRadius: 8,
+                                shadowOffset: { width: 0, height: 2 },
+                                elevation: 3,
+                              },
+                        ]}
+                      >
+                        <TouchableOpacity
+                          onPress={async () => {
+                            try {
+                              await onRefresh();
+                            } finally {
+                              setHasNewPosts(false);
+                              setNewPostsCount(0);
+                              try { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+                            }
+                          }}
+                          style={{ paddingVertical: 8, paddingHorizontal: 12 }}
+                          accessibilityRole="button"
+                          accessibilityLabel={t('home.newPosts', 'New posts available. Tap to refresh')}
+                        >
+                          <Text style={{ color: theme.background, fontWeight: '700' }}>
+                            {newPostsCount > 0
+                              ? t('home.newPostsCount', `${newPostsCount} new ${newPostsCount === 1 ? 'post' : 'posts'} — tap to refresh`)
+                              : t('home.newPosts', 'New posts available — tap to refresh')}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setHasNewPosts(false);
+                            setNewPostsCount(0);
+                          }}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          accessibilityRole="button"
+                          accessibilityLabel={t('common.dismiss', 'Dismiss')}
+                          style={{ paddingRight: 10, paddingVertical: 8, paddingLeft: 4 }}
+                        >
+                          <Ionicons name="close" size={16} color={theme.background} />
+                        </TouchableOpacity>
+                      </View>
+                    </Animated.View>
+                  </Animated.View>
+                );
+              }
+              return renderItem({ item: item as Wish, index: index - 1 } as any);
+            }}
           />
+          {showScrollTop && (
+            <TouchableOpacity
+              onPress={() => listRef.current?.scrollToOffset({ offset: 0, animated: true })}
+              style={[
+                {
+                  position: 'absolute',
+                  right: 16,
+                  bottom: 24,
+                  backgroundColor: theme.tint,
+                  padding: 12,
+                  borderRadius: 24,
+                },
+                Platform.OS === 'web'
+                  ? ({ boxShadow: '0px 6px 16px rgba(0,0,0,0.12)' } as const)
+                  : {
+                      shadowColor: '#000',
+                      shadowOpacity: 0.2,
+                      shadowRadius: 6,
+                      shadowOffset: { width: 0, height: 2 },
+                      elevation: 3,
+                    },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('home.scrollTop', 'Scroll to top')}
+            >
+              <Ionicons name="arrow-up" size={20} color={theme.background} />
+            </TouchableOpacity>
+          )}
           <ReportDialog
             visible={reportVisible}
             onClose={() => {
@@ -1252,6 +1722,40 @@ const createStyles = (c: (typeof Colors)['light'] & { name: string }) =>
       padding: 20,
       paddingBottom: 100,
       flexGrow: 1,
+    },
+    quoteBanner: {
+      backgroundColor: c.input,
+      padding: 12,
+      borderRadius: 10,
+      marginBottom: 12,
+      position: 'relative',
+    },
+    quoteTitle: {
+      color: c.tint,
+      fontWeight: '600',
+      marginBottom: 4,
+    },
+    quoteText: {
+      color: c.text,
+      fontSize: 14,
+      paddingRight: 20,
+    },
+    quoteActions: {
+      marginTop: 8,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    quoteActionText: {
+      color: c.tint,
+      textDecorationLine: 'underline',
+    },
+    quoteDismiss: {
+      position: 'absolute',
+      right: 8,
+      top: 8,
+      padding: 4,
+      borderRadius: 12,
     },
     title: {
       fontSize: 28,
@@ -1336,27 +1840,6 @@ const createStyles = (c: (typeof Colors)['light'] & { name: string }) =>
       fontSize: 14,
       textDecorationLine: 'underline',
     },
-    wishItem: {
-      backgroundColor: c.input,
-      padding: 12,
-      borderRadius: 8,
-      marginBottom: 10,
-      position: 'relative',
-    },
-    wishText: {
-      color: c.text,
-      fontSize: 16,
-    },
-    likeText: {
-      color: c.tint,
-      marginTop: 6,
-      fontSize: 14,
-    },
-    boostedLabel: {
-      color: c.tint,
-      fontSize: 12,
-      marginTop: 4,
-    },
     formCard: {
       backgroundColor: c.input,
       padding: 12,
@@ -1377,22 +1860,6 @@ const createStyles = (c: (typeof Colors)['light'] & { name: string }) =>
       color: c.text,
       fontSize: 14,
       marginBottom: 6,
-    },
-    author: {
-      color: c.text,
-      fontSize: 12,
-      marginBottom: 2,
-    },
-    giftBadge: {
-      position: 'absolute',
-      top: 6,
-      right: 6,
-      color: c.tint,
-      backgroundColor: c.input,
-      paddingHorizontal: 4,
-      paddingVertical: 2,
-      borderRadius: 4,
-      fontSize: 12,
     },
     noResults: {
       color: c.text,

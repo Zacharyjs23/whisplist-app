@@ -1,8 +1,10 @@
 import React, { useRef } from 'react';
-import { View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Wish } from '../types/Wish';
+
+const CAN_USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 export const reactionMap = {
   pray: '🙏',
@@ -45,13 +47,13 @@ export const ReactionBar: React.FC<ReactionBarProps> = ({
             onPressIn={() =>
               Animated.spring(reactionScales[key], {
                 toValue: 1.2,
-                useNativeDriver: true,
+                useNativeDriver: CAN_USE_NATIVE_DRIVER,
               }).start()
             }
             onPressOut={() =>
               Animated.spring(reactionScales[key], {
                 toValue: 1,
-                useNativeDriver: true,
+                useNativeDriver: CAN_USE_NATIVE_DRIVER,
               }).start()
             }
             onPress={() => onReact(key)}

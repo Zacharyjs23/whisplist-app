@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { PostType } from '@/types/post';
 import { Alert, Platform, ToastAndroid } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -6,7 +7,7 @@ import * as logger from '@/shared/logger';
 
 export const useWishComposer = (stripeEnabled?: string | false) => {
   const [wish, setWish] = useState('');
-  const [postType, setPostType] = useState<'wish' | 'confession' | 'advice' | 'dream'>('wish');
+  const [postType, setPostType] = useState<PostType>('wish');
   const [isPoll, setIsPoll] = useState(false);
   const [optionA, setOptionA] = useState('');
   const [optionB, setOptionB] = useState('');
@@ -76,7 +77,18 @@ export const useWishComposer = (stripeEnabled?: string | false) => {
     const originalWishText = wish;
     setRephrasing(true);
     try {
-      const url = `https://us-central1-${process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID}.cloudfunctions.net/rephraseWish`;
+      const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID;
+      if (!projectId) {
+        logger.warn('Cannot rephrase wish: Firebase project ID is missing');
+        const msg = 'Cloud rephrase is unavailable. Configure your Firebase project ID.';
+        if (Platform.OS === 'android') {
+          ToastAndroid.show(msg, ToastAndroid.SHORT);
+        } else {
+          Alert.alert(msg);
+        }
+        return;
+      }
+      const url = `https://us-central1-${projectId}.cloudfunctions.net/rephraseWish`;
       let attempt = 0;
       let response: Response | null = null;
       while (attempt < 3) {

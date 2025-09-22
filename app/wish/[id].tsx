@@ -62,6 +62,7 @@ import {
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useTranslation } from '@/contexts/I18nContext';
 import { BarChart } from 'react-native-chart-kit';
 import ReportDialog from '../../components/ReportDialog';
 import FulfillmentLinkDialog from '../../components/FulfillmentLinkDialog';
@@ -93,10 +94,14 @@ const emojiOptions = ['❤️', '😂', '😢', '👍'];
 const COMMENT_ITEM_HEIGHT = 80;
 const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 
+const CAN_USE_NATIVE_DRIVER = Platform.OS !== 'web';
+
 export default function Page() {
-  const { id } = useLocalSearchParams();
+  const params = useLocalSearchParams<{ id: string; gift?: string }>();
+  const { id } = params as any;
   const router = useRouter();
   const { theme } = useTheme();
+  const { t: tr } = useTranslation();
   const typeInfo = React.useMemo(
     () => ({
       ...baseTypeInfo,
@@ -143,6 +148,16 @@ export default function Page() {
   const [editText, setEditText] = useState('');
   const [editCategory, setEditCategory] = useState('');
   const { user, profile } = useAuthSession();
+  const [giftBanner, setGiftBanner] = useState<string | null>(null);
+  useEffect(() => {
+    const g = typeof params?.gift === 'string' ? params.gift : undefined;
+    if (g === 'success') setGiftBanner(tr('gifts.success', '🎁 Thank you for your support!'));
+    else if (g === 'cancel') setGiftBanner(tr('gifts.cancelled', 'Gift checkout canceled'));
+    if (g) {
+      const id = setTimeout(() => setGiftBanner(null), 4000);
+      return () => clearTimeout(id);
+    }
+  }, [params?.gift, tr]);
   useEffect(() => {
     const loadNickname = async () => {
       const n = await AsyncStorage.getItem('nickname');
@@ -600,7 +615,7 @@ export default function Page() {
       Animated.timing(animValue, {
         toValue: 1,
         duration: 400,
-        useNativeDriver: true,
+        useNativeDriver: CAN_USE_NATIVE_DRIVER,
       }).start();
 
       const currentUser = user?.uid || 'anon';
@@ -810,6 +825,11 @@ export default function Page() {
         keyboardVerticalOffset={80}
       >
         <ScrollView contentContainerStyle={styles.contentContainer}>
+          {giftBanner && (
+            <View style={[styles.banner, { backgroundColor: theme.input }]}> 
+              <Text style={{ color: theme.text }}>{giftBanner}</Text>
+            </View>
+          )}
           <TouchableOpacity
             onPress={() => router.back()}
             style={styles.backButton}
@@ -1323,6 +1343,11 @@ export default function Page() {
                   <View style={{ flexDirection: 'row', marginTop: 10 }}>
                     <TouchableOpacity
                       onPress={async () => {
+                        if (Platform.OS === 'ios') {
+                          Alert.alert('Gifts unavailable', 'Gifting is not available on iOS.');
+                          setConfirmGift(null);
+                          return;
+                        }
                         if (confirmGift.link) {
                           await WebBrowser.openBrowserAsync(confirmGift.link);
                           setShowThanks(true);
@@ -1471,6 +1496,11 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 16,
+  },
+  banner: {
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
   },
   wishBox: {
     padding: 14,

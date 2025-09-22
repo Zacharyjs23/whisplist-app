@@ -21,8 +21,11 @@ import {
   type QuerySnapshot,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import * as Linking from 'expo-linking';
 import type { Wish, ReactionType } from '../types/Wish';
 import { getFollowingIds } from './followers';
+import { chunk as chunkArray } from './chunk';
+import { mergeChunksByTsDesc } from './merge';
 
 const converter: FirestoreDataConverter<Wish> = {
   toFirestore: ({ id, ...wish }: Wish) => wish,
@@ -69,7 +72,7 @@ export function listenWishes(
     cb([...boosted, ...normal]);
   });
 
-  let unsubNormal = () => {};
+  let unsubsNormal: (() => void)[] = [];
 
   if (userId) {
     getFollowingIds(userId).then((ids) => {
@@ -78,14 +81,23 @@ export function listenWishes(
         cb([...boosted]);
         return;
       }
-      const normalQuery = query(
-        collection(db, 'wishes'),
-        where('userId', 'in', ids),
-        orderBy('timestamp', 'desc'),
-      );
-      unsubNormal = onSnapshot(normalQuery, (s) => {
-        normal = s.docs.map((d) => converter.fromFirestore(d));
-        cb([...boosted, ...normal]);
+      // Chunk into batches of 10 and merge results
+      const chunks: string[][] = chunkArray(ids, 10);
+      const chunkResults: Wish[][] = chunks.map(() => []);
+      unsubsNormal.forEach((u) => u());
+      unsubsNormal = [];
+      chunks.forEach((chunk, index) => {
+        const q = query(
+          collection(db, 'wishes'),
+          where('userId', 'in', chunk),
+          orderBy('timestamp', 'desc'),
+        );
+        const unsub = onSnapshot(q, (s) => {
+          chunkResults[index] = s.docs.map((d) => converter.fromFirestore(d));
+          normal = mergeChunksByTsDesc(chunkResults);
+          cb([...boosted, ...normal]);
+        });
+        unsubsNormal.push(unsub);
       });
     });
   } else {
@@ -94,7 +106,7 @@ export function listenWishes(
 
   return () => {
     unsubBoosted();
-    unsubNormal();
+    unsubsNormal.forEach((u) => u());
   };
 }
 
@@ -241,6 +253,8 @@ export async function createGiftCheckout(
   successUrl: string,
   cancelUrl: string,
 ) {
+  const sUrl = successUrl || Linking.createURL(`/wish/${wishId}?gift=success`);
+  const cUrl = cancelUrl || Linking.createURL(`/wish/${wishId}?gift=cancel`);
   const resp = await fetch(
     `https://us-central1-${process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID}.cloudfunctions.net/createGiftCheckoutSession`,
     {
@@ -250,8 +264,8 @@ export async function createGiftCheckout(
         wishId,
         amount,
         recipientId,
-        successUrl,
-        cancelUrl,
+        successUrl: sUrl,
+        cancelUrl: cUrl,
       }),
     },
   );
@@ -337,4 +351,3 @@ export async function cleanupExpiredWishes() {
   const snap = await getDocs(q);
   await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
 }
-

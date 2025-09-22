@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useRef } from 'react';
+import * as React from 'react';
 import {
   View,
   Text,
-  TextInput,
+  TextInput as RNTextInput,
   TouchableOpacity,
   FlatList,
   StyleSheet,
@@ -11,21 +11,18 @@ import {
   Platform,
   ToastAndroid,
 } from 'react-native';
+import type { TextInputProps, TextInput as TextInputInstance } from 'react-native';
 import { formatDistanceToNow } from 'date-fns';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  collection,
-  addDoc,
-  serverTimestamp,
-  query,
-  orderBy,
-  getDocs,
-} from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, getDocs, Timestamp } from 'firebase/firestore';
 import { addWish } from '../helpers/wishes';
 import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { db } from '../firebase';
+import { useTranslation } from '@/contexts/I18nContext';
 import * as logger from '@/shared/logger';
+
+const CAN_USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 const prompts = [
   '💭 What\u2019s your biggest wish this week?',
@@ -33,21 +30,37 @@ const prompts = [
   '🧠 What advice do you wish you had today?',
 ];
 
+type JournalEntry = {
+  id: string;
+  text: string;
+  mood?: string;
+  prompt?: string;
+  timestamp?: Timestamp | Date | { seconds: number } | number;
+};
+
+// Proper forwardRef wrapper for RN TextInput
+type InputRef = TextInputInstance;
+const ForwardedTextInput = React.forwardRef<InputRef, TextInputProps>((props, ref) => (
+  <RNTextInput {...props} ref={ref} />
+));
+ForwardedTextInput.displayName = 'ForwardedTextInput';
+
 export default function JournalPage() {
   const { user } = useAuthSession();
   const { theme } = useTheme();
-  const [prompt, setPrompt] = useState('');
-  const [entry, setEntry] = useState('');
-  const [entries, setEntries] = useState<any[]>([]);
-  const [streak, setStreak] = useState(0);
-  const [mood, setMood] = useState('😊');
-  const [usePrompt, setUsePrompt] = useState(true);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [moodSummary, setMoodSummary] = useState<Record<string, number>>({});
-  const promptOpacity = useRef(new Animated.Value(1)).current;
-  const inputRef = useRef<TextInput>(null);
+  const { t } = useTranslation();
+  const [prompt, setPrompt] = React.useState('');
+  const [entry, setEntry] = React.useState('');
+  const [entries, setEntries] = React.useState<JournalEntry[]>([]);
+  const [streak, setStreak] = React.useState(0);
+  const [mood, setMood] = React.useState('😊');
+  const [usePrompt, setUsePrompt] = React.useState(true);
+  const [expandedId, setExpandedId] = React.useState<string | null>(null);
+  const [moodSummary, setMoodSummary] = React.useState<Record<string, number>>({});
+  const promptOpacity = React.useRef(new Animated.Value(1)).current;
+  const inputRef = React.useRef<InputRef | null>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const load = async () => {
       const today = new Date().toISOString().split('T')[0];
       const savedDate = await AsyncStorage.getItem('dailyPromptDate');
@@ -77,7 +90,7 @@ export default function JournalPage() {
       Animated.timing(promptOpacity, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: CAN_USE_NATIVE_DRIVER,
       }).start();
       const sc = await AsyncStorage.getItem('journalStreakCount');
       setStreak(sc ? parseInt(sc, 10) : 0);
@@ -87,11 +100,16 @@ export default function JournalPage() {
           orderBy('timestamp', 'desc'),
         );
         const snap = await getDocs(q);
-        let loaded = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+        const loaded: JournalEntry[] = snap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as Omit<JournalEntry, 'id'>),
+        }));
         const offlineRaw = await AsyncStorage.getItem('offlineJournalEntries');
         if (offlineRaw) {
           try {
-            const offline = JSON.parse(offlineRaw) as any[];
+            const offline = JSON.parse(offlineRaw) as (
+              Omit<JournalEntry, 'id' | 'timestamp'> & { timestamp: number }
+            )[];
             for (const o of offline) {
               await addDoc(
                 collection(db, 'users', user.uid, 'journalEntries'),
@@ -161,7 +179,10 @@ export default function JournalPage() {
         'offlineJournalEntries',
         JSON.stringify(offline),
       );
-      Alert.alert('Saved offline', 'Your entry will sync when online.');
+      Alert.alert(
+        t('journal.savedOfflineTitle', 'Saved offline'),
+        t('journal.savedOfflineMessage', 'Your entry will sync when online.'),
+      );
     }
     setEntries([
       {
@@ -171,7 +192,7 @@ export default function JournalPage() {
       },
       ...entries,
     ]);
-    setMoodSummary((prev) => ({
+    setMoodSummary((prev: Record<string, number>) => ({
       ...prev,
       [mood]: (prev[mood] || 0) + 1,
     }));
@@ -227,7 +248,7 @@ export default function JournalPage() {
     Animated.timing(promptOpacity, {
       toValue: 1,
       duration: 300,
-      useNativeDriver: true,
+      useNativeDriver: CAN_USE_NATIVE_DRIVER,
     }).start();
     const msg = "✨ That's a deep one.";
     if (Platform.OS === 'android') {
@@ -237,10 +258,20 @@ export default function JournalPage() {
     }
   };
 
+  const toDate = (ts?: JournalEntry['timestamp']): Date | null => {
+    if (!ts) return null;
+    if (ts instanceof Date) return ts;
+    if (typeof ts === 'number') return new Date(ts);
+    const anyTs = ts as any;
+    if (typeof anyTs?.toDate === 'function') return anyTs.toDate();
+    if (typeof anyTs?.seconds === 'number') return new Date(anyTs.seconds * 1000);
+    return null;
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <Text style={[styles.header, { color: theme.text }]}>
-        Your Private Journal ✨
+      <Text style={[styles.header, { color: theme.text }]}> 
+        {t('journal.header', 'Your Private Journal ✨')}
       </Text>
       {usePrompt && (
         <>
@@ -277,7 +308,7 @@ export default function JournalPage() {
           </TouchableOpacity>
         ))}
         <TouchableOpacity
-          onPress={() => setUsePrompt((p) => !p)}
+          onPress={() => setUsePrompt((p: boolean) => !p)}
           style={{ marginLeft: 'auto' }}
         >
           <Text style={{ color: theme.tint }}>
@@ -285,7 +316,7 @@ export default function JournalPage() {
           </Text>
         </TouchableOpacity>
       </View>
-      <TextInput
+      <ForwardedTextInput
         ref={inputRef}
         style={[
           styles.input,
@@ -322,12 +353,10 @@ export default function JournalPage() {
                   : item.text}
             </Text>
             <Text style={[styles.entryDate, { color: theme.placeholder }]}> 
-              {/* theme fix */}
-              {item.timestamp?.seconds
-                ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), {
-                    addSuffix: true,
-                  })
-                : 'Just now'}
+              {(() => {
+                const d = toDate(item.timestamp);
+                return d ? formatDistanceToNow(d, { addSuffix: true }) : 'Just now';
+              })()}
             </Text>
             {expandedId === item.id && (
               <TouchableOpacity onPress={() => shareAsWish(item.text)}>
