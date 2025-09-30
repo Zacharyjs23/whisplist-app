@@ -20,6 +20,7 @@ export const useFeedLoader = (user: any) => {
   const PAGE_SIZE = 20;
   const [boostedCount, setBoostedCount] = useState(0);
   const [latestTs, setLatestTs] = useState<number | null>(null);
+  const userId = user?.uid ?? null;
 
   const fetchPageFromChunks = useCallback(
     async (
@@ -69,11 +70,11 @@ export const useFeedLoader = (user: any) => {
   );
 
   useEffect(() => {
-    cleanupExpiredWishes();
+    cleanupExpiredWishes(userId);
     const load = async () => {
       setLoading(true);
       try {
-        const following = user ? await getFollowingIds(user.uid) : [];
+        const following = userId ? await getFollowingIds(userId) : [];
         const now = new Date();
         const boostedSnap = await getDocs(
           query(
@@ -116,12 +117,12 @@ export const useFeedLoader = (user: any) => {
       }
     };
     load();
-  }, [user, fetchPageFromChunks]);
+  }, [userId, fetchPageFromChunks]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const followingIds = user ? await getFollowingIds(user.uid) : [];
+      const followingIds = userId ? await getFollowingIds(userId) : [];
       const now = new Date();
       const boostedSnap = await getDocs(
         query(
@@ -136,7 +137,7 @@ export const useFeedLoader = (user: any) => {
       })) as Wish[];
       setBoostedCount(boosted.length);
       let normal: Wish[] = [];
-      if (user && followingIds.length) {
+      if (userId && followingIds.length) {
         const { items, minTs, hasMore: more } = await fetchPageFromChunks(
           followingIds,
           PAGE_SIZE,
@@ -161,13 +162,13 @@ export const useFeedLoader = (user: any) => {
     } finally {
       setRefreshing(false);
     }
-  }, [user, fetchPageFromChunks]);
+  }, [userId, fetchPageFromChunks]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || !lastCursorTs) return;
     setLoadingMore(true);
     try {
-      const followingIds = user ? await getFollowingIds(user.uid) : [];
+      const followingIds = userId ? await getFollowingIds(userId) : [];
       if (!followingIds.length) {
         setHasMore(false);
         return;
@@ -187,7 +188,52 @@ export const useFeedLoader = (user: any) => {
     } finally {
       setLoadingMore(false);
     }
-  }, [lastCursorTs, user, loadingMore, hasMore, fetchPageFromChunks]);
+  }, [lastCursorTs, userId, loadingMore, hasMore, fetchPageFromChunks]);
+
+  const checkHasNewer = useCallback(async () => {
+    try {
+      const followingIds = userId ? await getFollowingIds(userId) : [];
+      if (!followingIds.length || !latestTs) return false;
+      const chunks = chunkArray(followingIds, 10);
+      const snaps = await Promise.all(
+        chunks.map((chunk) =>
+          getDocs(
+            query(
+              collection(db, 'wishes'),
+              where('userId', 'in', chunk),
+              orderBy('timestamp', 'desc'),
+              limit(1),
+            ),
+          ),
+        ),
+      );
+      const maxTs = snaps.reduce((acc, s) => {
+        const d = s.docs[0]?.data() as any;
+        return Math.max(acc, toMillis(d?.timestamp));
+      }, 0);
+      return maxTs > latestTs;
+    } catch (err) {
+      logger.warn('peek newer failed', err);
+      return false;
+    }
+  }, [userId, latestTs]);
+
+  const getNewerCount = useCallback(async () => {
+    const followingIds = userId ? await getFollowingIds(userId) : [];
+    if (!followingIds.length || !latestTs) return 0;
+    try {
+      const { items } = await fetchPageFromChunks(
+        followingIds,
+        PAGE_SIZE,
+        { afterTs: latestTs },
+      );
+      const base = latestTs ?? 0;
+      return items.filter((w) => toMillis((w as any).timestamp) > base).length;
+    } catch (err) {
+      logger.warn('newer count failed', err);
+      return 0;
+    }
+  }, [userId, latestTs, fetchPageFromChunks]);
 
   return {
     wishList,
@@ -200,55 +246,8 @@ export const useFeedLoader = (user: any) => {
     loadingMore,
     hasMore,
     boostedCount,
-    /**
-     * Check if there are newer posts than the newest item currently loaded.
-     */
-    checkHasNewer: async () => {
-      try {
-        const followingIds = user ? await getFollowingIds(user.uid) : [];
-        if (!followingIds.length || !latestTs) return false;
-        const chunks = chunkArray(followingIds, 10);
-        const snaps = await Promise.all(
-          chunks.map((chunk) =>
-            getDocs(
-              query(
-                collection(db, 'wishes'),
-                where('userId', 'in', chunk),
-                orderBy('timestamp', 'desc'),
-                limit(1),
-              ),
-            ),
-          ),
-        );
-        const maxTs = snaps.reduce((acc, s) => {
-          const d = s.docs[0]?.data() as any;
-          return Math.max(acc, toMillis(d?.timestamp));
-        }, 0);
-        return maxTs > latestTs;
-      } catch (err) {
-        logger.warn('peek newer failed', err);
-        return false;
-      }
-    },
-    /**
-     * Return an approximate count of new items by peeking the first page.
-     */
-    getNewerCount: async () => {
-      const followingIds = user ? await getFollowingIds(user.uid) : [];
-      if (!followingIds.length || !latestTs) return 0;
-      try {
-        const { items } = await fetchPageFromChunks(
-          followingIds,
-          PAGE_SIZE,
-          { afterTs: latestTs },
-        );
-        const base = latestTs ?? 0;
-        return items.filter((w) => toMillis((w as any).timestamp) > base).length;
-      } catch (err) {
-        logger.warn('newer count failed', err);
-        return 0;
-      }
-    },
+    checkHasNewer,
+    getNewerCount,
   };
 };
 

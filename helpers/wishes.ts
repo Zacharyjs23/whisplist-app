@@ -27,6 +27,15 @@ import { getFollowingIds } from './followers';
 import { chunk as chunkArray } from './chunk';
 import { mergeChunksByTsDesc } from './merge';
 
+const isFirestoreTimestamp = (value: unknown): value is Timestamp => {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Timestamp;
+  return typeof candidate.toDate === 'function';
+};
+
+const isNativeDate = (value: unknown): value is Date =>
+  Object.prototype.toString.call(value) === '[object Date]';
+
 const converter: FirestoreDataConverter<Wish> = {
   toFirestore: ({ id, ...wish }: Wish) => wish,
   fromFirestore: (
@@ -173,6 +182,9 @@ export async function addWish(
 ) {
   return addDoc(collection(db, 'wishes'), {
     likes: 0,
+    commentCount: 0,
+    fundingRaised: 0,
+    fundingSupporters: 0,
     reactions: {
       heart: 0,
       lightbulb: 0,
@@ -252,6 +264,7 @@ export async function createGiftCheckout(
   recipientId: string,
   successUrl: string,
   cancelUrl: string,
+  supporterId?: string | null,
 ) {
   const sUrl = successUrl || Linking.createURL(`/wish/${wishId}?gift=success`);
   const cUrl = cancelUrl || Linking.createURL(`/wish/${wishId}?gift=cancel`);
@@ -264,6 +277,7 @@ export async function createGiftCheckout(
         wishId,
         amount,
         recipientId,
+        supporterId: supporterId ?? null,
         successUrl: sUrl,
         cancelUrl: cUrl,
       }),
@@ -274,7 +288,10 @@ export async function createGiftCheckout(
 
 export async function setFulfillmentLink(id: string, link: string) {
   const ref = doc(db, 'wishes', id);
-  return updateDoc(ref, { fulfillmentLink: link });
+  return updateDoc(ref, {
+    fulfillmentLink: link,
+    fulfilledAt: serverTimestamp(),
+  });
 }
 
 export async function getWish(id: string): Promise<Wish | null> {
@@ -345,9 +362,49 @@ export async function getAllWishes(): Promise<Wish[]> {
   return wishes;
 }
 
-export async function cleanupExpiredWishes() {
-  const now = new Date();
-  const q = query(collection(db, 'wishes'), where('expiresAt', '<=', now));
-  const snap = await getDocs(q);
-  await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+export async function cleanupExpiredWishes(userId?: string | null) {
+  if (!userId) return;
+  try {
+    const snap = await getDocs(
+      query(collection(db, 'wishes'), where('userId', '==', userId)),
+    );
+    if (snap.empty) return;
+
+    const now = Date.now();
+    const expiredDocs = snap.docs.filter((docSnap) => {
+      const data = docSnap.data() as Partial<Wish>;
+      const expiresAt = data?.expiresAt;
+      if (!expiresAt) return false;
+      const expiryDate = (() => {
+        if (isFirestoreTimestamp(expiresAt)) {
+          return expiresAt.toDate();
+        }
+        if (isNativeDate(expiresAt)) {
+          return expiresAt;
+        }
+        if (expiresAt && typeof (expiresAt as { toDate?: () => Date }).toDate === 'function') {
+          try {
+            return (expiresAt as { toDate: () => Date }).toDate();
+          } catch {
+            return null;
+          }
+        }
+        return null;
+      })();
+      return expiryDate != null && expiryDate.getTime() <= now;
+    });
+
+    if (!expiredDocs.length) return;
+
+    await Promise.all(
+      expiredDocs.map((docSnap) =>
+        deleteDoc(docSnap.ref).catch(() => {
+          // Ignore permission errors so feed loading is not blocked.
+          return null;
+        }),
+      ),
+    );
+  } catch {
+    // Ignore cleanup failures; they will be retried on next load.
+  }
 }

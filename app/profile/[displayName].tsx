@@ -33,13 +33,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { Colors } from '@/constants/Colors';
 import type { Wish } from '../../types/Wish';
 import * as logger from '@/shared/logger';
-
-const typeInfo: Record<string, { emoji: string; color: string }> = {
-  wish: { emoji: '💭', color: '#1e1e1e' },
-  confession: { emoji: '😶\u200d🌫️', color: '#374151' },
-  advice: { emoji: '🧠', color: '#064e3b' },
-  dream: { emoji: '🌙', color: '#312e81' },
-};
+import { POST_TYPE_META, normalizePostType } from '@/types/post';
 
 export default function Page() {
   const { displayName } = useLocalSearchParams<{ displayName: string }>();
@@ -221,7 +215,7 @@ export default function Page() {
         data={wishes}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={
-          <Text style={[styles.noResults, { color: theme.text }]}>No public wishes yet</Text>
+          <Text style={[styles.noResults, { color: theme.text }]}>No public posts yet</Text>
         }
         renderItem={({ item }) => {
           const isBoosted =
@@ -231,14 +225,15 @@ export default function Page() {
           const timeLeft = isBoosted
             ? formatTimeLeft(item.boostedUntil!.toDate())
             : '';
+          const typeMeta = POST_TYPE_META[normalizePostType(item.type)];
           return (
             <TouchableOpacity
               onPress={() => router.push(`/wish/${item.id}`)}
               style={[styles.wishItem, { backgroundColor: theme.input }]}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={styles.categoryText}>
-                {typeInfo[item.type || 'wish'].emoji} #{item.category}{' '}
+              <Text style={[styles.categoryText, { color: typeMeta.color }]}>
+                {typeMeta.emoji} #{item.category}{' '}
                 {item.audioUrl ? '🔊' : ''}
               </Text>
               <Text style={[styles.wishText, { color: theme.text }]}>{item.text}</Text>

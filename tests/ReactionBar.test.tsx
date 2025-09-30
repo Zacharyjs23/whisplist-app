@@ -1,7 +1,6 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import { ReactionBar, ReactionKey } from '@/components/ReactionBar';
-import type { Wish } from '@/types/Wish';
 import { StyleSheet } from 'react-native';
 
 jest.mock('@expo/vector-icons', () => {
@@ -17,19 +16,13 @@ jest.mock('@/contexts/ThemeContext', () => ({
 }));
 
 describe('ReactionBar', () => {
-  const wish: Wish = {
-    id: '1',
-    text: 'test',
-    category: 'gen',
-    likes: 0,
-    reactions: { pray: 1, lightbulb: 0, hug: 0, heart: 0 },
-  };
+  const counts = { pray: 1, lightbulb: 0, hug: 0, heart: 0 };
 
   it('calls onReact when a reaction is pressed', () => {
     const onReact = jest.fn();
     const { getByTestId } = render(
       <ReactionBar
-        wish={wish}
+        counts={counts}
         userReaction={null}
         onReact={onReact}
         onToggleSave={jest.fn()}
@@ -45,7 +38,7 @@ describe('ReactionBar', () => {
     const onToggleSave = jest.fn();
     const { getByTestId } = render(
       <ReactionBar
-        wish={wish}
+        counts={counts}
         userReaction={null}
         onReact={jest.fn()}
         onToggleSave={onToggleSave}
@@ -60,7 +53,7 @@ describe('ReactionBar', () => {
   it('highlights selected reaction', () => {
     const { getByTestId } = render(
       <ReactionBar
-        wish={wish}
+        counts={counts}
         userReaction={'pray' as ReactionKey}
         onReact={jest.fn()}
         onToggleSave={jest.fn()}
@@ -73,4 +66,3 @@ describe('ReactionBar', () => {
     expect(flattened.backgroundColor).toBe('#eee');
   });
 });
-

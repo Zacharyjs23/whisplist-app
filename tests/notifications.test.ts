@@ -5,7 +5,9 @@ jest.mock(
       document: jest.fn(() => ({ onUpdate: jest.fn(), onCreate: jest.fn() })),
     },
     pubsub: { schedule: jest.fn(() => ({ onRun: jest.fn() })) },
+    https: { onRequest: jest.fn((handler: any) => handler) },
     runWith: jest.fn().mockReturnValue({ https: { onRequest: (h: any) => h } }),
+    logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn() },
   }),
   { virtual: true },
 );
@@ -55,8 +57,7 @@ jest.mock(
   { virtual: true },
 );
 
-import * as logger from '../shared/logger.ts';
-jest.spyOn(logger, 'error').mockImplementation(() => {});
+import * as functions from 'firebase-functions';
 
 import { __test } from '../functions/src/index';
 const { sendPush } = __test;
@@ -72,15 +73,12 @@ describe('sendPush', () => {
       token: 'FcmToken',
       notification: { title: 'Title', body: 'Body' },
     });
-    expect(logger.error).not.toHaveBeenCalled();
+    expect((functions as any).logger.error).not.toHaveBeenCalled();
   });
 
   it('logs error when FCM send fails', async () => {
     mockMessagingSend.mockRejectedValueOnce(new Error('fcm fail'));
     await sendPush('user1', 'Title', 'Body');
-    expect(logger.error).toHaveBeenCalledWith(
-      'Error sending FCM notification',
-      expect.any(Error),
-    );
+    expect((functions as any).logger.error).toHaveBeenCalledWith('Error sending FCM notification', expect.any(Error));
   });
 });

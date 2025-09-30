@@ -14,9 +14,11 @@ import * as logger from '@/shared/logger';
 
 export interface NotificationDoc {
   type: string;
+  title?: string;
   message: string;
   timestamp: Timestamp;
   read?: boolean;
+  path?: string | null;
 }
 
 export type NotificationItem = NotificationDoc & { id: string };

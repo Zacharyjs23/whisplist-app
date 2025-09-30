@@ -1,16 +1,16 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
-import * as logger from '../../shared/logger.ts';
+// Use Cloud Functions logger
 import { STRIPE_SECRET_KEY } from './secrets';
 
-let stripe: Stripe;
+let stripe: any;
 
 const db = admin.firestore();
 
 export const createCheckoutSession = functions
   .runWith({ secrets: [STRIPE_SECRET_KEY] })
-  .https.onRequest(async (req, res) => {
+  .https.onRequest(async (req: any, res: any) => {
     if (req.method !== 'POST') {
       res.status(405).send('Method not allowed');
       return;
@@ -51,11 +51,12 @@ export const createCheckoutSession = functions
         wishId,
         userId,
         status: 'pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
       res.json({ url: session.url, sessionId: session.id });
     } catch (err) {
-      logger.error('Error creating checkout session', err);
+      functions.logger.error('Error creating checkout session', err);
       res.status(500).send('Internal error');
     }
   });

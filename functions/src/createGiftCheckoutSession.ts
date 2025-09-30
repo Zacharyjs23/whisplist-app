@@ -1,23 +1,23 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
-import * as logger from '../../shared/logger.ts';
+// Use Cloud Functions logger
 import { STRIPE_SECRET_KEY } from './secrets';
 
-let stripe: Stripe;
+let stripe: any;
 
 const db = admin.firestore();
 const MAX_AMOUNT = 10_000; // $10k limit to prevent unreasonable charges
 
 export const createGiftCheckoutSession = functions
   .runWith({ secrets: [STRIPE_SECRET_KEY] })
-  .https.onRequest(async (req, res) => {
+  .https.onRequest(async (req: any, res: any) => {
     if (req.method !== 'POST') {
       res.status(405).send('Method not allowed');
       return;
     }
 
-    const { wishId, amount, recipientId, successUrl, cancelUrl } = req.body;
+    const { wishId, amount, recipientId, successUrl, cancelUrl, supporterId } = req.body;
     if (
       !wishId ||
       amount === undefined ||
@@ -36,6 +36,10 @@ export const createGiftCheckoutSession = functions
       return;
     }
 
+    const supporter = typeof supporterId === 'string' && supporterId.trim().length > 0
+      ? supporterId.trim()
+      : null;
+
     try {
       if (!stripe) {
         stripe = new Stripe(STRIPE_SECRET_KEY.value(), {
@@ -48,6 +52,11 @@ export const createGiftCheckoutSession = functions
       if (!stripeAccountId) {
         res.status(400).send('Recipient not enabled for Stripe');
         return;
+      }
+
+      const metadata: Record<string, string> = { wishId, recipientId };
+      if (supporter) {
+        metadata.supporterId = supporter;
       }
 
       const session = await stripe.checkout.sessions.create({
@@ -67,7 +76,7 @@ export const createGiftCheckoutSession = functions
           application_fee_amount: Math.round(numAmount * 100 * 0.1),
           transfer_data: { destination: stripeAccountId },
         },
-        metadata: { wishId, recipientId },
+        metadata,
         success_url: successUrl,
         cancel_url: cancelUrl,
       });
@@ -77,11 +86,18 @@ export const createGiftCheckoutSession = functions
         .doc(wishId)
         .collection('gifts')
         .doc(session.id)
-        .set({ amount: numAmount, recipientId, status: 'pending' });
+        .set({
+          amount: numAmount,
+          recipientId,
+          supporterId: supporter,
+          status: 'pending',
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        });
 
       res.json({ url: session.url });
     } catch (err) {
-      logger.error('Error creating gift checkout session', err);
+      functions.logger.error('Error creating gift checkout session', err);
       res.status(500).send('Internal error');
     }
   });

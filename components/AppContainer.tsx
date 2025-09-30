@@ -6,6 +6,8 @@ import { useAuthFlows } from '@/contexts/AuthFlowsContext';
 import { useTranslation } from '@/contexts/I18nContext';
 import usePushNotifications from '@/hooks/usePushNotifications';
 import useDailyQuote from '@/hooks/useDailyQuote';
+import { setTelemetry } from '@/shared/logger';
+import { sendTelemetry } from '@/services/telemetry';
 
 export const AppContainer: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -20,6 +22,23 @@ export const AppContainer: React.FC<{ children: React.ReactNode }> = ({
       : 'dark-content';
   usePushNotifications();
   useDailyQuote();
+
+  useEffect(() => {
+    if (process.env.EXPO_PUBLIC_ENV !== 'production') return;
+    setTelemetry((level, meta, ...args) => {
+      const message = args
+        .map((arg) => {
+          if (typeof arg === 'string') return arg;
+          try {
+            return JSON.stringify(arg);
+          } catch {
+            return String(arg);
+          }
+        })
+        .join(' ');
+      void sendTelemetry(level, message, meta);
+    });
+  }, []);
 
   useEffect(() => {
     if (authError) {

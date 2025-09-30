@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import type { PostType } from '@/types/post';
+import { DEFAULT_POST_TYPE } from '@/types/post';
 import { Alert, Platform, ToastAndroid } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as logger from '@/shared/logger';
+import { recordEngagementEvent } from '@/helpers/engagement';
+import type { MilestoneId } from '@/types/Engagement';
 
 export const useWishComposer = (stripeEnabled?: string | false) => {
   const [wish, setWish] = useState('');
-  const [postType, setPostType] = useState<PostType>('wish');
+  const [postType, setPostType] = useState<PostType>(DEFAULT_POST_TYPE);
   const [isPoll, setIsPoll] = useState(false);
   const [optionA, setOptionA] = useState('');
   const [optionB, setOptionB] = useState('');
@@ -22,6 +25,9 @@ export const useWishComposer = (stripeEnabled?: string | false) => {
   const [useProfilePost, setUseProfilePost] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [enableExternalGift, setEnableExternalGift] = useState(!stripeEnabled);
+  const [fundingEnabled, setFundingEnabled] = useState(false);
+  const [fundingGoal, setFundingGoal] = useState('');
+  const [fundingPresets, setFundingPresets] = useState('5,10,25');
 
   const pickImage = async () => {
     const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -38,9 +44,9 @@ export const useWishComposer = (stripeEnabled?: string | false) => {
     }
   };
 
-  const resetComposer = () => {
+  const resetComposer = (nextType?: PostType) => {
     setWish('');
-    setPostType('wish');
+    setPostType(nextType ?? DEFAULT_POST_TYPE);
     setIsPoll(false);
     setOptionA('');
     setOptionB('');
@@ -54,22 +60,42 @@ export const useWishComposer = (stripeEnabled?: string | false) => {
     setShowAdvanced(false);
     setEnableExternalGift(!stripeEnabled);
     setRephrasing(false);
+    setFundingEnabled(false);
+    setFundingGoal('');
+    setFundingPresets('5,10,25');
   };
 
-  const updateStreak = async () => {
+  const updateStreak = async (
+    userId?: string | null,
+  ): Promise<{ current: number; unlocked: MilestoneId[] }> => {
     const today = new Date().toISOString().split('T')[0];
     const lastDate = await AsyncStorage.getItem('lastPostedDate');
     let streak = parseInt((await AsyncStorage.getItem('streakCount')) || '0', 10);
-    if (lastDate === today) return streak;
-    if (lastDate) {
-      const diff = (new Date(today).getTime() - new Date(lastDate).getTime()) / 86400000;
-      streak = diff === 1 ? streak + 1 : 1;
-    } else {
-      streak = 1;
+    if (lastDate !== today) {
+      if (lastDate) {
+        const diff = (new Date(today).getTime() - new Date(lastDate).getTime()) / 86400000;
+        streak = diff === 1 ? streak + 1 : 1;
+      } else {
+        streak = 1;
+      }
+      await AsyncStorage.setItem('lastPostedDate', today);
+      await AsyncStorage.setItem('streakCount', streak.toString());
     }
-    await AsyncStorage.setItem('lastPostedDate', today);
-    await AsyncStorage.setItem('streakCount', streak.toString());
-    return streak;
+    let unlocked: MilestoneId[] = [];
+    if (userId) {
+      try {
+        const result = await recordEngagementEvent(userId, 'posting');
+        if (result) {
+          if (typeof result.current === 'number') {
+            streak = result.current;
+          }
+          unlocked = result.unlocked ?? [];
+        }
+      } catch (err) {
+        logger.warn('Failed to sync posting streak to Firestore', err);
+      }
+    }
+    return { current: streak, unlocked };
   };
 
   const handleRephrase = async () => {
@@ -150,6 +176,12 @@ export const useWishComposer = (stripeEnabled?: string | false) => {
     setShowAdvanced,
     enableExternalGift,
     setEnableExternalGift,
+    fundingEnabled,
+    setFundingEnabled,
+    fundingGoal,
+    setFundingGoal,
+    fundingPresets,
+    setFundingPresets,
     resetComposer,
   };
 };

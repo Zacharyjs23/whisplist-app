@@ -4,6 +4,7 @@ jest.mock(
     runWith: jest.fn().mockReturnValue({
       https: { onRequest: (handler: any) => handler },
     }),
+    logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn() },
   }),
   { virtual: true },
 );
@@ -24,18 +25,23 @@ jest.mock(
   () => ({
     __esModule: true,
     initializeApp: jest.fn(),
-    firestore: () => ({
-      collection: (name: string) => {
-        if (name === 'users') {
-          return { doc: () => ({ get: mockUserGet }) };
-        }
-        return {
-          doc: () => ({
-            collection: () => ({ doc: () => ({ set: jest.fn() }) }),
-          }),
-        };
+    firestore: Object.assign(
+      () => ({
+        collection: (name: string) => {
+          if (name === 'users') {
+            return { doc: () => ({ get: mockUserGet }) };
+          }
+          return {
+            doc: () => ({
+              collection: () => ({ doc: () => ({ set: jest.fn() }) }),
+            }),
+          };
+        },
+      }),
+      {
+        FieldValue: { serverTimestamp: jest.fn(() => 'ts') },
       },
-    }),
+    ),
   }),
   { virtual: true },
 );

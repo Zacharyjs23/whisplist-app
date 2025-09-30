@@ -7,7 +7,7 @@ interface RephraseRequest {
   tone?: 'gentle' | 'concise' | 'uplifting';
 }
 
-export const rephraseWish = onRequest({ secrets: [OPENAI_API_KEY] }, async (req, res) => {
+export const rephraseWish = onRequest({ secrets: [OPENAI_API_KEY] }, async (req: any, res: any) => {
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
     const { text, tone = 'gentle' } = body as RephraseRequest;

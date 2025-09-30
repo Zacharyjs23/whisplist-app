@@ -13,9 +13,9 @@ platform :ios, podfile_properties['ios.deploymentTarget'] || '13.0'
 install! 'cocoapods',
   :deterministic_uuids => false
 
-# Allow Swift pods without module maps to generate modular headers.
-# This avoids "Module not found" build failures for Firebase libraries.
-use_modular_headers!
+# Avoid globally enabling modular headers, which can conflict
+# with React Native's own modulemaps and cause redefinition errors.
+# If a specific pod needs modular headers, declare it explicitly.
 
 
 prepare_react_native_project!
@@ -38,11 +38,9 @@ target 'WhispList' do
 
   config = use_native_modules!(config_command)
 
-  # FirebaseCoreInternal requires GoogleUtilities to expose a module map when
-  # built as a static library. Declaring it with :modular_headers prevents the
-  # "Could not build module 'DarwinFoundation'" error without enabling
-  # use_modular_headers! globally.
-  pod 'GoogleUtilities', :modular_headers => true
+  # If a specific Firebase/Google pod requires modular headers, declare it
+  # explicitly below. Newer versions typically don't require this globally.
+  pod 'GoogleUtilities'
 
   use_frameworks! :linkage => podfile_properties['ios.useFrameworks'].to_sym if podfile_properties['ios.useFrameworks']
   use_frameworks! :linkage => ENV['USE_FRAMEWORKS'].to_sym if ENV['USE_FRAMEWORKS']
@@ -63,35 +61,13 @@ target 'WhispList' do
         :ccache_enabled => podfile_properties['apple.ccacheEnabled'] == 'true',
       )
 
-
-      # This is necessary for Xcode 14, because it signs resource bundles by default
-      # when building for devices.
+      # Prevent resource bundle signing when building for devices
+      # (Xcode may attempt to sign resource bundles by default).
       installer.target_installation_results.pod_target_installation_results
         .each do |pod_name, target_installation_result|
         target_installation_result.resource_bundle_targets.each do |resource_bundle_target|
           resource_bundle_target.build_configurations.each do |config|
             config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
-          end
-        end
-      end
-
-      # Delete DEFINES_MODULE to avoid CocoaPods merge conflicts
-      installer.pods_project.targets.each do |target|
-        conflicting_targets = [
-          'React-RuntimeApple',
-          'React-RCTRuntime',
-          'React-jsc',
-          'Fabric',
-          'expo-dev-menu',
-          'Main',
-          'ReactNativeCompatibles',
-          'SafeAreaView',
-          'Vendored'
-        ]
-
-        if conflicting_targets.include?(target.name)
-          target.build_configurations.each do |config|
-            config.build_settings.delete('DEFINES_MODULE')
           end
         end
       end

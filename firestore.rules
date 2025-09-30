@@ -1,8 +1,174 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Basic helpers
     function signedIn() {
       return request.auth != null;
+    }
+
+    function isShortString(field, max) {
+      return field is string && field.size() <= max;
+    }
+
+    function hasOnlyAllowedKeys(obj, allowed) {
+      return obj.keys().hasOnly(allowed);
+    }
+
+    function hasDefaultReactionSeed(reactions) {
+      return reactions is map
+        && reactions.keys().hasOnly(['heart','lightbulb','hug','pray'])
+        && (!('heart' in reactions) || reactions.heart == 0)
+        && (!('lightbulb' in reactions) || reactions.lightbulb == 0)
+        && (!('hug' in reactions) || reactions.hug == 0)
+        && (!('pray' in reactions) || reactions.pray == 0);
+    }
+
+    function isNonNegativeInt(value) {
+      return value is int && value >= 0;
+    }
+
+    function getReactionCount(map, key) {
+      return map is map && key in map && map[key] is int ? map[key] : 0;
+    }
+
+    function isValidReactionMap(map) {
+      return map is map
+        && map.keys().hasOnly(['heart','lightbulb','hug','pray'])
+        && (!('heart' in map) || isNonNegativeInt(map.heart))
+        && (!('lightbulb' in map) || isNonNegativeInt(map.lightbulb))
+        && (!('hug' in map) || isNonNegativeInt(map.hug))
+        && (!('pray' in map) || isNonNegativeInt(map.pray));
+    }
+
+    function reactionDiffWithinBounds(oldMap, newMap) {
+      let heartDiff = getReactionCount(newMap, 'heart') - getReactionCount(oldMap, 'heart');
+      let bulbDiff = getReactionCount(newMap, 'lightbulb') - getReactionCount(oldMap, 'lightbulb');
+      let hugDiff = getReactionCount(newMap, 'hug') - getReactionCount(oldMap, 'hug');
+      let prayDiff = getReactionCount(newMap, 'pray') - getReactionCount(oldMap, 'pray');
+      let totalDiff = heartDiff + bulbDiff + hugDiff + prayDiff;
+      let changed = (heartDiff == 0 ? 0 : 1)
+        + (bulbDiff == 0 ? 0 : 1)
+        + (hugDiff == 0 ? 0 : 1)
+        + (prayDiff == 0 ? 0 : 1);
+      return heartDiff >= -1 && heartDiff <= 1
+        && bulbDiff >= -1 && bulbDiff <= 1
+        && hugDiff >= -1 && hugDiff <= 1
+        && prayDiff >= -1 && prayDiff <= 1
+        && totalDiff >= -1 && totalDiff <= 1
+        && changed <= 2;
+    }
+
+
+    function getCommentCount(data) {
+      return data is map && 'commentCount' in data && data.commentCount is int
+        ? data.commentCount
+        : 0;
+    }
+
+    function commentCountWithinBounds(oldData, newData) {
+      let oldCount = getCommentCount(oldData);
+      let newCount = getCommentCount(newData);
+      let diff = newCount - oldCount;
+      return newCount >= 0 && diff >= -1 && diff <= 1;
+    }
+
+
+    function allowedMilestoneIds() {
+      return [
+        'posting_1','posting_3','posting_7','posting_14','posting_30',
+        'gifting_1','gifting_5','gifting_15',
+        'fulfillment_1','fulfillment_3','fulfillment_10'
+      ];
+    }
+
+    function validMilestoneMap(map) {
+      return map is map
+        && map.keys().hasOnly(allowedMilestoneIds())
+        && (!('posting_1' in map) || isShortString(map.posting_1, 32))
+        && (!('posting_3' in map) || isShortString(map.posting_3, 32))
+        && (!('posting_7' in map) || isShortString(map.posting_7, 32))
+        && (!('posting_14' in map) || isShortString(map.posting_14, 32))
+        && (!('posting_30' in map) || isShortString(map.posting_30, 32))
+        && (!('gifting_1' in map) || isShortString(map.gifting_1, 32))
+        && (!('gifting_5' in map) || isShortString(map.gifting_5, 32))
+        && (!('gifting_15' in map) || isShortString(map.gifting_15, 32))
+        && (!('fulfillment_1' in map) || isShortString(map.fulfillment_1, 32))
+        && (!('fulfillment_3' in map) || isShortString(map.fulfillment_3, 32))
+        && (!('fulfillment_10' in map) || isShortString(map.fulfillment_10, 32));
+    }
+
+    function validStreakEntry(entry) {
+      return entry is map
+        && entry.keys().hasOnly(['current','longest','lastDate','milestones'])
+        && (!('current' in entry) || (entry.current is int && entry.current >= 0))
+        && (!('longest' in entry) || (entry.longest is int && entry.longest >= 0))
+        && (!('lastDate' in entry)
+          || entry.lastDate == null
+          || isShortString(entry.lastDate, 10))
+        && (!('milestones' in entry) || validMilestoneMap(entry.milestones));
+    }
+
+    function validProgressDoc(data) {
+      return data is map
+        && data.keys().hasOnly(['posting','gifting','fulfillment','updatedAt'])
+        && (!('posting' in data) || validStreakEntry(data.posting))
+        && (!('gifting' in data) || validStreakEntry(data.gifting))
+        && (!('fulfillment' in data) || validStreakEntry(data.fulfillment))
+        && (!('updatedAt' in data) || data.updatedAt == request.time);
+    }
+
+
+
+    function validCommentParent(wishId) {
+      return !('parentId' in request.resource.data)
+        || (
+          request.resource.data.parentId is string
+          && request.resource.data.parentId.size() >= 1
+          && exists(/databases/$(database)/documents/wishes/$(wishId)/comments/$(request.resource.data.parentId))
+        );
+    }
+
+    // Direct message threads
+    match /dmThreads/{threadId} {
+      allow create: if signedIn() && request.auth.uid in request.resource.data.participants;
+      // Participants can read; updates allowed but participants list is immutable client-side
+      allow read: if signedIn() && request.auth.uid in resource.data.participants;
+      allow update: if signedIn()
+        && request.auth.uid in resource.data.participants
+        && request.resource.data.participants == resource.data.participants;
+
+      match /messages/{messageId} {
+        // Only participants may read messages
+        allow read: if signedIn() &&
+          request.auth.uid in get(/databases/$(database)/documents/dmThreads/$(threadId)).data.participants;
+        // Strict create: whitelist keys, require senderId = auth.uid, limit sizes
+        allow create: if signedIn() &&
+          request.auth.uid in get(/databases/$(database)/documents/dmThreads/$(threadId)).data.participants &&
+          hasOnlyAllowedKeys(request.resource.data, [
+            'senderId','text','imageUrl','replyToId','replyToSenderId','replyToText','replyToImageUrl','timestamp'
+          ]) &&
+          ('senderId' in request.resource.data && request.resource.data.senderId == request.auth.uid) &&
+          (
+            ('text' in request.resource.data && isShortString(request.resource.data.text, 2000)) ||
+            ('imageUrl' in request.resource.data && isShortString(request.resource.data.imageUrl, 2000))
+          ) &&
+          (!('replyToId' in request.resource.data) || isShortString(request.resource.data.replyToId, 200)) &&
+          (!('replyToSenderId' in request.resource.data) || isShortString(request.resource.data.replyToSenderId, 200)) &&
+          (!('replyToText' in request.resource.data) || isShortString(request.resource.data.replyToText, 2000)) &&
+          (!('replyToImageUrl' in request.resource.data) || isShortString(request.resource.data.replyToImageUrl, 2000));
+        // Do not allow arbitrary updates/deletes to messages
+        allow update, delete: if false;
+      }
+
+      match /typing/{userId} {
+        // Participants can read typing state; users may only write their own doc
+        allow read: if signedIn() && request.auth.uid in get(/databases/$(database)/documents/dmThreads/$(threadId)).data.participants;
+        allow write: if signedIn()
+          && request.auth.uid in get(/databases/$(database)/documents/dmThreads/$(threadId)).data.participants
+          && request.auth.uid == userId
+          && hasOnlyAllowedKeys(request.resource.data, ['typing','updatedAt'])
+          && (!('typing' in request.resource.data) || request.resource.data.typing is bool);
+      }
     }
 
     function wishOwner(wishId) {
@@ -19,7 +185,17 @@ service cloud.firestore {
 
       match /notifications/{notificationId} {
         // Users can read their own notifications and mark them as read
-        allow read, write: if request.auth.uid == uid;
+        allow read: if signedIn() && request.auth.uid == uid;
+        allow update: if signedIn()
+          && request.auth.uid == uid
+          && request.resource.data.diff(resource.data).removedKeys().hasOnly([])
+          && (
+            request.resource.data.diff(resource.data).addedKeys().hasOnly([])
+            || request.resource.data.diff(resource.data).addedKeys().hasOnly(['read'])
+          )
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly(['read'])
+          && request.resource.data.read is bool;
+        allow create, delete: if false;
       }
 
       match /referrals/{referralId} {
@@ -44,27 +220,165 @@ service cloud.firestore {
         allow read: if true;
         allow write: if request.auth != null && request.auth.uid == uid;
       }
+
+      // Saved wishes for each user
+      match /savedWishes/{wishId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      // Billing and subscription documents for the user
+      match /billing/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      match /progress/{docId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow write: if request.auth != null
+          && request.auth.uid == uid
+          && validProgressDoc(request.resource.data);
+      }
     }
 
     // Public wish documents
     match /wishes/{wishId} {
       // Everyone (including anonymous) can read wishes
       allow read: if true;
-      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if signedIn() && request.auth.uid == resource.data.userId;
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && hasOnlyAllowedKeys(request.resource.data, [
+          'text','category','type','likes','userId','displayName','photoURL','isAnonymous','boostedUntil','boosted',
+          'audioUrl','imageUrl','giftLink','giftType','giftLabel','fulfillmentLink','fulfilledAt','fundingGoal','fundingCurrency','fundingPresets','fundingRaised','fundingSupporters','isPoll','optionA','optionB',
+          'votesA','votesB','mood','reactions','commentCount','expiresAt','timestamp','active'
+        ])
+        && (!('likes' in request.resource.data) || request.resource.data.likes == 0)
+        && (!('votesA' in request.resource.data) || request.resource.data.votesA == 0)
+        && (!('votesB' in request.resource.data) || request.resource.data.votesB == 0)
+        && (!('reactions' in request.resource.data) || hasDefaultReactionSeed(request.resource.data.reactions))
+        && (!('commentCount' in request.resource.data) || request.resource.data.commentCount == 0)
+        && (!('timestamp' in request.resource.data) || request.resource.data.timestamp == request.time)
+        && !('boostedUntil' in request.resource.data)
+        && !('boosted' in request.resource.data)
+        && !('fulfilledAt' in request.resource.data)
+        && (!('fundingGoal' in request.resource.data) || (request.resource.data.fundingGoal is number && request.resource.data.fundingGoal >= 0))
+        && (!('fundingCurrency' in request.resource.data) || isShortString(request.resource.data.fundingCurrency, 10))
+        && (!('fundingPresets' in request.resource.data)
+          || (request.resource.data.fundingPresets is list
+            && request.resource.data.fundingPresets.size() <= 6))
+        && (!('fundingRaised' in request.resource.data) || request.resource.data.fundingRaised == 0)
+        && (!('fundingSupporters' in request.resource.data) || request.resource.data.fundingSupporters == 0)
+        && (!('text' in request.resource.data) || isShortString(request.resource.data.text, 280))
+        && (!('category' in request.resource.data) || isShortString(request.resource.data.category, 40))
+        && (!('type' in request.resource.data) || isShortString(request.resource.data.type, 30))
+        && (!('displayName' in request.resource.data) || isShortString(request.resource.data.displayName, 50))
+        && (!('photoURL' in request.resource.data) || isShortString(request.resource.data.photoURL, 2000))
+        && (!('audioUrl' in request.resource.data) || isShortString(request.resource.data.audioUrl, 2000))
+        && (!('imageUrl' in request.resource.data) || isShortString(request.resource.data.imageUrl, 2000))
+        && (!('giftLink' in request.resource.data) || isShortString(request.resource.data.giftLink, 2000))
+        && (!('giftType' in request.resource.data) || isShortString(request.resource.data.giftType, 20))
+        && (!('giftLabel' in request.resource.data) || isShortString(request.resource.data.giftLabel, 50))
+        && (!('fulfillmentLink' in request.resource.data) || isShortString(request.resource.data.fulfillmentLink, 2000))
+        && (!('mood' in request.resource.data) || isShortString(request.resource.data.mood, 10))
+        && (!('optionA' in request.resource.data) || isShortString(request.resource.data.optionA, 100))
+        && (!('optionB' in request.resource.data) || isShortString(request.resource.data.optionB, 100));
+      allow update: if (
+          signedIn()
+          && request.auth.uid == resource.data.userId
+          && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
+          && hasOnlyAllowedKeys(request.resource.data, [
+            'text','category','type','likes','userId','displayName','photoURL','isAnonymous','boostedUntil','boosted',
+            'audioUrl','imageUrl','giftLink','giftType','giftLabel','fulfillmentLink','fulfilledAt','fundingGoal','fundingCurrency','fundingPresets','fundingRaised','fundingSupporters','isPoll','optionA','optionB',
+            'votesA','votesB','mood','reactions','commentCount','expiresAt','timestamp','active'
+          ])
+          && (!('likes' in request.resource.data) || request.resource.data.likes == resource.data.likes)
+          && (!('votesA' in request.resource.data) || request.resource.data.votesA == resource.data.votesA)
+          && (!('votesB' in request.resource.data) || request.resource.data.votesB == resource.data.votesB)
+          && (!('reactions' in request.resource.data) || request.resource.data.reactions == resource.data.reactions)
+          && (!('commentCount' in request.resource.data) || request.resource.data.commentCount == resource.data.commentCount)
+          && (!('timestamp' in request.resource.data) || request.resource.data.timestamp == resource.data.timestamp)
+          && (!('boostedUntil' in request.resource.data)
+            || request.resource.data.boostedUntil == resource.data.boostedUntil
+            || request.resource.data.boostedUntil == null
+            || (request.resource.data.boostedUntil is timestamp
+              && request.resource.data.boostedUntil >= request.time
+              && request.resource.data.boostedUntil <= request.time + duration.value(72, 'h')))
+          && (!('boosted' in request.resource.data) || request.resource.data.boosted == resource.data.boosted)
+          && (!('fulfilledAt' in request.resource.data)
+            || request.resource.data.fulfilledAt == resource.data.fulfilledAt
+            || request.resource.data.fulfilledAt == null
+            || request.resource.data.fulfilledAt == request.time)
+          && (!('fundingGoal' in request.resource.data)
+            || (request.resource.data.fundingGoal is number && request.resource.data.fundingGoal >= 0))
+          && (!('fundingCurrency' in request.resource.data)
+            || isShortString(request.resource.data.fundingCurrency, 10))
+          && (!('fundingPresets' in request.resource.data)
+            || (request.resource.data.fundingPresets is list
+              && request.resource.data.fundingPresets.size() <= 6))
+          && (!('fundingRaised' in request.resource.data) || request.resource.data.fundingRaised == resource.data.fundingRaised)
+          && (!('fundingSupporters' in request.resource.data) || request.resource.data.fundingSupporters == resource.data.fundingSupporters)
+          && (!('text' in request.resource.data) || isShortString(request.resource.data.text, 280))
+          && (!('category' in request.resource.data) || isShortString(request.resource.data.category, 40))
+          && (!('type' in request.resource.data) || isShortString(request.resource.data.type, 30))
+          && (!('displayName' in request.resource.data) || isShortString(request.resource.data.displayName, 50))
+          && (!('photoURL' in request.resource.data) || isShortString(request.resource.data.photoURL, 2000))
+          && (!('audioUrl' in request.resource.data) || isShortString(request.resource.data.audioUrl, 2000))
+          && (!('imageUrl' in request.resource.data) || isShortString(request.resource.data.imageUrl, 2000))
+          && (!('giftLink' in request.resource.data) || isShortString(request.resource.data.giftLink, 2000))
+          && (!('giftType' in request.resource.data) || isShortString(request.resource.data.giftType, 20))
+          && (!('giftLabel' in request.resource.data) || isShortString(request.resource.data.giftLabel, 50))
+          && (!('fulfillmentLink' in request.resource.data) || isShortString(request.resource.data.fulfillmentLink, 2000))
+          && (!('mood' in request.resource.data) || isShortString(request.resource.data.mood, 10))
+          && (!('optionA' in request.resource.data) || isShortString(request.resource.data.optionA, 100))
+          && (!('optionB' in request.resource.data) || isShortString(request.resource.data.optionB, 100))
+        )
+        || (
+          signedIn()
+          && request.resource.data.diff(resource.data).addedKeys().hasOnly([])
+          && request.resource.data.diff(resource.data).removedKeys().hasOnly([])
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly(['reactions'])
+          && (!('reactions' in resource.data) || isValidReactionMap(resource.data.reactions))
+          && ('reactions' in request.resource.data)
+          && isValidReactionMap(request.resource.data.reactions)
+          && reactionDiffWithinBounds(resource.data.reactions, request.resource.data.reactions)
+        )
+        || (
+          signedIn()
+          && request.writeFields.hasOnly(['commentCount'])
+          && commentCountWithinBounds(resource.data, request.resource.data)
+        );
       allow delete: if wishOwner(wishId);
 
       match /comments/{commentId} {
         // Allow anyone to read comments
         allow read: if true;
-        allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
-        allow update, delete: if signedIn() && request.auth.uid == resource.data.userId;
+        allow create: if signedIn()
+          && request.resource.data.userId == request.auth.uid
+          && hasOnlyAllowedKeys(request.resource.data, [
+            'text','userId','displayName','photoURL','isAnonymous','timestamp','parentId','reactions','userReactions','nickname'
+          ])
+          && ('text' in request.resource.data && isShortString(request.resource.data.text, 280) && request.resource.data.text.size() >= 1)
+          && validCommentParent(wishId);
+        allow update: if signedIn()
+          && request.auth.uid == resource.data.userId
+          && hasOnlyAllowedKeys(request.resource.data, [
+            'text','userId','displayName','photoURL','isAnonymous','timestamp','parentId','reactions','userReactions','nickname'
+          ])
+          && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
+          && (!('timestamp' in request.resource.data) || request.resource.data.timestamp == resource.data.timestamp)
+          && (!('text' in request.resource.data) || (isShortString(request.resource.data.text, 280) && request.resource.data.text.size() >= 1))
+          && (!('parentId' in request.resource.data) || request.resource.data.parentId == resource.data.parentId);
+        allow delete: if signedIn() && request.auth.uid == resource.data.userId;
       }
 
       match /gifts/{giftId} {
-        allow read: if wishOwner(wishId) || (signedIn() && request.auth.uid == resource.data.recipientId);
+        allow read: if signedIn()
+          && (wishOwner(wishId)
+            || ('recipientId' in resource.data
+              && request.auth.uid == resource.data.recipientId));
         allow create: if wishOwner(wishId) || (signedIn() && request.auth.uid == request.resource.data.recipientId);
-        allow update, delete: if wishOwner(wishId) || (signedIn() && request.auth.uid == resource.data.recipientId);
+        allow update, delete: if wishOwner(wishId)
+          || (signedIn()
+            && ('recipientId' in resource.data)
+            && request.auth.uid == resource.data.recipientId);
       }
 
       // Reactions stored under each wish
@@ -78,11 +392,37 @@ service cloud.firestore {
       }
     }
 
+    // Gifts are also stored under /gifts/{wishId}/gifts/{giftId} by backend functions
+    match /gifts/{wishId} {
+      match /gifts/{giftId} {
+        allow read: if signedIn()
+          && (wishOwner(wishId)
+            || ('recipientId' in resource.data
+              && request.auth.uid == resource.data.recipientId));
+        // Client writes are restricted; backend functions write with admin privileges
+        allow write: if false;
+      }
+    }
+
 
     // Referral records for tracking invites
     match /referrals/{referralId} {
-      // Restrict access so only the referred user may read/write
-      allow read, write: if signedIn() && request.auth.uid == referralId;
+      // Referred users can manage their own record; referrers may read for reward tracking
+      allow read: if signedIn()
+        && (
+          request.auth.uid == referralId
+          || ('referrerId' in resource.data && resource.data.referrerId == request.auth.uid)
+        );
+      allow write: if signedIn() && request.auth.uid == referralId;
+    }
+
+    // Collection group access for gifts across all parents
+    // Allows a recipient to read any gift document addressed to them,
+    // regardless of whether it's under /wishes/{wishId}/gifts or /gifts/{wishId}/gifts
+    match /{path=**}/gifts/{giftId} {
+      allow read: if signedIn()
+        && ('recipientId' in resource.data)
+        && request.auth.uid == resource.data.recipientId;
     }
 
     // Allow reading reactions stored at /reactions/{wishId}/users/{userId}
@@ -91,6 +431,46 @@ service cloud.firestore {
         allow read: if true;
         allow write: if signedIn() && request.auth.uid == userId;
       }
+    }
+
+    // Votes: each user's vote under votes/{wishId}/users/{uid}
+    // Only the owning user can read/write their vote. Limit keys to ['option','timestamp']
+    match /votes/{wishId} {
+      match /users/{uid} {
+        allow read: if signedIn() && request.auth.uid == uid;
+        allow create, update: if signedIn()
+          && request.auth.uid == uid
+          && hasOnlyAllowedKeys(request.resource.data, ['option','timestamp'])
+          && ('option' in request.resource.data)
+          && (request.resource.data.option == 'A' || request.resource.data.option == 'B');
+        allow delete: if signedIn() && request.auth.uid == uid;
+      }
+    }
+
+    // Reports: allow signed-in users to create; deny reads/updates/deletes
+    // Keep keys to ['itemId','type','reason','timestamp']
+    match /reports/{reportId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['itemId','type','reason','timestamp'])
+        && ('itemId' in request.resource.data)
+        && ('type' in request.resource.data)
+        && ('reason' in request.resource.data)
+        && ('timestamp' in request.resource.data)
+        && isShortString(request.resource.data.itemId, 200)
+        && isShortString(request.resource.data.type, 50)
+        && isShortString(request.resource.data.reason, 2000);
+      allow read, update, delete: if false;
+    }
+
+    // Feedback: allow signed-in users to create; deny reads/updates/deletes
+    // Keep keys to ['text','timestamp']
+    match /feedback/{feedbackId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['text','timestamp'])
+        && ('text' in request.resource.data)
+        && ('timestamp' in request.resource.data)
+        && isShortString(request.resource.data.text, 2000);
+      allow read, update, delete: if false;
     }
 
     match /{document=**} {

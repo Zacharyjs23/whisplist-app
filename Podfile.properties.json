@@ -1,4 +1,5 @@
 {
   "expo.jsEngine": "jsc",
-  "newArchEnabled": "false"
+  "newArchEnabled": "false",
+  "ios.deploymentTarget": "15.1"
 }

@@ -20,3 +20,20 @@
 
 7. **Changes to Terms**
    We may update these Terms from time to time. Continued use of the service after changes constitutes acceptance of the new Terms.
+
+8. **Subscriptions & Billing**
+
+   - Certain supporter features are available via a paid subscription.
+   - iOS: Purchases are in‑app purchases handled by Apple through the App Store. You can manage, cancel, or request refunds via your Apple ID (Settings → Apple ID → Subscriptions). We do not control Apple’s billing or refund decisions.
+   - Web/Android: Purchases may be processed by Stripe. By subscribing you authorize recurring charges until you cancel. You can cancel anytime via the in‑app “Manage Subscription” link (Stripe billing portal). When canceled, access continues until the end of the paid period.
+   - Free trials (if offered) convert to a paid subscription unless canceled before the trial ends.
+   - Prices, taxes, and availability may vary by region and platform.
+
+9. **Gifts & Tips**
+
+   - Gifts/tips are voluntary payments to support creators or the app. Payments processed by Stripe (or other providers) are subject to their terms. Where platform rules apply (e.g., iOS), gifting may be limited or disabled.
+   - Except where required by law or platform policy, gifts/tips are non‑refundable.
+
+10. **Contact**
+
+   For billing or account questions contact support@whisplist.app.

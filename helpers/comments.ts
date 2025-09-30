@@ -11,6 +11,7 @@ import {
   getDocs,
   deleteDoc,
   Timestamp,
+  increment,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import * as logger from '../shared/logger';
@@ -77,10 +78,18 @@ export async function addComment<
   onError?: (err: unknown) => void,
 ) {
   try {
-    return await addDoc(collection(db, 'wishes', wishId, 'comments'), {
+    const docRef = await addDoc(collection(db, 'wishes', wishId, 'comments'), {
       timestamp: serverTimestamp(),
       ...data,
     });
+    try {
+      await updateDoc(doc(db, 'wishes', wishId), {
+        commentCount: increment(1),
+      });
+    } catch (err) {
+      logger.warn('Failed to increment comment count', err);
+    }
+    return docRef;
   } catch (err) {
     logger.error('Error adding comment', err);
     onError?.(err);
@@ -113,7 +122,14 @@ export async function deleteComment(
 ) {
   try {
     const ref = doc(db, 'wishes', wishId, 'comments', commentId);
-    return await deleteDoc(ref);
+    await deleteDoc(ref);
+    try {
+      await updateDoc(doc(db, 'wishes', wishId), {
+        commentCount: increment(-1),
+      });
+    } catch (err) {
+      logger.warn('Failed to decrement comment count', err);
+    }
   } catch (err) {
     logger.error('Error deleting comment', err);
     onError?.(err);
@@ -189,4 +205,3 @@ export async function getWishComments<
     throw err;
   }
 }
-

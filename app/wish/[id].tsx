@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { createPlayer, type AudioPlayer } from 'expo-audio';
 import {
   getWish,
@@ -12,6 +13,7 @@ import {
   updateWish,
   deleteWish,
 } from '../../helpers/wishes';
+import { recordEngagementEvent } from '@/helpers/engagement';
 import {
   listenWishComments,
   addComment,
@@ -58,6 +60,7 @@ import {
   Modal,
   Linking as RNLinking,
   Share,
+  ToastAndroid,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
@@ -70,16 +73,9 @@ import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { trackEvent } from '@/helpers/analytics';
+import { useWishMeta } from '@/hooks/useWishMeta';
 import * as logger from '@/shared/logger';
-
-const baseTypeInfo = {
-  wish: { emoji: '💭', color: '#333333' },
-  confession: { emoji: '😶\u200d🌫️', color: '#374151' },
-  advice: { emoji: '🧠', color: '#064e3b' },
-  dream: { emoji: '🌙', color: '#312e81' },
-};
-
-type WishType = 'wish' | 'confession' | 'advice' | 'dream';
+import { POST_TYPE_META, normalizePostType } from '@/types/post';
 
 const formatTimeLeft = (d: Date) => {
   const ms = d.getTime() - Date.now();
@@ -97,20 +93,17 @@ const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 const CAN_USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 export default function Page() {
-  const params = useLocalSearchParams<{ id: string; gift?: string }>();
+  const params = useLocalSearchParams<{ id: string; gift?: string; comment?: string }>();
   const { id } = params as any;
   const router = useRouter();
   const { theme } = useTheme();
   const { t: tr } = useTranslation();
-  const typeInfo = React.useMemo(
-    () => ({
-      ...baseTypeInfo,
-      wish: { emoji: '💭', color: theme.input },
-    }),
-    [theme],
-  );
   const [wish, setWish] = useState<Wish | null>(null);
-  const t: WishType = (wish?.type as WishType) || 'wish';
+  const normalizedType = React.useMemo(
+    () => normalizePostType(wish?.type),
+    [wish?.type],
+  );
+  const typeMeta = POST_TYPE_META[normalizedType];
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
@@ -137,6 +130,8 @@ export default function Page() {
   } | null>(null);
   const [showThanks, setShowThanks] = useState(false);
   const [thanksMessage, setThanksMessage] = useState('');
+  const [thanksContext, setThanksContext] = useState<{ wishId: string } | null>(null);
+  const [customAmount, setCustomAmount] = useState('');
   const [nickname, setNickname] = useState('');
   const [owner, setOwner] = useState<any | null>(null);
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
@@ -149,6 +144,12 @@ export default function Page() {
   const [editCategory, setEditCategory] = useState('');
   const { user, profile } = useAuthSession();
   const [giftBanner, setGiftBanner] = useState<string | null>(null);
+  const commentInputRef = useRef<TextInput | null>(null);
+  const autoScrollRef = useRef(false);
+  const [shouldFocusComposer, setShouldFocusComposer] = useState(false);
+  const [commentSuccess, setCommentSuccess] = useState<string | null>(null);
+  const successOpacity = useRef(new Animated.Value(0)).current;
+  const { giftCount: metaGiftCount, giftTotal: metaGiftTotal } = useWishMeta(wish);
   useEffect(() => {
     const g = typeof params?.gift === 'string' ? params.gift : undefined;
     if (g === 'success') setGiftBanner(tr('gifts.success', '🎁 Thank you for your support!'));
@@ -166,46 +167,102 @@ export default function Page() {
     loadNickname();
   }, []);
 
+  useEffect(() => {
+    const shouldFocus =
+      typeof params?.comment === 'string' &&
+      (params.comment === '1' || params.comment === 'true');
+    if (!shouldFocus) return;
+    autoScrollRef.current = true;
+    setShouldFocusComposer(true);
+  }, [params?.comment]);
+
+  useEffect(() => {
+    if (!shouldFocusComposer) return;
+    const timer = setTimeout(() => {
+      commentInputRef.current?.focus();
+      setShouldFocusComposer(false);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [shouldFocusComposer]);
+
+  const showCommentSuccess = useCallback(
+    (message: string) => {
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(message, ToastAndroid.SHORT);
+        return;
+      }
+      setCommentSuccess(message);
+      successOpacity.stopAnimation();
+      successOpacity.setValue(0);
+      Animated.sequence([
+        Animated.timing(successOpacity, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+        Animated.delay(1600),
+        Animated.timing(successOpacity, {
+          toValue: 0,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+      ]).start(({ finished }) => {
+        if (finished) {
+          setCommentSuccess(null);
+        }
+      });
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+        () => {},
+      );
+    },
+    [successOpacity],
+  );
+
   const isBoosted =
     wish?.boostedUntil &&
     wish.boostedUntil.toDate &&
     wish.boostedUntil.toDate() > new Date();
   const isActiveWish =
     isBoosted || (wish?.likes || 0) > 5 || wish?.active === true;
+  const isLoggedIn = !!user?.uid;
+  const isReply = !!replyTo;
   const [timeLeft, setTimeLeft] = useState(
     isBoosted && wish?.boostedUntil
       ? formatTimeLeft(wish.boostedUntil!.toDate())
       : '',
   );
-  const glowAnim = useRef(new Animated.Value(0)).current;
+  const glowAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
-    if (isBoosted && wish?.boostedUntil) {
-      const update = () =>
-        setTimeLeft(formatTimeLeft(wish.boostedUntil!.toDate()));
-      update();
-      const id = setInterval(update, 60000);
-      const loop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, {
-            toValue: 1,
-            duration: 1000,
-            useNativeDriver: false,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 0,
-            duration: 1000,
-            useNativeDriver: false,
-          }),
-        ]),
-      );
-      loop.start();
-      return () => {
-        clearInterval(id);
-        loop.stop();
-      };
-    } else {
+    if (!isBoosted || !wish?.boostedUntil) {
       setTimeLeft('');
+      glowAnim.setValue(1);
+      return;
     }
+    const update = () =>
+      setTimeLeft(formatTimeLeft(wish.boostedUntil!.toDate()));
+    update();
+    const id = setInterval(update, 60000);
+    glowAnim.setValue(1);
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 1.04,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => {
+      clearInterval(id);
+      loop.stop();
+      glowAnim.setValue(1);
+    };
   }, [isBoosted, wish?.boostedUntil, glowAnim]);
   const canBoost =
     user &&
@@ -217,6 +274,8 @@ export default function Page() {
   const flatListRef = useRef<FlatList<Comment>>(null);
 
   const animationRefs = useRef<{ [key: string]: Animated.Value }>({});
+  const animatedCommentIds = useRef<Set<string>>(new Set());
+  const hasHydratedComments = useRef(false);
 
   const fetchWish = useCallback(async () => {
     setLoading(true);
@@ -263,12 +322,36 @@ export default function Page() {
     const unsubscribe = listenWishComments(
       id as string,
       (list) => {
+        const ids = new Set<string>();
+        const isInitialBatch = !hasHydratedComments.current && list.length > 0;
         list.forEach((d) => {
           const commentId = d.id;
+          ids.add(commentId);
           if (!animationRefs.current[commentId]) {
-            animationRefs.current[commentId] = new Animated.Value(0);
+            const initialValue = isInitialBatch ? 1 : 0;
+            animationRefs.current[commentId] = new Animated.Value(initialValue);
+            if (isInitialBatch) {
+              animatedCommentIds.current.add(commentId);
+            } else {
+              animatedCommentIds.current.delete(commentId);
+            }
+          } else if (isInitialBatch) {
+            animatedCommentIds.current.add(commentId);
           }
         });
+        Object.keys(animationRefs.current).forEach((key) => {
+          if (!ids.has(key)) {
+            delete animationRefs.current[key];
+          }
+        });
+        animatedCommentIds.current.forEach((key) => {
+          if (!ids.has(key)) {
+            animatedCommentIds.current.delete(key);
+          }
+        });
+        if (isInitialBatch) {
+          hasHydratedComments.current = true;
+        }
 
         const sorted = [...list].sort((a, b) => {
           const aCount = Object.values(a.reactions || {}).reduce(
@@ -283,9 +366,17 @@ export default function Page() {
         });
 
         setComments(sorted);
-        setTimeout(() => {
-          flatListRef.current?.scrollToEnd({ animated: true });
-        }, 300);
+        setWish((prev) =>
+          prev ? { ...prev, commentCount: sorted.length } : prev,
+        );
+        const shouldScroll =
+          autoScrollRef.current || !hasHydratedComments.current;
+        if (shouldScroll) {
+          setTimeout(() => {
+            flatListRef.current?.scrollToEnd({ animated: true });
+          }, 250);
+          autoScrollRef.current = false;
+        }
         setLoading(false);
       },
       (err) => {
@@ -389,6 +480,11 @@ export default function Page() {
 
   const handlePostComment = useCallback(async () => {
     if (!comment.trim()) return;
+    if (!user?.uid) {
+      router.push('/auth');
+      return;
+    }
+    autoScrollRef.current = true;
     setPostingComment(true);
     try {
       await addComment(
@@ -400,7 +496,7 @@ export default function Page() {
           photoURL: useProfileComment ? profile?.photoURL || '' : '',
           isAnonymous: !useProfileComment,
           ...(nickname && !useProfileComment ? { nickname } : {}),
-          parentId: replyTo,
+          ...(replyTo ? { parentId: replyTo } : {}),
           reactions: {},
           userReactions: {},
         },
@@ -411,15 +507,29 @@ export default function Page() {
       setComment('');
       setReplyTo(null);
       if (nickname) await AsyncStorage.setItem('nickname', nickname);
-
-      // Push notifications are sent from Cloud Functions
-      Alert.alert('Comment posted!');
+      showCommentSuccess(tr('wish.commentPosted', 'Comment posted'));
+      setWish((prev) =>
+        prev
+          ? { ...prev, commentCount: (prev.commentCount || 0) + 1 }
+          : prev,
+      );
     } catch {
       // error handled in onError
     } finally {
       setPostingComment(false);
     }
-  }, [comment, id, replyTo, user, profile, useProfileComment, nickname]);
+  }, [
+    comment,
+    id,
+    replyTo,
+    user,
+    profile,
+    useProfileComment,
+    nickname,
+    showCommentSuccess,
+    tr,
+    router,
+  ]);
 
   const handleReact = useCallback(
     async (commentId: string, emoji: string) => {
@@ -448,35 +558,74 @@ export default function Page() {
 
   const handleSaveComment = useCallback(async () => {
     if (!editingCommentId) return;
+    const trimmed = editingCommentText.trim();
+    if (!trimmed) {
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(tr('comments.emptyWarning', 'Comment cannot be empty.'), ToastAndroid.SHORT);
+      } else if (Platform.OS === 'web') {
+        if (typeof globalThis !== 'undefined' && typeof (globalThis as any).alert === 'function') {
+          (globalThis as any).alert(tr('comments.emptyWarning', 'Comment cannot be empty.'));
+        }
+      } else {
+        Alert.alert(tr('common.error', 'Something went wrong'), tr('comments.emptyWarning', 'Comment cannot be empty.'));
+      }
+      return;
+    }
     try {
       await updateComment(id as string, editingCommentId, {
-        text: editingCommentText,
+        text: trimmed,
       });
       setEditingCommentId(null);
       setEditingCommentText('');
     } catch (err) {
       logger.error('❌ Failed to update comment:', err);
     }
-  }, [editingCommentId, editingCommentText, id]);
+  }, [editingCommentId, editingCommentText, id, tr]);
 
   const handleDeleteComment = useCallback(
     (commentId: string) => {
-      Alert.alert('Delete Comment', 'Are you sure?', [
-        { text: 'Cancel', style: 'cancel' },
+      const title = tr('comments.deleteTitle', 'Delete Comment');
+      const message = tr('comments.deleteConfirm', 'Are you sure you want to delete this comment?');
+      const performDelete = async () => {
+        try {
+          await deleteComment(id as string, commentId);
+          setWish((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  commentCount: Math.max(0, (prev.commentCount || 0) - 1),
+                }
+              : prev,
+          );
+        } catch (err) {
+          logger.error('❌ Failed to delete comment:', err);
+        }
+      };
+
+      if (Platform.OS === 'web') {
+        const approved =
+          typeof globalThis !== 'undefined' &&
+          typeof (globalThis as any).confirm === 'function'
+            ? (globalThis as any).confirm(message)
+            : true;
+        if (approved) {
+          void performDelete();
+        }
+        return;
+      }
+
+      Alert.alert(title, message, [
+        { text: tr('common.cancel', 'Cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: tr('common.delete', 'Delete'),
           style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteComment(id as string, commentId);
-            } catch (err) {
-              logger.error('❌ Failed to delete comment:', err);
-            }
+          onPress: () => {
+            void performDelete();
           },
         },
       ]);
     },
-    [id],
+    [id, tr],
   );
 
   const handleReport = useCallback(
@@ -539,12 +688,19 @@ export default function Page() {
       if (!link.trim()) return;
       try {
         await setFulfillmentLink(id as string, link.trim());
+        if (user?.uid) {
+          try {
+            await recordEngagementEvent(user.uid, 'fulfillment');
+          } catch (err) {
+            logger.warn('Failed to record fulfillment streak', err);
+          }
+        }
         await fetchWish();
       } catch (err) {
         logger.error('❌ Failed to fulfill wish:', err);
       }
     },
-    [fetchWish, id],
+    [fetchWish, id, user?.uid],
   );
 
   const handleBoostWish = useCallback(() => {
@@ -573,6 +729,58 @@ export default function Page() {
     },
     [wish],
   );
+
+  const handleCustomAmountSubmit = useCallback(() => {
+    const input = customAmount.trim();
+    if (!input) {
+      Alert.alert(
+        tr('gifts.enterAmountTitle', 'Enter amount'),
+        tr('gifts.enterAmountBody', 'Please enter an amount to contribute.'),
+      );
+      return;
+    }
+    const parsed = Number(input.replace(/[^0-9.]/g, ''));
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      Alert.alert(
+        tr('gifts.invalidAmountTitle', 'Invalid amount'),
+        tr('gifts.invalidAmountBody', 'Enter a valid amount greater than zero.'),
+      );
+      return;
+    }
+    if (parsed > 10_000) {
+      Alert.alert(
+        tr('gifts.limitTitle', 'Amount too high'),
+        tr('gifts.limitBody', 'The maximum contribution is $10,000.'),
+      );
+      return;
+    }
+    const normalized = Math.round(parsed * 100) / 100;
+    handleSendMoney(normalized);
+    setCustomAmount('');
+  }, [customAmount, handleSendMoney, tr]);
+
+  const fundingPresets = React.useMemo(() => {
+    if (wish?.fundingPresets && Array.isArray(wish.fundingPresets) && wish.fundingPresets.length) {
+      const cleaned = (wish.fundingPresets as number[]).filter((n) => typeof n === 'number' && n > 0);
+      if (cleaned.length) return cleaned;
+    }
+    if (wish?.fundingGoal && wish.fundingGoal > 0) {
+      const base = Math.max(5, Math.round(wish.fundingGoal / 5));
+      return [Math.max(3, Math.round(base * 0.5)), base, Math.round(base * 1.5)];
+    }
+    return [3, 5, 10];
+  }, [wish?.fundingPresets, wish?.fundingGoal]);
+
+  const fundingGoalAmount = typeof wish?.fundingGoal === 'number' ? wish.fundingGoal : 0;
+  const raisedFromMeta = typeof metaGiftTotal === 'number' ? metaGiftTotal : 0;
+  const supportersFromMeta = typeof metaGiftCount === 'number' ? metaGiftCount : 0;
+  const raisedFromWish = typeof wish?.fundingRaised === 'number' ? wish.fundingRaised : 0;
+  const supportersFromWish = typeof wish?.fundingSupporters === 'number' ? wish.fundingSupporters : 0;
+  const fundingRaised = Math.max(raisedFromWish, raisedFromMeta, 0);
+  const fundingSupporters = Math.max(supportersFromWish, supportersFromMeta, 0);
+  const fundingProgressPercent = fundingGoalAmount > 0 ? Math.min(100, (fundingRaised / fundingGoalAmount) * 100) : 0;
+  const fundingPercentDisplay = Math.round(fundingProgressPercent);
+  const hasFundingGoal = fundingGoalAmount > 0;
 
   const handleUpdateWish = useCallback(async () => {
     if (!wish) return;
@@ -611,12 +819,25 @@ export default function Page() {
 
   const renderCommentItem = useCallback(
     (item: Comment, level = 0) => {
-      const animValue = animationRefs.current[item.id] || new Animated.Value(0);
-      Animated.timing(animValue, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: CAN_USE_NATIVE_DRIVER,
-      }).start();
+      let animValue = animationRefs.current[item.id];
+      if (!animValue) {
+        animValue = new Animated.Value(1);
+        animationRefs.current[item.id] = animValue;
+        animatedCommentIds.current.add(item.id);
+      }
+      if (!animatedCommentIds.current.has(item.id)) {
+        animatedCommentIds.current.add(item.id);
+        animValue.setValue(0);
+        Animated.timing(animValue, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: CAN_USE_NATIVE_DRIVER,
+        }).start(({ finished }) => {
+          if (!finished) {
+            animatedCommentIds.current.delete(item.id);
+          }
+        });
+      }
 
       const currentUser = user?.uid || 'anon';
       const userReaction = item.userReactions?.[currentUser];
@@ -855,14 +1076,14 @@ export default function Page() {
                   style={[
                     styles.wishBox,
                     {
-                      backgroundColor: typeInfo[t].color,
-                      borderColor: isBoosted
-                        ? glowAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: ['#facc15', '#fde68a'],
-                          })
-                        : 'transparent',
-                      borderWidth: isBoosted ? 2 : 0,
+                      backgroundColor: theme.input,
+                      borderColor: isBoosted ? '#facc15' : typeMeta.color,
+                      borderWidth: isBoosted ? 2 : 1,
+                      transform: [
+                        {
+                          scale: isBoosted ? glowAnim : 1,
+                        },
+                      ],
                     },
                   ]}
                 >
@@ -873,8 +1094,9 @@ export default function Page() {
                       alignItems: 'center',
                     }}
                   >
-                    <Text style={[styles.wishCategory, { color: theme.tint }]}>
-                      {typeInfo[t].emoji} #{wish.category}
+                    <Text style={[styles.wishCategory, { color: typeMeta.color }]}
+                    >
+                      {typeMeta.emoji} #{wish.category}
                     </Text>
                     <TouchableOpacity onPress={handleShare} hitSlop={HIT_SLOP}>
                       <Ionicons
@@ -992,6 +1214,48 @@ export default function Page() {
                     </TouchableOpacity>
                   )}
 
+                  {hasFundingGoal && (
+                    <View style={[styles.fundingCard, { backgroundColor: theme.input }]}>
+                      <View style={[styles.fundingProgressOuter, { backgroundColor: theme.background }]}>
+                        <View
+                          style={[
+                            styles.fundingProgressInner,
+                            { width: `${fundingProgressPercent}%`, backgroundColor: theme.tint },
+                          ]}
+                        />
+                      </View>
+                      <View style={styles.fundingInfoRow}>
+                        <Text style={[styles.fundingLabel, { color: theme.text }]}
+                          accessibilityLabel={tr('wish.fundingProgress', {
+                            raised: fundingRaised.toFixed(2),
+                            goal: fundingGoalAmount.toFixed(2),
+                          })}
+                        >
+                          {tr('wish.fundingProgress', {
+                            raised: fundingRaised.toFixed(2),
+                            goal: fundingGoalAmount.toFixed(2),
+                          })}
+                        </Text>
+                        <Text style={[styles.fundingPercent, { color: theme.placeholder }]}
+                          accessibilityLabel={tr('wish.fundingPercent', { percent: fundingPercentDisplay })}
+                        >
+                          {tr('wish.fundingPercent', { percent: fundingPercentDisplay })}
+                        </Text>
+                      </View>
+                      <Text style={[styles.fundingSupporters, { color: theme.placeholder }]}
+                        accessibilityLabel={
+                          fundingSupporters > 0
+                            ? tr('wish.fundingSupporters', { count: fundingSupporters })
+                            : tr('wish.fundingBeFirst', 'Be the first to chip in')
+                        }
+                      >
+                        {fundingSupporters > 0
+                          ? tr('wish.fundingSupporters', { count: fundingSupporters })
+                          : tr('wish.fundingBeFirst', 'Be the first to chip in')}
+                      </Text>
+                    </View>
+                  )}
+
                   {profile?.giftingEnabled && wish.giftLink && (
                     <View
                       style={{
@@ -1043,21 +1307,41 @@ export default function Page() {
                     </View>
                   )}
                   {profile?.giftingEnabled && owner?.stripeAccountId && (
-                    <View style={{ flexDirection: 'row', marginTop: 8 }}>
-                      {[3, 5, 10].map((amt) => (
+                    <View style={styles.fundingControls}>
+                      <View style={styles.fundingPresetRow}
+                        accessibilityLabel={tr('wish.fundingQuickAmounts', 'Quick amounts')}
+                      >
+                        {fundingPresets.map((amt) => (
+                          <TouchableOpacity
+                            key={amt}
+                            onPress={() => handleSendMoney(amt)}
+                            style={[styles.fundingPresetButton, { backgroundColor: theme.input }]}
+                          >
+                            <Text style={[styles.fundingPresetLabel, { color: theme.tint }]}>${amt}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      <View style={styles.customAmountRow}>
+                        <TextInput
+                          style={[styles.customAmountInput, { backgroundColor: theme.input, color: theme.text }]}
+                          placeholder={tr('wish.fundingCustomPlaceholder', 'Custom amount')}
+                          placeholderTextColor={theme.placeholder}
+                          keyboardType="numeric"
+                          value={customAmount}
+                          onChangeText={setCustomAmount}
+                          returnKeyType="done"
+                          onSubmitEditing={handleCustomAmountSubmit}
+                        />
                         <TouchableOpacity
-                          key={amt}
-                          onPress={() => handleSendMoney(amt)}
-                          style={{
-                            backgroundColor: theme.input,
-                            padding: 8,
-                            borderRadius: 8,
-                            marginRight: 6,
-                          }}
+                          onPress={handleCustomAmountSubmit}
+                          style={[styles.customAmountButton, { backgroundColor: theme.tint }]}
+                          hitSlop={HIT_SLOP}
                         >
-                          <Text style={{ color: theme.tint }}>${amt}</Text>
+                          <Text style={[styles.customAmountButtonText, { color: theme.background }]}>
+                            {tr('wish.fundingCustomCta', 'Send')}
+                          </Text>
                         </TouchableOpacity>
-                      ))}
+                      </View>
                     </View>
                   )}
 
@@ -1175,18 +1459,42 @@ export default function Page() {
             </View>
           )}
 
+          {commentSuccess && Platform.OS !== 'android' && (
+            <Animated.View
+              style={[
+                styles.successToast,
+                { backgroundColor: theme.tint, opacity: successOpacity },
+              ]}
+              pointerEvents="none"
+            >
+              <Text style={[styles.successToastText, { color: theme.background }]}>
+                {commentSuccess}
+              </Text>
+            </Animated.View>
+          )}
+
           <Text style={[styles.label, { color: theme.placeholder }]}>
-            Comment
+            {isReply
+              ? tr('wish.replyLabel', 'Reply')
+              : tr('wish.commentLabel', 'Comment')}
           </Text>
           <TextInput
+            ref={commentInputRef}
             style={[
               styles.input,
               { backgroundColor: theme.input, color: theme.text },
             ]}
-            placeholder="Your comment"
+            placeholder={
+              isReply
+                ? tr('wish.placeholderReply', 'Write your reply')
+                : tr('wish.placeholderComment', 'Share your thoughts')
+            }
             placeholderTextColor={theme.placeholder} // theme fix
             value={comment}
             onChangeText={setComment}
+            editable={isLoggedIn}
+            selectTextOnFocus={isLoggedIn}
+            accessibilityState={{ disabled: !isLoggedIn }}
           />
           {!useProfileComment && (
             <TextInput
@@ -1194,10 +1502,13 @@ export default function Page() {
                 styles.input,
                 { backgroundColor: theme.input, color: theme.text },
               ]}
-              placeholder="Nickname or emoji"
+              placeholder={tr('wish.nicknamePlaceholder', 'Nickname or emoji')}
               placeholderTextColor={theme.placeholder} // theme fix
               value={nickname}
               onChangeText={setNickname}
+              editable={isLoggedIn}
+              selectTextOnFocus={isLoggedIn}
+              accessibilityState={{ disabled: !isLoggedIn }}
             />
           )}
 
@@ -1209,25 +1520,46 @@ export default function Page() {
             }}
           >
             <Text style={{ color: theme.text, marginRight: 8 }}>
-              Comment with profile
+              {tr('wish.commentWithProfile', 'Comment with profile')}
             </Text>
             <Switch
               value={useProfileComment}
               onValueChange={setUseProfileComment}
+              disabled={!isLoggedIn}
             />
           </View>
+
+          {!isLoggedIn && (
+            <TouchableOpacity
+              style={[styles.signInNotice, { borderColor: theme.tint }]}
+              onPress={() => router.push('/auth')}
+              hitSlop={HIT_SLOP}
+            >
+              <Ionicons
+                name="log-in-outline"
+                size={18}
+                color={theme.tint}
+                style={{ marginRight: 6 }}
+              />
+              <Text style={{ color: theme.tint }}>
+                {tr('wish.signInToComment', 'Sign in to comment')}
+              </Text>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={[styles.button, { backgroundColor: theme.tint }]}
             onPress={handlePostComment}
-            disabled={postingComment}
+            disabled={postingComment || !isLoggedIn || !comment.trim()}
             hitSlop={HIT_SLOP}
           >
             {postingComment ? (
               <ActivityIndicator color={theme.text} />
             ) : (
               <Text style={[styles.buttonText, { color: theme.text }]}>
-                Send Comment
+                {isReply
+                  ? tr('wish.sendReply', 'Send reply')
+                  : tr('wish.sendComment', 'Send comment')}
               </Text>
             )}
           </TouchableOpacity>
@@ -1338,7 +1670,11 @@ export default function Page() {
                   style={[styles.modalCard, { backgroundColor: theme.input }]}
                 >
                   <Text style={[styles.modalText, { color: theme.text }]}>
-                    Confirm sending gift?
+                    {confirmGift?.amount
+                      ? tr('gifts.confirmAmount', 'Send ${{amount}} to this wish?', {
+                          amount: confirmGift.amount.toFixed(2),
+                        })
+                      : tr('gifts.confirmGift', 'Confirm sending gift?')}
                   </Text>
                   <View style={{ flexDirection: 'row', marginTop: 10 }}>
                     <TouchableOpacity
@@ -1348,8 +1684,12 @@ export default function Page() {
                           setConfirmGift(null);
                           return;
                         }
+                        let nextThanksContext: { wishId: string } | null = null;
                         if (confirmGift.link) {
                           await WebBrowser.openBrowserAsync(confirmGift.link);
+                          if (confirmGift.wishId) {
+                            nextThanksContext = { wishId: confirmGift.wishId };
+                          }
                           setShowThanks(true);
                         } else if (
                           confirmGift.wishId &&
@@ -1363,14 +1703,17 @@ export default function Page() {
                               confirmGift.recipientId,
                               process.env.EXPO_PUBLIC_GIFT_SUCCESS_URL!,
                               process.env.EXPO_PUBLIC_GIFT_CANCEL_URL!,
+                              user?.uid ?? null,
                             );
                             if (res.url)
                               await WebBrowser.openBrowserAsync(res.url);
                             setShowThanks(true);
+                            nextThanksContext = { wishId: confirmGift.wishId };
                           } catch (err) {
                             logger.error('Failed to checkout', err);
                           }
                         }
+                        setThanksContext(nextThanksContext);
                         setConfirmGift(null);
                       }}
                       style={[
@@ -1400,7 +1743,10 @@ export default function Page() {
               transparent
               animationType="fade"
               visible
-              onRequestClose={() => setShowThanks(false)}
+              onRequestClose={() => {
+                setShowThanks(false);
+                setThanksContext(null);
+              }}
             >
               <View style={styles.modalBackdrop}>
                 <View
@@ -1423,7 +1769,7 @@ export default function Page() {
                     value={thanksMessage}
                     onChangeText={setThanksMessage}
                   />
-                  {confirmGift?.wishId && (
+                  {thanksContext?.wishId && (
                     <TouchableOpacity
                       onPress={async () => {
                         try {
@@ -1431,7 +1777,7 @@ export default function Page() {
                             collection(
                               db,
                               'wishes',
-                              confirmGift!.wishId!,
+                              thanksContext.wishId,
                               'gifts',
                             ),
                             {
@@ -1445,6 +1791,7 @@ export default function Page() {
                         }
                         setThanksMessage('');
                         setShowThanks(false);
+                        setThanksContext(null);
                       }}
                       style={[
                         styles.button,
@@ -1458,7 +1805,10 @@ export default function Page() {
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity
-                    onPress={() => setShowThanks(false)}
+                    onPress={() => {
+                      setShowThanks(false);
+                      setThanksContext(null);
+                    }}
                     style={[
                       styles.button,
                       { backgroundColor: theme.tint, marginTop: 10 },
@@ -1541,6 +1891,75 @@ const styles = StyleSheet.create({
   pollOptionText: {
     textAlign: 'center',
   },
+  fundingCard: {
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 12,
+  },
+  fundingProgressOuter: {
+    height: 10,
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  fundingProgressInner: {
+    height: 10,
+    borderRadius: 999,
+  },
+  fundingInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  fundingLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  fundingPercent: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  fundingSupporters: {
+    fontSize: 12,
+    marginTop: 6,
+  },
+  fundingControls: {
+    marginTop: 10,
+  },
+  fundingPresetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  fundingPresetButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  fundingPresetLabel: {
+    fontWeight: '600',
+  },
+  customAmountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  customAmountInput: {
+    flex: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
+  },
+  customAmountButton: {
+    marginLeft: 8,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+  },
+  customAmountButtonText: {
+    fontWeight: '600',
+  },
   commentBox: {
     backgroundColor: '#1a1a1a',
     padding: 10,
@@ -1551,6 +1970,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
+  },
+  successToast: {
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  successToastText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  signInNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
   },
   nickname: {
     fontSize: 12,

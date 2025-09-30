@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Ensure UTF-8 so CocoaPods doesn't crash on Ruby unicode_normalize
+export LANG=${LANG:-en_US.UTF-8}
+export LC_ALL=${LC_ALL:-en_US.UTF-8}
+
 # Clean iOS build artifacts and reinstall CocoaPods
 # Run this script from the root of your Expo project
 
@@ -17,7 +21,7 @@ fi
 
 # 4. Reinstall pods with repository update to ensure dependencies are fresh
 cd ios
-pod install --repo-update
+LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install --repo-update
 cd ..
 
 echo "Finished cleaning and reinstalling iOS pods."

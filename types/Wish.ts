@@ -9,7 +9,7 @@ export type Wish<
   text: string;
   category: string;
   /**
-   * Type of post (e.g. "wish", "confession", "advice", "dream")
+   * Type of post (e.g. "celebration", "goal", "struggle", "advice")
    */
   type?: string;
   likes: number;
@@ -34,6 +34,18 @@ export type Wish<
    * Link provided by a user after fulfilling the wish
    */
   fulfillmentLink?: string;
+  fulfilledAt?: Timestamp | null;
+  fundingGoal?: number;
+  fundingCurrency?: string;
+  fundingPresets?: number[];
+  /**
+   * Aggregated amount raised toward the goal
+   */
+  fundingRaised?: number;
+  /**
+   * Number of completed contributions
+   */
+  fundingSupporters?: number;
   isPoll?: boolean;
   optionA?: string;
   optionB?: string;
@@ -43,6 +55,10 @@ export type Wish<
    * Optional mood emoji used for styling
    */
   mood?: string;
+  /**
+   * Cached number of comments for quick display.
+   */
+  commentCount?: number;
   /**
    * Emoji reaction counts
    */
@@ -60,4 +76,3 @@ export type Wish<
    */
   active?: boolean;
 } & Extra;
-

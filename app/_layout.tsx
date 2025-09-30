@@ -3,6 +3,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AuthSessionProvider, useAuthSession } from '@/contexts/AuthSessionContext';
 import { AuthFlowsProvider } from '@/contexts/AuthFlowsContext';
 import { ReferralProvider } from '@/contexts/ReferralContext';
+import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { SavedWishesProvider } from '@/contexts/SavedWishesContext';
 import { I18nProvider } from '@/contexts/I18nContext';
@@ -45,15 +46,17 @@ export default function Layout() {
       <AuthSessionProvider>
         <AuthFlowsProvider>
           <ReferralProvider>
-            <I18nProvider>
-              <ThemeProvider>
-                <SavedWishesProvider>
-                  <AppContainer>
-                    <LayoutInner />
-                  </AppContainer>
-                </SavedWishesProvider>
-              </ThemeProvider>
-            </I18nProvider>
+            <SubscriptionProvider>
+              <I18nProvider>
+                <ThemeProvider>
+                  <SavedWishesProvider>
+                    <AppContainer>
+                      <LayoutInner />
+                    </AppContainer>
+                  </SavedWishesProvider>
+                </ThemeProvider>
+              </I18nProvider>
+            </SubscriptionProvider>
           </ReferralProvider>
         </AuthFlowsProvider>
       </AuthSessionProvider>

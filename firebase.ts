@@ -4,6 +4,9 @@ import {
   getFirestore,
   initializeFirestore,
   persistentLocalCache,
+  persistentMultipleTabManager,
+  memoryLocalCache,
+  setLogLevel,
   type Firestore,
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
@@ -12,6 +15,7 @@ import {
   initializeAuth,
   getReactNativePersistence,
 } from 'firebase/auth';
+import { getFunctions } from 'firebase/functions';
 import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
 import { Platform, ToastAndroid, Alert } from 'react-native';
 import * as logger from '@/shared/logger';
@@ -28,6 +32,10 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
+if (__DEV__) {
+  setLogLevel('debug');
+}
+
 export const auth =
   Platform.OS === 'web'
     ? getAuth(app)
@@ -38,7 +46,11 @@ export const auth =
 export const db: Firestore = (() => {
   try {
     const initialized = initializeFirestore(app, {
-      localCache: persistentLocalCache(),
+      // Use persistent cache on web (IndexedDB) with multi-tab support, memory cache on native.
+      localCache:
+        Platform.OS === 'web'
+          ? persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+          : memoryLocalCache(),
     });
     // For multi-tab support, import persistentMultipleTabManager from 'firebase/firestore'
     // and pass it to persistentLocalCache as:
@@ -61,6 +73,18 @@ export const db: Firestore = (() => {
   }
 })();
 export const storage = getStorage(app);
+export const functions = (() => {
+  const region = process.env.EXPO_PUBLIC_FIREBASE_FUNCTIONS_REGION;
+  try {
+    return region ? getFunctions(app, region) : getFunctions(app);
+  } catch (error) {
+    logger.error('Failed to initialize Functions:', error, {
+      userId: auth.currentUser?.uid,
+      severity: 'medium',
+    });
+    throw error;
+  }
+})();
 
 let analytics: Analytics | undefined;
 if (process.env.EXPO_PUBLIC_ENV === 'production') {

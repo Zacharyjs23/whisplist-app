@@ -6,7 +6,7 @@
  */
 const fs = require('fs');
 const { execSync } = require('child_process');
-const logger = require('../shared/logger.ts');
+// Use console directly; avoid requiring TS modules from a Node script
 
 const APP_JSON = 'app.json';
 
@@ -26,7 +26,7 @@ function cleanProjectId() {
       delete appJson.expo.extra.eas;
     }
     fs.writeFileSync(APP_JSON, JSON.stringify(appJson, null, 2));
-    logger.log('Removed invalid eas.projectId from app.json');
+    console.log('Removed invalid eas.projectId from app.json');
   }
 }
 
@@ -34,7 +34,7 @@ function runEasInit() {
   try {
     execSync('eas init', { stdio: 'inherit' });
   } catch (err) {
-    logger.error('`eas init` failed:', err.message);
+    console.error('`eas init` failed:', err.message);
   }
 }
 

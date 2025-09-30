@@ -123,6 +123,50 @@ npx expo run:ios
 The script removes the `Pods` directory, clears Xcode's derived data, and runs
 `pod install --repo-update` so the iOS project builds from a clean state.
 
+## SVG assets
+
+You can import SVGs as React components thanks to `react-native-svg` and the
+configured Metro transformer. Example:
+
+```tsx
+import Logo from '@/assets/images/react-logo.svg';
+
+export function HeaderLogo() {
+  return <Logo width={120} height={40} />;
+}
+```
+
+If TypeScript complains, ensure your editor is picking up `types/svg.d.ts`.
+
+## Firestore rules tests locally
+
+Rules tests are skipped unless a local emulator is running. Start your emulator
+on port 8080 (e.g. `firebase emulators:start`) and run:
+
+```bash
+npm run test:rules:emu
+```
+
+## Storage/Firestore emulator tests
+
+You can run both Firestore and Storage rules suites against local emulators.
+
+1) Ensure emulators are running (default ports shown):
+
+- Firestore: `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080`
+- Storage: `FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199`
+
+2) Run the rules tests:
+
+```
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 \
+FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199 \
+npm run test:rules
+```
+
+Suites are under `tests/rules/*` and include Firestore (wishes, dmThreads, users, gifts)
+and Storage (type/size limits, ownership, DM media access, public read buckets).
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).

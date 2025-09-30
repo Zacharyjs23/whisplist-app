@@ -25,6 +25,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  ScrollView,
   KeyboardAvoidingView,
   Platform,
   StatusBar as RNStatusBar,
@@ -51,51 +52,89 @@ import ReportDialog from '../../components/ReportDialog';
 import { db, storage } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuthSession } from '@/contexts/AuthSessionContext';
-import { DAILY_PROMPTS } from '../../constants/prompts';
+import { getDailyPromptForDate, getTypePromptForDate } from '../../constants/prompts';
 import * as logger from '@/shared/logger';
 import { useWishComposer } from '@/hooks/useWishComposer';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useFeedLoader } from '@/hooks/useFeedLoader';
 import { UserImpact } from '@/components/UserImpact';
-import { FeedHeader } from '@/components/FeedHeader';
-import type { FilterType } from '@/types/post';
 import WishCardComponent from '@/components/WishCard';
 import { WishComposer } from '@/components/WishComposer';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { SupporterPaywallModal } from '@/components/SupporterPaywallModal';
+import { resolvePlanBenefits } from '@/helpers/subscriptionPerks';
 import { getLocalDateKey } from '@/helpers/date';
 import { trackEvent } from '@/helpers/analytics';
 import { optimizeImageForUpload } from '@/helpers/image';
 import { uploadResumableWithProgress } from '@/helpers/storage';
 import { enqueuePendingWish, flushPendingWishes as flushPendingWishesHelper, getQueueStatus } from '@/helpers/offlineQueue';
+import { primeWishMeta } from '@/helpers/wishMeta';
 import { FeedSkeleton } from '@/components/FeedSkeleton';
+import { OfflineQueueBanner } from '@/components/home/OfflineQueueBanner';
+import EngagementCard from '@/components/home/EngagementCard';
+import { useEngagementStats } from '@/hooks/useEngagementStats';
+import CommunityPulseCard from '@/components/home/CommunityPulseCard';
+import { useCommunityPulse } from '@/hooks/useCommunityPulse';
+import ActionPromptsCard, { ActionPrompt } from '@/components/home/ActionPromptsCard';
+import { useSupporterThanks } from '@/hooks/useSupporterThanks';
+import type { EngagementKind, MilestoneId } from '@/types/Engagement';
+import type { PostType } from '@/types/post';
+import { DEFAULT_POST_TYPE, normalizePostType } from '@/types/post';
+import { getPreferredPostType, recordPostTypeUsage } from '@/helpers/postPreferences';
 
 // typeInfo removed; shared WishCard controls its styling
 
-const CAN_USE_NATIVE_DRIVER = Platform.OS !== 'web';
-
-/**
- * Pick a random prompt index that is not in the recent list. If all prompts
- * have been used recently, the recent list is cleared to start fresh.
- */
-const pickPromptIndex = (recent: number[]): number => {
-  let available = DAILY_PROMPTS.map((_, i) => i).filter(
-    (i) => !recent.includes(i),
-  );
-  if (available.length === 0) {
-    recent = [];
-    available = DAILY_PROMPTS.map((_, i) => i);
+const milestoneFallback = (id: MilestoneId) => {
+  const [kind, rawValue] = id.split('_');
+  const value = Number(rawValue) || 0;
+  switch (kind) {
+    case 'posting':
+      return value <= 1
+        ? 'First wish posted!'
+        : `Posting streak — ${value} days`;
+    case 'gifting':
+      return value <= 1
+        ? 'First gift sent!'
+        : `Gifting streak — ${value} supporters reached`;
+    case 'fulfillment':
+      return value <= 1
+        ? 'First wish fulfilled!'
+        : `Fulfillment streak — ${value} wishes completed`;
+    default:
+      return 'Milestone unlocked';
   }
-  return available[Math.floor(Math.random() * available.length)];
 };
+
+const CAN_USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 const MAX_WISH_LENGTH = 280;
 const MAX_LINK_LENGTH = 2000;
 const sanitizeInput = (text: string) => text.replace(/[<>]/g, '').trim();
 
+type QuickAction = {
+  key: string;
+  label: string;
+  description?: string;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  href?: Href;
+  onPress?: () => void;
+};
+
 export default function Page() {
   const { user, profile } = useAuthSession();
   const { t } = useTranslation();
+  const supporterPerks = React.useMemo(
+    () => resolvePlanBenefits((key, defaultText) => t(key, { defaultValue: defaultText }), 'supporter_monthly'),
+    [t],
+  );
+  const { stats: engagementStats, loading: engagementLoading } = useEngagementStats(user?.uid);
+  const {
+    boosts: pulseBoosts,
+    fulfillments: pulseFulfillments,
+    supporters: pulseSupporters,
+    loading: pulseLoading,
+  } = useCommunityPulse();
+  const { items: supporterThanks } = useSupporterThanks(user?.uid);
   const stripeEnabled = profile?.giftingEnabled && profile?.stripeAccountId;
   const {
     wish,
@@ -131,6 +170,12 @@ export default function Page() {
     setShowAdvanced,
     enableExternalGift,
     setEnableExternalGift,
+    fundingEnabled,
+    setFundingEnabled,
+    fundingGoal,
+    setFundingGoal,
+    fundingPresets,
+    setFundingPresets,
     resetComposer,
   } = useWishComposer(stripeEnabled);
   const {
@@ -154,8 +199,6 @@ export default function Page() {
     boostedCount,
     getNewerCount,
   } = useFeedLoader(user);
-  const [searchTerm, setSearchTerm] = React.useState('');
-  const [filterType, setFilterType] = React.useState<FilterType>('all');
   const [reportVisible, setReportVisible] = React.useState(false);
   const [reportTarget, setReportTarget] = React.useState<string | null>(null);
   const { theme } = useTheme();
@@ -180,9 +223,21 @@ export default function Page() {
   const [persistedImageUrl, setPersistedImageUrl] = React.useState('');
   const [draftLoaded, setDraftLoaded] = React.useState(false);
   const [draftSavedAt, setDraftSavedAt] = React.useState<number | null>(null);
+  const [typePrompt, setTypePrompt] = React.useState('');
   const [offlinePostedCount, setOfflinePostedCount] = React.useState(0);
   const [hasPendingQueue, setHasPendingQueue] = React.useState(false);
   const [paywallOpen, setPaywallOpen] = React.useState(false);
+  const [recentMilestone, setRecentMilestone] = React.useState<MilestoneId | null>(null);
+  const milestoneTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const milestoneIgnoreRef = React.useRef<Set<MilestoneId>>(new Set());
+  const milestoneHistoryRef = React.useRef<Record<EngagementKind, Set<MilestoneId>>>(
+    {
+      posting: new Set(),
+      gifting: new Set(),
+      fulfillment: new Set(),
+    },
+  );
+  const milestonesHydratedRef = React.useRef(false);
 
   const promptOpacity = React.useRef(new Animated.Value(0)).current;
   const [quoteText, setQuoteText] = React.useState<string | null>(null);
@@ -194,13 +249,144 @@ export default function Page() {
   const listRef = React.useRef<FlatList<Wish> | null>(null);
   // Work around React 19 + RN typing mismatch for ref on FlatList in some IDEs
   const FlatListAny = FlatList as unknown as any;
+  const focusComposer = React.useCallback(() => {
+    listRef.current?.scrollToOffset?.({ offset: 0, animated: true });
+  }, []);
   const [showScrollTop, setShowScrollTop] = React.useState(false);
   const [hasNewPosts, setHasNewPosts] = React.useState(false);
   const [newPostsCount, setNewPostsCount] = React.useState(0);
-  const [headerElevated, setHeaderElevated] = React.useState(false);
   const newBannerOpacity = React.useRef(new Animated.Value(0)).current;
   const newBannerTranslate = React.useRef(new Animated.Value(10)).current;
-  const headerPulse = React.useRef(new Animated.Value(0)).current;
+  const preferredPostTypeRef = React.useRef<PostType | null>(null);
+  const draftLoadedRef = React.useRef(draftLoaded);
+  const composerHasContentRef = React.useRef(false);
+
+  React.useEffect(() => {
+    preferredPostTypeRef.current = postType;
+  }, [postType]);
+
+  React.useEffect(() => {
+    if (!user?.uid) return;
+    let cancelled = false;
+    const hydratePreferredType = async () => {
+      if (draftLoadedRef.current) return;
+      if (composerHasContentRef.current) return;
+      try {
+        const preferred = await getPreferredPostType(user.uid);
+        if (cancelled || !preferred) return;
+        if (draftLoadedRef.current || composerHasContentRef.current) return;
+        preferredPostTypeRef.current = preferred;
+        setPostType((current) =>
+          current === DEFAULT_POST_TYPE ? preferred : current,
+        );
+      } catch (err) {
+        logger.warn('Failed to hydrate preferred post type', err);
+      }
+    };
+    void hydratePreferredType();
+    return () => {
+      cancelled = true;
+    };
+  }, [setPostType, user?.uid]);
+
+  React.useEffect(() => {
+    draftLoadedRef.current = draftLoaded;
+  }, [draftLoaded]);
+
+  React.useEffect(() => {
+    composerHasContentRef.current =
+      wish.trim().length > 0 ||
+      !!selectedImage ||
+      includeAudio ||
+      giftLink.trim().length > 0 ||
+      isPoll ||
+      fundingEnabled;
+  }, [fundingEnabled, giftLink, includeAudio, isPoll, selectedImage, wish]);
+
+  const offlineStatusBanner = React.useMemo(
+    () => (
+      <OfflineQueueBanner
+        hasPending={hasPendingQueue}
+        pendingText={t('offline.pendingQueue', 'Posting saved wishes in background…')}
+        postedCount={offlinePostedCount}
+        postedText={(count) =>
+          count === 1
+            ? t('offline.postedOne', 'Your saved wish was posted.')
+            : t('offline.postedCount', { count })
+        }
+        pillColor={theme.input}
+        cardColor={theme.input}
+        textColor={theme.text}
+      />
+    ),
+    [hasPendingQueue, offlinePostedCount, t, theme.input, theme.text],
+  );
+
+  const heroGreeting = React.useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return t('home.greetingMorning', 'Good morning');
+    if (hour < 18) return t('home.greetingAfternoon', 'Good afternoon');
+    return t('home.greetingEvening', 'Good evening');
+  }, [t]);
+
+  const heroName = React.useMemo(() => {
+    if (profile?.displayName) {
+      const first = profile.displayName.trim().split(' ')[0];
+      if (first.length > 0) return first;
+    }
+    return t('home.friendFallback', 'friend');
+  }, [profile?.displayName, t]);
+
+  const quickActions = React.useMemo<QuickAction[]>(
+    () => [
+      {
+        key: 'feed',
+        label: t('home.quickActions.feed', 'Explore wishes'),
+        description: t('home.quickActions.feedDescription', 'See what the community is sharing'),
+        icon: 'compass-outline',
+        href: '/feed' as Href,
+      },
+      {
+        key: 'journal',
+        label: t('home.quickActions.journal', 'Daily journal'),
+        description: t('home.quickActions.journalDescription', 'Reflect privately'),
+        icon: 'book-outline',
+        href: '/journal' as Href,
+      },
+      {
+        key: 'messages',
+        label: t('home.quickActions.messages', 'Messages'),
+        description: t('home.quickActions.messagesDescription', 'Catch up with friends'),
+        icon: 'chatbubble-ellipses-outline',
+        href: '/(tabs)/messages' as Href,
+      },
+      {
+        key: 'profile',
+        label: t('home.quickActions.profile', 'Profile'),
+        description: t('home.quickActions.profileDescription', 'Update your space'),
+        icon: 'person-circle-outline',
+        href: '/(tabs)/profile' as Href,
+      },
+    ],
+    [t],
+  );
+
+  const heroImpactSummary = React.useMemo(() => {
+    const total = impact.wishes + impact.boosts + impact.gifts;
+    if (total === 0) {
+      return t(
+        'home.heroImpactSummary.empty',
+        'Start your story with today’s wish.',
+      );
+    }
+    return t('home.heroImpactSummary.stats', {
+      wishes: impact.wishes,
+      boosts: impact.boosts,
+      gifts: impact.gifts,
+    });
+  }, [impact.boosts, impact.gifts, impact.wishes, t]);
+  const impactTotal = impact.wishes + impact.boosts + impact.gifts;
+  const hasImpact = impactTotal > 0;
 
   if (!db || !storage) {
     logger.error('Firebase modules undefined in index page', { db, storage });
@@ -237,6 +423,7 @@ export default function Page() {
               setReportTarget(item.id);
               setReportVisible(true);
             }}
+            onDeleted={handleWishDeletedRef.current}
           />
         </View>
       );
@@ -326,20 +513,6 @@ export default function Page() {
           useNativeDriver: CAN_USE_NATIVE_DRIVER,
         }),
       ]).start();
-      // Pulse the sticky header subtly to indicate freshness
-      headerPulse.setValue(0);
-      Animated.sequence([
-        Animated.timing(headerPulse, {
-          toValue: 1,
-          duration: 220,
-          useNativeDriver: CAN_USE_NATIVE_DRIVER,
-        }),
-        Animated.timing(headerPulse, {
-          toValue: 0,
-          duration: 220,
-          useNativeDriver: CAN_USE_NATIVE_DRIVER,
-        }),
-      ]).start();
     } else {
       Animated.parallel([
         Animated.timing(newBannerOpacity, {
@@ -354,7 +527,7 @@ export default function Page() {
         }),
       ]).start();
     }
-  }, [hasNewPosts, newBannerOpacity, newBannerTranslate, headerPulse]);
+  }, [hasNewPosts, newBannerOpacity, newBannerTranslate]);
 
   // Initialize queue status on mount
   React.useEffect(() => {
@@ -373,7 +546,7 @@ export default function Page() {
         setDraftLoaded(true);
         const p = JSON.parse(raw);
         if (typeof p?.wish === 'string') setWish(p.wish);
-        if (p?.postType) setPostType(p.postType as any);
+        if (p?.postType) setPostType(normalizePostType(p.postType));
         if (typeof p?.isPoll === 'boolean') setIsPoll(p.isPoll);
         if (typeof p?.optionA === 'string') setOptionA(p.optionA);
         if (typeof p?.optionB === 'string') setOptionB(p.optionB);
@@ -416,7 +589,9 @@ export default function Page() {
       !isPoll &&
       !giftLink.trim() &&
       !giftType.trim() &&
-      !giftLabel.trim();
+      !giftLabel.trim() &&
+      !fundingEnabled &&
+      !fundingGoal.trim();
     const save = async () => {
       try {
         if (draftEmpty) {
@@ -435,6 +610,9 @@ export default function Page() {
           giftLink,
           giftType,
           giftLabel,
+          fundingEnabled,
+          fundingGoal,
+          fundingPresets,
           useProfilePost,
           autoDelete,
           enableExternalGift,
@@ -458,6 +636,9 @@ export default function Page() {
     giftLink,
     giftType,
     giftLabel,
+    fundingEnabled,
+    fundingGoal,
+    fundingPresets,
     useProfilePost,
     autoDelete,
     enableExternalGift,
@@ -619,67 +800,154 @@ export default function Page() {
   React.useEffect(() => {
     const loadPromptAndStreak = async () => {
       try {
-        const today = new Date().toISOString().split('T')[0];
-        const savedDate = await AsyncStorage.getItem('dailyPromptDate');
-        let savedPrompt = await AsyncStorage.getItem('dailyPromptText');
-        const recentRaw = await AsyncStorage.getItem('recentPromptIndices');
-        let recent: number[] = recentRaw ? JSON.parse(recentRaw) : [];
-
-        if (savedDate !== today || !savedPrompt) {
-          const index = pickPromptIndex(recent);
-          savedPrompt = DAILY_PROMPTS[index];
-          await AsyncStorage.setItem('dailyPromptDate', today);
-          await AsyncStorage.setItem('dailyPromptText', savedPrompt);
-          recent = [index, ...recent].slice(0, 20);
-          await AsyncStorage.setItem(
-            'recentPromptIndices',
-            JSON.stringify(recent),
-          );
+        const today = getLocalDateKey();
+        const promptForToday = getDailyPromptForDate(today);
+        promptOpacity.setValue(0);
+        setDailyPrompt(promptForToday);
+        if (promptForToday) {
+          await AsyncStorage.multiSet([
+            ['dailyPromptDate', today],
+            ['dailyPromptText', promptForToday],
+          ]);
         }
-
-        setDailyPrompt(savedPrompt || '');
         Animated.timing(promptOpacity, {
           toValue: 1,
           duration: 500,
           useNativeDriver: CAN_USE_NATIVE_DRIVER,
         }).start();
-
-        const streak = await AsyncStorage.getItem('streakCount');
-        if (streak) setStreakCount(parseInt(streak, 10));
       } catch (err) {
-        logger.error('Failed to load prompt or streak', err);
+        logger.error('Failed to load daily prompt', err);
       }
     };
 
     loadPromptAndStreak();
   }, [promptOpacity]);
 
-  /**
-   * Allow the user to fetch a new prompt for the current day.
-   * The date remains the same but the prompt text and recent list update.
-   */
-  const requestNewPrompt = async () => {
-    const recentRaw = await AsyncStorage.getItem('recentPromptIndices');
-    let recent: number[] = recentRaw ? JSON.parse(recentRaw) : [];
-    const index = pickPromptIndex(recent);
-    const newPrompt = DAILY_PROMPTS[index];
-    await AsyncStorage.setItem('dailyPromptText', newPrompt);
-    recent = [index, ...recent].slice(0, 20);
-    await AsyncStorage.setItem('recentPromptIndices', JSON.stringify(recent));
-    promptOpacity.setValue(0);
-    setDailyPrompt(newPrompt);
-    Animated.timing(promptOpacity, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: CAN_USE_NATIVE_DRIVER,
-    }).start();
-    const msg = t('composer.deepPrompt', "✨ That's a deep one.");
-    if (Platform.OS === 'android') {
-      ToastAndroid.show(msg, ToastAndroid.SHORT);
-    } else {
-      Alert.alert(msg);
+  React.useEffect(() => {
+    const today = getLocalDateKey();
+    setTypePrompt(getTypePromptForDate(postType, today));
+  }, [postType]);
+
+  const postingStats = engagementStats.posting;
+
+  React.useEffect(() => {
+    setStreakCount(postingStats.current);
+  }, [postingStats]);
+
+  React.useEffect(() => () => {
+    if (milestoneTimeoutRef.current) {
+      clearTimeout(milestoneTimeoutRef.current);
     }
-  };
+  }, []);
+
+  const announceMilestone = React.useCallback(
+    (milestoneId: MilestoneId, source: 'local' | 'sync' = 'local') => {
+      try {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      } catch {}
+      setRecentMilestone(milestoneId);
+      if (milestoneTimeoutRef.current) {
+        clearTimeout(milestoneTimeoutRef.current);
+      }
+      milestoneTimeoutRef.current = setTimeout(() => {
+        setRecentMilestone(null);
+      }, 5500);
+      try {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      try {
+        trackEvent('milestone_unlocked', { id: milestoneId, source });
+      } catch {}
+    },
+    [setRecentMilestone],
+  );
+
+  const milestoneMessage = React.useMemo(() => {
+    if (!recentMilestone) return null;
+    const key = `home.milestones.${recentMilestone}`;
+    return t(key, milestoneFallback(recentMilestone));
+  }, [recentMilestone, t]);
+
+  const daysSinceLastPost = React.useMemo(() => {
+    const last = engagementStats.posting.lastDate;
+    if (!last) return Number.POSITIVE_INFINITY;
+    const lastMs = Date.parse(`${last}T00:00:00`);
+    const todayMs = Date.parse(`${getLocalDateKey()}T00:00:00`);
+    if (Number.isNaN(lastMs) || Number.isNaN(todayMs)) {
+      return Number.POSITIVE_INFINITY;
+    }
+    return Math.max(0, Math.floor((todayMs - lastMs) / 86_400_000));
+  }, [engagementStats.posting.lastDate]);
+
+  const actionPrompts = React.useMemo(() => {
+    const prompts: ActionPrompt[] = [];
+    if (daysSinceLastPost >= 1 && daysSinceLastPost < 5) {
+      prompts.push({
+        key: 'streak-reminder',
+        icon: '🔥',
+        message: t('home.prompts.streakMessage', 'Share today to keep your streak alive.'),
+        cta: t('home.prompts.streakCta', 'Compose'),
+        onPress: focusComposer,
+      });
+    }
+    supporterThanks.slice(0, 2).forEach((entry, index) => {
+      if (!entry.supporterId) return;
+      prompts.push({
+        key: `supporter-${entry.supporterId}-${index}`,
+        icon: '💌',
+        message: t('home.prompts.supporterMessage', 'Thank {{name}} for their gift.', {
+          name: entry.supporterName,
+        }),
+        cta: t('home.prompts.supporterCta', 'Send thanks'),
+        onPress: () => {
+          if (entry.wishId) {
+            router.push(`/wish/${entry.wishId}` as Href);
+          } else {
+            router.push('/(tabs)/profile' as Href);
+          }
+        },
+      });
+    });
+    return prompts;
+  }, [daysSinceLastPost, supporterThanks, t, focusComposer]);
+
+  React.useEffect(() => {
+    const kinds: EngagementKind[] = ['posting', 'gifting', 'fulfillment'];
+    if (!milestonesHydratedRef.current) {
+      kinds.forEach((kind) => {
+        const entry = engagementStats[kind];
+        const ids = Object.keys(entry?.milestones ?? {}) as MilestoneId[];
+        milestoneHistoryRef.current[kind] = new Set(ids);
+      });
+      milestonesHydratedRef.current = true;
+      return;
+    }
+
+    kinds.forEach((kind) => {
+      const entry = engagementStats[kind];
+      const currentIds = new Set(Object.keys(entry?.milestones ?? {}) as MilestoneId[]);
+      const previous = milestoneHistoryRef.current[kind];
+      const newIds: MilestoneId[] = [];
+      currentIds.forEach((id) => {
+        if (!previous.has(id)) {
+          newIds.push(id);
+        }
+      });
+      if (newIds.length > 0) {
+        const newest = newIds.reduce((best, candidate) => {
+          const bestValue = Number(best.split('_')[1] || '0');
+          const candidateValue = Number(candidate.split('_')[1] || '0');
+          return candidateValue >= bestValue ? candidate : best;
+        }, newIds[0]);
+        if (milestoneIgnoreRef.current.has(newest)) {
+          milestoneIgnoreRef.current.delete(newest);
+        } else {
+          announceMilestone(newest, 'sync');
+        }
+      }
+      milestoneHistoryRef.current[kind] = currentIds;
+    });
+  }, [engagementStats, announceMilestone]);
   const handlePostWish = async () => {
     const sanitizedWish = sanitizeInput(wish);
     const sanitizedLink = sanitizeInput(giftLink);
@@ -687,6 +955,13 @@ export default function Page() {
     const sanitizedGiftLabel = sanitizeInput(giftLabel);
     const sanitizedOptionA = sanitizeInput(optionA);
     const sanitizedOptionB = sanitizeInput(optionB);
+    const submittedType = postType;
+    const parsedFundingGoal = fundingGoal.trim();
+    const fundingGoalValue = parsedFundingGoal ? Number(parsedFundingGoal.replace(/[^0-9.]/g, '')) : NaN;
+    const fundingPresetValues = fundingPresets
+      .split(',')
+      .map((v) => Number(v.trim()))
+      .filter((n) => Number.isFinite(n) && n > 0);
 
     if (sanitizedWish === '') return;
     if (sanitizedWish.length > MAX_WISH_LENGTH) {
@@ -701,6 +976,20 @@ export default function Page() {
         t('composer.linkTooLongTitle', 'Link too long'),
         t('composer.linkTooLong', { max: MAX_LINK_LENGTH }),
       );
+      return;
+    }
+    if (fundingEnabled) {
+      if (!Number.isFinite(fundingGoalValue) || fundingGoalValue <= 0) {
+        Alert.alert(
+          t('composer.fundingGoalErrorTitle', 'Set a goal'),
+          t('composer.fundingGoalErrorBody', 'Enter a positive goal amount to enable funding.'),
+        );
+        return;
+      }
+    }
+
+    if (!user) {
+      setPostError(t('errors.authRequired', 'Please sign in before posting.'));
       return;
     }
 
@@ -752,8 +1041,8 @@ export default function Page() {
       }
       await addWish({
         text: sanitizedWish,
-        category: postType,
-        type: postType,
+        category: submittedType,
+        type: submittedType,
         userId: user?.uid,
         displayName: useProfilePost ? profile?.displayName || '' : '',
         photoURL: useProfilePost ? profile?.photoURL || '' : '',
@@ -764,6 +1053,11 @@ export default function Page() {
             ...(sanitizedGiftType && { giftType: sanitizedGiftType }),
             ...(sanitizedGiftLabel && { giftLabel: sanitizedGiftLabel }),
           }),
+        ...(fundingEnabled && Number.isFinite(fundingGoalValue) && fundingGoalValue > 0 && {
+          fundingGoal: fundingGoalValue,
+          fundingCurrency: 'usd',
+          ...(fundingPresetValues.length ? { fundingPresets: fundingPresetValues } : {}),
+        }),
         ...(isPoll && {
           isPoll: true,
           optionA: sanitizedOptionA,
@@ -794,11 +1088,16 @@ export default function Page() {
       }
 
       resetRecorder();
-      resetComposer();
+      resetComposer(submittedType);
       setPostConfirm(true);
       setUploadProgress(null);
-      const streak = await updateStreak();
-      setStreakCount(streak);
+      const streakResult = await updateStreak(user?.uid);
+      setStreakCount(streakResult.current);
+      if (streakResult.unlocked.length > 0) {
+        const milestoneId = streakResult.unlocked[0];
+        milestoneIgnoreRef.current.add(milestoneId);
+        announceMilestone(milestoneId, 'local');
+      }
       try {
         trackEvent('post_success', {
           offline: false,
@@ -806,8 +1105,13 @@ export default function Page() {
           has_audio: !!audioUrl,
           text_length: sanitizedWish.length,
           link_length: sanitizedLink.length,
+          post_type: submittedType,
         });
       } catch {}
+      preferredPostTypeRef.current = submittedType;
+      if (user?.uid) {
+        void recordPostTypeUsage(user.uid, submittedType);
+      }
       // Clear pending draft on success
       try {
         await AsyncStorage.removeItem('pendingPost.v1');
@@ -823,8 +1127,8 @@ export default function Page() {
       try {
         const payload = {
           text: sanitizedWish,
-          category: postType,
-          type: postType,
+          category: submittedType,
+          type: submittedType,
           userId: user?.uid,
           displayName: useProfilePost ? profile?.displayName || '' : '',
           photoURL: useProfilePost ? profile?.photoURL || '' : '',
@@ -835,6 +1139,11 @@ export default function Page() {
               ...(sanitizedGiftType && { giftType: sanitizedGiftType }),
               ...(sanitizedGiftLabel && { giftLabel: sanitizedGiftLabel }),
             }),
+          ...(fundingEnabled && Number.isFinite(fundingGoalValue) && fundingGoalValue > 0 && {
+            fundingGoal: fundingGoalValue,
+            fundingCurrency: 'usd',
+            ...(fundingPresetValues.length ? { fundingPresets: fundingPresetValues } : {}),
+          }),
           ...(isPoll && {
             isPoll: true,
             optionA: sanitizedOptionA,
@@ -860,6 +1169,7 @@ export default function Page() {
           text_length: sanitizedWish.length,
           link_length: sanitizedLink.length,
           error: (error as any)?.message,
+          post_type: submittedType,
         });
       } catch {}
       // Save draft for later resume
@@ -874,6 +1184,9 @@ export default function Page() {
           giftLink: sanitizedLink,
           giftType: sanitizedGiftType,
           giftLabel: sanitizedGiftLabel,
+          fundingEnabled,
+          fundingGoal,
+          fundingPresets,
           useProfilePost,
           autoDelete,
           enableExternalGift,
@@ -909,23 +1222,48 @@ export default function Page() {
   };
 
 
-  const filteredWishes = React.useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
-    if (!q && filterType === 'all') return wishList;
-    return wishList.filter(
-      (wish: Wish) =>
-        (!q || wish.text.toLowerCase().includes(q)) &&
-        (filterType === 'all' || wish.type === filterType) &&
-        (!wish.expiresAt || wish.expiresAt.toDate() > new Date()),
-    );
-  }, [wishList, searchTerm, filterType]);
+  const [removedWishIds, setRemovedWishIds] = React.useState<Set<string>>(new Set());
+  const handleWishDeletedRef = React.useRef<(id: string) => void>(() => {});
+
+  const filteredWishes = React.useMemo(
+    () => wishList.filter((w) => !removedWishIds.has(w.id)),
+    [wishList, removedWishIds],
+  );
+
+  React.useEffect(() => {
+    setRemovedWishIds((prev) => {
+      if (!prev.size) return prev;
+      const next = new Set<string>();
+      wishList.forEach((w) => {
+        if (prev.has(w.id)) next.add(w.id);
+      });
+      return next.size === prev.size ? prev : next;
+    });
+  }, [wishList]);
+
+  handleWishDeletedRef.current = (id: string) => {
+    setRemovedWishIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  };
+
+  React.useEffect(() => {
+    if (!user?.uid) return;
+    wishList.slice(0, 25).forEach((wishItem) => {
+      if (wishItem?.id && wishItem.userId === user.uid) {
+        primeWishMeta(wishItem.id, wishItem.userId, user.uid);
+      }
+    });
+  }, [wishList, user?.uid]);
 
 /*
   const WishCard: React.FC<{ item: Wish }> = ({ item }) => {
     const [timeLeft, setTimeLeft] = useState('');
     const [giftCount, setGiftCount] = useState(0);
     const [hasGiftMsg, setHasGiftMsg] = useState(false);
-    const glowAnim = useRef(new Animated.Value(0)).current;
+    const glowAnim = useRef(new Animated.Value(1)).current;
     const isBoosted =
       item.boostedUntil &&
       item.boostedUntil.toDate &&
@@ -953,41 +1291,39 @@ export default function Page() {
     }, [item.id]);
 
     useEffect(() => {
-      if (isBoosted && item.boostedUntil) {
-        const update = () =>
-          setTimeLeft(formatTimeLeft(item.boostedUntil!.toDate()));
-        update();
-        const id = setInterval(update, 60000);
-        const loop = Animated.loop(
-          Animated.sequence([
-            Animated.timing(glowAnim, {
-              toValue: 1,
-              duration: 1000,
-              useNativeDriver: false,
-            }),
-            Animated.timing(glowAnim, {
-              toValue: 0,
-              duration: 1000,
-              useNativeDriver: false,
-            }),
-          ]),
-        );
-        loop.start();
-        return () => {
-          clearInterval(id);
-          loop.stop();
-        };
-      } else {
+      if (!isBoosted || !item.boostedUntil) {
         setTimeLeft('');
+        glowAnim.setValue(1);
+        return;
       }
+      const update = () =>
+        setTimeLeft(formatTimeLeft(item.boostedUntil!.toDate()));
+      update();
+      const id = setInterval(update, 60000);
+      glowAnim.setValue(1);
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, {
+            toValue: 1.04,
+            duration: 900,
+            useNativeDriver: true,
+          }),
+          Animated.timing(glowAnim, {
+            toValue: 1,
+            duration: 900,
+            useNativeDriver: true,
+          }),
+        ]),
+      );
+      loop.start();
+      return () => {
+        clearInterval(id);
+        loop.stop();
+        glowAnim.setValue(1);
+      };
     }, [glowAnim, isBoosted, item.boostedUntil]);
 
-    const borderColor = isBoosted
-      ? glowAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: ['#facc15', '#fde68a'],
-        })
-      : 'transparent';
+    const borderColor = isBoosted ? '#facc15' : 'transparent';
 
     const canBoost =
       user &&
@@ -1031,6 +1367,7 @@ export default function Page() {
                 item.userId!,
                 process.env.EXPO_PUBLIC_GIFT_SUCCESS_URL!,
                 process.env.EXPO_PUBLIC_GIFT_CANCEL_URL!,
+                user?.uid ?? null,
               );
               if (res.url) await WebBrowser.openBrowserAsync(res.url);
             } catch (err) {
@@ -1050,6 +1387,7 @@ export default function Page() {
             backgroundColor: typeInfo[item.type || 'wish'].color,
             borderColor,
             borderWidth: isBoosted ? 2 : 0,
+            transform: [{ scale: isBoosted ? glowAnim : 1 }],
           },
         ]}
       >
@@ -1303,8 +1641,8 @@ export default function Page() {
         >
           <FlatListAny
             ref={listRef}
-            data={[{ __type: 'filters' } as any, ...filteredWishes]}
-            keyExtractor={(item: any, index: number) => (item.__type === 'filters' ? '__filters__' : item.id)}
+            data={filteredWishes}
+            keyExtractor={(item: Wish) => item.id}
             onEndReached={loadMore}
             onEndReachedThreshold={0.5}
             initialNumToRender={10}
@@ -1314,21 +1652,19 @@ export default function Page() {
             removeClippedSubviews
             keyboardShouldPersistTaps="handled"
             maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-            stickyHeaderIndices={[0]}
             scrollEventThrottle={16}
             onScroll={({ nativeEvent }: { nativeEvent: NativeScrollEvent }) => {
               const y = nativeEvent.contentOffset.y;
               if (!showScrollTop && y > 300) setShowScrollTop(true);
               else if (showScrollTop && y <= 300) setShowScrollTop(false);
-              if (!headerElevated && y > 8) setHeaderElevated(true);
-              else if (headerElevated && y <= 8) setHeaderElevated(false);
             }}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
             contentContainerStyle={styles.contentContainer}
+            ListHeaderComponentStyle={styles.headerComponent}
             ListHeaderComponent={
-              <>
+              <View style={styles.headerContainer}>
                 {showQuote && quoteText ? (
                   <DailyQuoteBanner
                     visible={showQuote}
@@ -1339,183 +1675,434 @@ export default function Page() {
                     onOpenSettings={() => router.push('/settings' as Href)}
                   />
                 ) : null}
-                <Text style={styles.title}>WhispList ✨</Text>
-                {hasPendingQueue && (
-                  <View style={{ backgroundColor: theme.input, padding: 8, borderRadius: 999, alignSelf: 'center', marginBottom: 10 }}>
-                    <Text style={{ color: theme.text }}>
-                      {t('offline.pendingQueue', 'Posting saved wishes in background…')}
+                {milestoneMessage ? (
+                  <View style={[styles.milestoneToast, { borderColor: theme.tint }]}>
+                    <Text style={[styles.milestoneTitle, { color: theme.tint }]}>
+                      {t('home.milestones.title', 'Milestone unlocked!')}
+                    </Text>
+                    <Text style={[styles.milestoneText, { color: theme.text }]}>{milestoneMessage}</Text>
+                  </View>
+                ) : null}
+                <View style={styles.heroCard}>
+                  <Text style={styles.heroGreeting}>
+                    {heroGreeting}, {heroName} ✨
+                  </Text>
+                  <Text style={styles.heroSubtitle}>
+                    {t('home.heroSubtitle', 'Share a wish or explore the community.')}
+                  </Text>
+                  {streakCount > 0 ? (
+                    <View style={styles.heroChipRow}>
+                      <View style={styles.heroChip}>
+                        <Text style={styles.heroChipText}>
+                          🔥 {t('home.streakChip', 'Streak: {{count}} days', { count: streakCount })}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
+                  <Text style={[styles.heroImpactSummary, { color: theme.placeholder }]}>
+                    {heroImpactSummary}
+                  </Text>
+                  {hasImpact ? (
+                    <View style={styles.heroStatsRow}>
+                      <View style={[styles.heroStat, styles.heroStatSpacing]}>
+                        <Text style={[styles.heroStatValue, { color: theme.text }]}>
+                          {impact.wishes}
+                        </Text>
+                        <Text style={[styles.heroStatLabel, { color: theme.placeholder }]}>
+                          {t('home.heroStats.wishes', 'Wishes')}
+                        </Text>
+                      </View>
+                      <View style={[styles.heroStat, styles.heroStatSpacing]}>
+                        <Text style={[styles.heroStatValue, { color: theme.text }]}>
+                          {impact.boosts}
+                        </Text>
+                        <Text style={[styles.heroStatLabel, { color: theme.placeholder }]}>
+                          {t('home.heroStats.boosts', 'Boosts')}
+                        </Text>
+                      </View>
+                      <View style={styles.heroStat}>
+                        <Text style={[styles.heroStatValue, { color: theme.text }]}>
+                          {impact.gifts}
+                        </Text>
+                        <Text style={[styles.heroStatLabel, { color: theme.placeholder }]}>
+                          {t('home.heroStats.gifts', 'Gifts')}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
+                  <View style={styles.quickActionsHeader}>
+                    <Text style={[styles.quickActionsTitle, { color: theme.text }]}>
+                      {t('home.quickActions.title', 'Quick shortcuts')}
+                    </Text>
+                    <Text style={[styles.quickActionsSubtitle, { color: theme.placeholder }]}>
+                      {t('home.quickActions.subtitle', 'Jump back into your routine')}
                     </Text>
                   </View>
-                )}
-                {offlinePostedCount > 0 && (
-                  <View style={{ backgroundColor: theme.input, padding: 10, borderRadius: 8, marginBottom: 10 }}>
-                    <Text style={{ color: theme.text, textAlign: 'center' }}>
-                      {offlinePostedCount === 1
-                        ? t('offline.postedOne', 'Your saved wish was posted.')
-                        : t('offline.postedCount', { count: offlinePostedCount })}
-                    </Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.quickActionScroll}
+                  >
+                    {quickActions.map((action) => (
+                      <TouchableOpacity
+                        key={action.key}
+                        onPress={() => {
+                          if (action.onPress) {
+                            action.onPress();
+                            return;
+                          }
+                          if (action.href) {
+                            router.push(action.href);
+                          }
+                        }}
+                        style={[
+                          styles.quickActionCard,
+                          {
+                            backgroundColor: theme.background,
+                            borderColor: theme.placeholder,
+                          },
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel={action.label}
+                      >
+                        <View
+                          style={[
+                            styles.quickActionIconWrap,
+                            { backgroundColor: theme.input },
+                          ]}
+                        >
+                          <Ionicons name={action.icon} size={18} color={theme.tint} />
+                        </View>
+                        <Text
+                          style={[styles.quickActionLabel, { color: theme.text }]}
+                        >
+                          {action.label}
+                        </Text>
+                        {action.description ? (
+                          <Text
+                            style={[
+                              styles.quickActionDescription,
+                              { color: theme.placeholder },
+                            ]}
+                            numberOfLines={2}
+                          >
+                            {action.description}
+                          </Text>
+                        ) : null}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+                <View style={styles.sectionSpacing}>
+                  <EngagementCard stats={engagementStats} loading={engagementLoading} />
+                </View>
+                <View style={styles.sectionSpacing}>
+                  <CommunityPulseCard
+                    boosts={pulseBoosts}
+                    fulfillments={pulseFulfillments}
+                    supporters={pulseSupporters}
+                    loading={pulseLoading}
+                  />
+                </View>
+                {actionPrompts.length ? (
+                  <View style={styles.sectionSpacing}>
+                    <ActionPromptsCard prompts={actionPrompts} />
                   </View>
-                )}
-                {error && (
-                  <View style={{ backgroundColor: theme.input, padding: 10, borderRadius: 8, marginBottom: 10 }}>
-                    <Text style={{ color: theme.text, textAlign: 'center', marginBottom: 8 }}>
-                      {error}
-                    </Text>
+                ) : null}
+                {offlineStatusBanner ? (
+                  <View style={styles.sectionSpacing}>{offlineStatusBanner}</View>
+                ) : null}
+                {error ? (
+                  <View style={[styles.errorCard, { backgroundColor: theme.input }]}>
+                    <Text style={styles.errorText}>{error}</Text>
                     <TouchableOpacity
                       onPress={onRefresh}
                       accessibilityRole="button"
                       accessibilityLabel={t('common.retry', 'Retry loading')}
-                      style={{ alignSelf: 'center', backgroundColor: theme.tint, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6 }}
+                      style={styles.errorButton}
                     >
-                      <Text style={{ color: theme.background, fontWeight: '600' }}>{t('common.retry', 'Retry')}</Text>
+                      <Text style={styles.errorButtonText}>{t('common.retry', 'Retry')}</Text>
                     </TouchableOpacity>
                   </View>
-                )}
-                <Text style={styles.subtitle}>{t('home.subtitle')}</Text>
-                {streakCount > 0 && (
-                  <Text style={styles.streak}>
-                    🔥 You’ve posted {streakCount} days in a row!
-                  </Text>
-                )}
-
-                <WishComposer
-                  wish={wish}
-                  setWish={setWish}
-                  dailyPrompt={dailyPrompt}
-                  onRefreshPrompt={requestNewPrompt}
-                  rephrasing={rephrasing}
-                  onRephrase={() => {
-                    if (!isSupporter) { setPaywallOpen(true); return; }
-                    void handleRephrase();
-                  }}
-                  postType={postType}
-                  setPostType={setPostType}
-                  showAdvanced={showAdvanced}
-                  setShowAdvanced={(v: boolean) => {
-                    LayoutAnimation.configureNext(
-                      LayoutAnimation.Presets.easeInEaseOut,
-                    );
-                    setShowAdvanced(v);
-                  }}
-                  isPoll={isPoll}
-                  setIsPoll={setIsPoll}
-                  optionA={optionA}
-                  setOptionA={setOptionA}
-                  optionB={optionB}
-                  setOptionB={setOptionB}
-                  includeAudio={includeAudio}
-                  setIncludeAudio={setIncludeAudio}
-                  isRecording={isRecording}
-                  startRecording={startRecording}
-                  stopRecording={stopRecording}
-                  resetRecorder={resetRecorder}
-                  stripeEnabled={!!stripeEnabled}
-                  enableExternalGift={enableExternalGift}
-                  setEnableExternalGift={setEnableExternalGift}
-                  giftLink={giftLink}
-                  setGiftLink={setGiftLink}
-                  giftType={giftType}
-                  setGiftType={setGiftType}
-                  giftLabel={giftLabel}
-                  setGiftLabel={setGiftLabel}
-                  useProfilePost={useProfilePost}
-                  setUseProfilePost={setUseProfilePost}
-                  autoDelete={autoDelete}
-                  setAutoDelete={setAutoDelete}
-                  selectedImage={selectedImage}
-                  pickImage={pickImage}
-                  posting={posting}
-                  uploadProgress={uploadProgress}
-                  uploadStage={uploadStage}
-                  errorText={postError}
-                  onRetry={handlePostWish}
-                  isDraftLoaded={draftLoaded}
-                  draftSavedAt={draftSavedAt}
-                  hasPendingQueue={hasPendingQueue}
-                  onSaveDraft={async () => {
-                    try {
-                      const draft = {
-                        wish,
-                        postType,
-                        isPoll,
-                        optionA,
-                        optionB,
-                        includeAudio,
-                        giftLink,
-                        giftType,
-                        giftLabel,
-                        useProfilePost,
-                        autoDelete,
-                        enableExternalGift,
-                        persistedAudioUrl,
-                        persistedImageUrl,
-                        manual: true,
-                        savedAt: Date.now(),
-                      };
-                      await AsyncStorage.setItem('pendingPost.v1', JSON.stringify(draft));
-                      setDraftLoaded(true);
-                      setDraftSavedAt(draft.savedAt);
+                ) : null}
+                <View style={styles.sectionSpacing}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionHeading}>
+                      {t('home.composeTitle', 'Share something new')}
+                    </Text>
+                    <Text style={styles.sectionDescription}>
+                      {t(
+                        'home.composeSubtitle',
+                        'Let a fresh wish float into the world.',
+                      )}
+                    </Text>
+                  </View>
+                  <WishComposer
+                    wish={wish}
+                    setWish={setWish}
+                    dailyPrompt={dailyPrompt}
+                    typePrompt={typePrompt}
+                    rephrasing={rephrasing}
+                    onRephrase={() => {
+                      if (!isSupporter) {
+                        setPaywallOpen(true);
+                        return;
+                      }
+                      void handleRephrase();
+                    }}
+                    postType={postType}
+                    setPostType={setPostType}
+                    showAdvanced={showAdvanced}
+                    setShowAdvanced={(v: boolean) => {
+                      LayoutAnimation.configureNext(
+                        LayoutAnimation.Presets.easeInEaseOut,
+                      );
+                      setShowAdvanced(v);
+                    }}
+                    isPoll={isPoll}
+                    setIsPoll={setIsPoll}
+                    optionA={optionA}
+                    setOptionA={setOptionA}
+                    optionB={optionB}
+                    setOptionB={setOptionB}
+                    includeAudio={includeAudio}
+                    setIncludeAudio={setIncludeAudio}
+                    isRecording={isRecording}
+                    startRecording={startRecording}
+                    stopRecording={stopRecording}
+                    resetRecorder={resetRecorder}
+                    stripeEnabled={!!stripeEnabled}
+                    enableExternalGift={enableExternalGift}
+                    setEnableExternalGift={setEnableExternalGift}
+                    fundingEnabled={fundingEnabled}
+                    setFundingEnabled={setFundingEnabled}
+                    fundingGoal={fundingGoal}
+                    setFundingGoal={setFundingGoal}
+                    fundingPresets={fundingPresets}
+                    setFundingPresets={setFundingPresets}
+                    giftLink={giftLink}
+                    setGiftLink={setGiftLink}
+                    giftType={giftType}
+                    setGiftType={setGiftType}
+                    giftLabel={giftLabel}
+                    setGiftLabel={setGiftLabel}
+                    useProfilePost={useProfilePost}
+                    setUseProfilePost={setUseProfilePost}
+                    autoDelete={autoDelete}
+                    setAutoDelete={setAutoDelete}
+                    selectedImage={selectedImage}
+                    pickImage={pickImage}
+                    posting={posting}
+                    uploadProgress={uploadProgress}
+                    uploadStage={uploadStage}
+                    errorText={postError}
+                    onRetry={handlePostWish}
+                    isDraftLoaded={draftLoaded}
+                    draftSavedAt={draftSavedAt}
+                    hasPendingQueue={hasPendingQueue}
+                    onSaveDraft={async () => {
                       try {
-                        trackEvent('draft_saved', {
-                          has_image: !!(selectedImage || persistedImageUrl),
-                          has_audio: !!(recordedUri || persistedAudioUrl),
+                        const draft = {
+                          wish,
+                          postType,
+                          isPoll,
+                          optionA,
+                          optionB,
+                          includeAudio,
+                          giftLink,
+                          giftType,
+                          giftLabel,
+                          useProfilePost,
+                          autoDelete,
+                          enableExternalGift,
+                          persistedAudioUrl,
+                          persistedImageUrl,
+                          manual: true,
+                          savedAt: Date.now(),
+                        };
+                        await AsyncStorage.setItem('pendingPost.v1', JSON.stringify(draft));
+                        setDraftLoaded(true);
+                        setDraftSavedAt(draft.savedAt);
+                        try {
+                          trackEvent('draft_saved', {
+                            has_image: !!(selectedImage || persistedImageUrl),
+                            has_audio: !!(recordedUri || persistedAudioUrl),
+                            text_length: wish.length,
+                          });
+                        } catch {}
+                        if (Platform.OS === 'android') {
+                          ToastAndroid.show(t('composer.draftSaved', 'Draft saved'), ToastAndroid.SHORT);
+                        } else {
+                          Alert.alert(t('composer.draftSaved', 'Draft saved'));
+                        }
+                      } catch {}
+                    }}
+                    onDiscardDraft={async () => {
+                      const proceed = await new Promise<boolean>((resolve) => {
+                        Alert.alert(
+                          t('composer.discardConfirmTitle', 'Discard draft?'),
+                          t(
+                            'composer.discardConfirmMessage',
+                            'This will remove your saved draft.',
+                          ),
+                          [
+                            {
+                              text: t('common.cancel', 'Cancel'),
+                              style: 'cancel',
+                              onPress: () => resolve(false),
+                            },
+                            {
+                              text: t('composer.discardDraft', 'Discard'),
+                              style: 'destructive',
+                              onPress: () => resolve(true),
+                            },
+                          ],
+                        );
+                      });
+                      if (!proceed) return;
+                      try {
+                        await AsyncStorage.removeItem('pendingPost.v1');
+                      } catch {}
+                      setPersistedAudioUrl('');
+                      setPersistedImageUrl('');
+                      setDraftLoaded(false);
+                      setDraftSavedAt(null);
+                      resetRecorder();
+                      resetComposer(preferredPostTypeRef.current ?? DEFAULT_POST_TYPE);
+                      setPostError(null);
+                      try {
+                        trackEvent('draft_discarded', {
+                          had_image: !!(selectedImage || persistedImageUrl),
+                          had_audio: !!(recordedUri || persistedAudioUrl),
                           text_length: wish.length,
                         });
                       } catch {}
-                      if (Platform.OS === 'android') {
-                        ToastAndroid.show(t('composer.draftSaved', 'Draft saved'), ToastAndroid.SHORT);
-                      } else {
-                        Alert.alert(t('composer.draftSaved', 'Draft saved'));
-                      }
-                    } catch {}
-                  }}
-                  onDiscardDraft={async () => {
-                    const proceed = await new Promise<boolean>((resolve) => {
-                      Alert.alert(t('composer.discardConfirmTitle', 'Discard draft?'), t('composer.discardConfirmMessage', 'This will remove your saved draft.'), [
-                        { text: t('common.cancel', 'Cancel'), style: 'cancel', onPress: () => resolve(false) },
-                        { text: t('composer.discardDraft', 'Discard'), style: 'destructive', onPress: () => resolve(true) },
-                      ]);
-                    });
-                    if (!proceed) return;
-                    try {
-                      await AsyncStorage.removeItem('pendingPost.v1');
-                    } catch {}
-                    setPersistedAudioUrl('');
-                    setPersistedImageUrl('');
-                    setDraftLoaded(false);
-                    setDraftSavedAt(null);
-                    resetRecorder();
-                    resetComposer();
-                    setPostError(null);
-                    try {
-                      trackEvent('draft_discarded', {
-                        had_image: !!(selectedImage || persistedImageUrl),
-                        had_audio: !!(recordedUri || persistedAudioUrl),
-                        text_length: wish.length,
-                      });
-                    } catch {}
-                  }}
-                  onSubmit={handlePostWish}
-                  maxWishLength={MAX_WISH_LENGTH}
-                  maxLinkLength={MAX_LINK_LENGTH}
-                />
+                    }}
+                    onSubmit={handlePostWish}
+                    maxWishLength={MAX_WISH_LENGTH}
+                    maxLinkLength={MAX_LINK_LENGTH}
+                    isAuthenticated={!!user}
+                  />
+                </View>
                 <SupporterPaywallModal
                   visible={paywallOpen}
                   onClose={() => setPaywallOpen(false)}
                   onSubscribe={() => {
                     setPaywallOpen(false);
-                    router.push('/(tabs)/settings/subscriptions' as Href);
+                    router.push('/(tabs)/profile/settings/subscriptions' as Href);
                   }}
-                  perks={[
-                    t('subscriptions.benefits.rephrase', 'Rephrase assistant'),
-                    t('subscriptions.benefits.badge', 'Supporter badge'),
-                    t('subscriptions.benefits.image', 'Higher image quality'),
-                    t('subscriptions.benefits.early', 'Early access to features'),
-                  ]}
+                  perks={supporterPerks}
                 />
-
-                <UserImpact impact={impact} />
-              </>
+                {hasImpact ? (
+                  <View style={styles.sectionSpacing}>
+                    <View style={styles.sectionHeader}>
+                      <Text style={styles.sectionHeading}>
+                        {t('home.impactTitle', 'Your impact')}
+                      </Text>
+                      <Text style={styles.sectionDescription}>
+                        {t(
+                          'home.impactSubtitle',
+                          'A quick snapshot of how your wishes are doing.',
+                        )}
+                      </Text>
+                    </View>
+                    <UserImpact impact={impact} />
+                  </View>
+                ) : null}
+                <View
+                  style={[
+                    styles.feedIntroCard,
+                    {
+                      backgroundColor: theme.input,
+                      borderColor: theme.placeholder,
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.feedIntroText,
+                      !hasNewPosts && { marginBottom: 0 },
+                    ]}
+                  >
+                    <Text style={styles.sectionHeading}>
+                      {t('home.feedHeading', 'Community feed')}
+                    </Text>
+                    <Text style={styles.sectionDescription}>
+                      {t(
+                        'home.feedDescription',
+                        'See the latest wishes from people you follow.',
+                      )}
+                    </Text>
+                  </View>
+                  <Animated.View
+                    style={[
+                      styles.newPostsWrapper,
+                      {
+                        opacity: newBannerOpacity,
+                        transform: [{ translateY: newBannerTranslate }],
+                        display: hasNewPosts ? 'flex' : 'none',
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.newPostsCard,
+                        Platform.OS === 'web'
+                          ? ({ boxShadow: '0px 4px 12px rgba(0,0,0,0.1)' } as const)
+                          : styles.newPostsShadow,
+                      ]}
+                    >
+                      <TouchableOpacity
+                        onPress={async () => {
+                          try {
+                            await onRefresh();
+                          } finally {
+                            setHasNewPosts(false);
+                            setNewPostsCount(0);
+                            try {
+                              await Haptics.impactAsync(
+                                Haptics.ImpactFeedbackStyle.Light,
+                              );
+                            } catch {}
+                          }
+                        }}
+                        style={styles.newPostsButton}
+                        accessibilityRole="button"
+                        accessibilityLabel={t(
+                          'home.newPosts',
+                          'New posts available. Tap to refresh',
+                        )}
+                      >
+                        <Text style={styles.newPostsText}>
+                          {newPostsCount > 0
+                            ? t(
+                                'home.newPostsCount',
+                                `${newPostsCount} new ${
+                                  newPostsCount === 1 ? 'post' : 'posts'
+                                } — tap to refresh`,
+                              )
+                            : t(
+                                'home.newPosts',
+                                'New posts available — tap to refresh',
+                              )}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setHasNewPosts(false);
+                          setNewPostsCount(0);
+                        }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('common.dismiss', 'Dismiss')}
+                        style={styles.newPostsDismiss}
+                      >
+                        <Ionicons name="close" size={16} color={theme.background} />
+                      </TouchableOpacity>
+                    </View>
+                  </Animated.View>
+                </View>
+              </View>
             }
             ListEmptyComponent={
               loading ? (
@@ -1525,10 +2112,13 @@ export default function Page() {
               ) : (
                 <View style={{ alignItems: 'center', marginTop: 24 }}>
                   <Text style={styles.noResults}>
-                    {t('home.noResults', 'No wishes yet. Try exploring or following more people!')}
+                    {t(
+                      'home.noResults',
+                      "No wishes here yet. Share one to start the conversation ✨",
+                    )}
                   </Text>
                   <TouchableOpacity
-                    onPress={() => router.push('/explore' as Href)}
+                    onPress={() => router.push('/feed' as Href)}
                     style={{ marginTop: 12, backgroundColor: theme.tint, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8 }}
                     accessibilityRole="button"
                     accessibilityLabel={t('home.explore', 'Explore wishes')}
@@ -1549,120 +2139,9 @@ export default function Page() {
                 </Text>
               ) : null
             }
-            renderItem={({ item, index }: { item: any; index: number }) => {
-              if ((item as any).__type === 'filters') {
-                return (
-                  <Animated.View
-                    style={[
-                      {
-                        backgroundColor: theme.background,
-                        paddingTop: 6,
-                        paddingBottom: 6,
-                        borderBottomColor: theme.input,
-                        borderBottomWidth: StyleSheet.hairlineWidth,
-                      },
-                      Platform.OS === 'web'
-                        ? ({
-                            boxShadow: headerElevated
-                              ? '0px 3px 10px rgba(0,0,0,0.12)'
-                              : 'none',
-                          } as const)
-                        : {
-                            shadowColor: '#000',
-                            shadowOpacity: headerElevated ? 0.08 : 0,
-                            shadowRadius: headerElevated ? 10 : 0,
-                            shadowOffset: {
-                              width: 0,
-                              height: headerElevated ? 3 : 0,
-                            },
-                            elevation: headerElevated ? 3 : 0,
-                          },
-                    ]}
-                  >
-                    <Animated.View
-                      {...(Platform.OS === 'web' ? {} : { pointerEvents: 'none' })}
-                      style={[
-                        StyleSheet.absoluteFill,
-                        {
-                          backgroundColor: theme.tint,
-                          opacity: headerPulse.interpolate({ inputRange: [0, 1], outputRange: [0, 0.08] }),
-                        },
-                        Platform.OS === 'web' && ({ pointerEvents: 'none' } as const),
-                      ]}
-                    />
-                    <FeedHeader
-                      searchTerm={searchTerm}
-                      setSearchTerm={setSearchTerm}
-                      filterType={filterType}
-                      setFilterType={setFilterType}
-                    />
-                    <Animated.View
-                      style={{
-                        opacity: newBannerOpacity,
-                        transform: [{ translateY: newBannerTranslate }],
-                        display: hasNewPosts ? 'flex' : 'none',
-                      }}
-                    >
-                      <View
-                        style={[
-                          {
-                            alignSelf: 'center',
-                            marginTop: 6,
-                            backgroundColor: theme.tint,
-                            borderRadius: 999,
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                          },
-                          Platform.OS === 'web'
-                            ? ({ boxShadow: '0px 4px 12px rgba(0,0,0,0.1)' } as const)
-                            : {
-                                shadowColor: '#000',
-                                shadowOpacity: 0.15,
-                                shadowRadius: 8,
-                                shadowOffset: { width: 0, height: 2 },
-                                elevation: 3,
-                              },
-                        ]}
-                      >
-                        <TouchableOpacity
-                          onPress={async () => {
-                            try {
-                              await onRefresh();
-                            } finally {
-                              setHasNewPosts(false);
-                              setNewPostsCount(0);
-                              try { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
-                            }
-                          }}
-                          style={{ paddingVertical: 8, paddingHorizontal: 12 }}
-                          accessibilityRole="button"
-                          accessibilityLabel={t('home.newPosts', 'New posts available. Tap to refresh')}
-                        >
-                          <Text style={{ color: theme.background, fontWeight: '700' }}>
-                            {newPostsCount > 0
-                              ? t('home.newPostsCount', `${newPostsCount} new ${newPostsCount === 1 ? 'post' : 'posts'} — tap to refresh`)
-                              : t('home.newPosts', 'New posts available — tap to refresh')}
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={() => {
-                            setHasNewPosts(false);
-                            setNewPostsCount(0);
-                          }}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          accessibilityRole="button"
-                          accessibilityLabel={t('common.dismiss', 'Dismiss')}
-                          style={{ paddingRight: 10, paddingVertical: 8, paddingLeft: 4 }}
-                        >
-                          <Ionicons name="close" size={16} color={theme.background} />
-                        </TouchableOpacity>
-                      </View>
-                    </Animated.View>
-                  </Animated.View>
-                );
-              }
-              return renderItem({ item: item as Wish, index: index - 1 } as any);
-            }}
+            renderItem={({ item, index }: { item: Wish; index: number }) =>
+              renderItem({ item, index })
+            }
           />
           {showScrollTop && (
             <TouchableOpacity
@@ -1709,8 +2188,15 @@ export default function Page() {
   }
 }
 
-const createStyles = (c: (typeof Colors)['light'] & { name: string }) =>
-  StyleSheet.create({
+const createStyles = (c: (typeof Colors)['light'] & { name: string }) => {
+  const isDarkLike = ['dark', 'neon', 'cyberpunk'].includes(c.name);
+  const subtleBorder = isDarkLike
+    ? 'rgba(255,255,255,0.16)'
+    : 'rgba(17,24,28,0.08)';
+  const mutedText = isDarkLike
+    ? 'rgba(236,237,238,0.72)'
+    : 'rgba(17,24,28,0.6)';
+  return StyleSheet.create({
     safeArea: {
       flex: 1,
       backgroundColor: c.background,
@@ -1722,6 +2208,228 @@ const createStyles = (c: (typeof Colors)['light'] & { name: string }) =>
       padding: 20,
       paddingBottom: 100,
       flexGrow: 1,
+    },
+    headerComponent: {
+      backgroundColor: c.background,
+      paddingBottom: 12,
+    },
+    headerContainer: {
+      marginBottom: 24,
+    },
+    milestoneToast: {
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: subtleBorder,
+      backgroundColor: c.card,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 20,
+    },
+    milestoneTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      marginBottom: 4,
+    },
+    milestoneText: {
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    heroCard: {
+      backgroundColor: c.input,
+      padding: 20,
+      borderRadius: 16,
+      marginBottom: 24,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: subtleBorder,
+      ...(Platform.OS === 'ios'
+        ? {
+            shadowColor: '#000',
+            shadowOpacity: 0.12,
+            shadowRadius: 12,
+            shadowOffset: { width: 0, height: 6 },
+          }
+        : { elevation: 2 }),
+    },
+    heroGreeting: {
+      fontSize: 24,
+      fontWeight: '700',
+      color: c.text,
+    },
+    heroSubtitle: {
+      fontSize: 14,
+      color: c.placeholder,
+      marginTop: 4,
+    },
+    heroChipRow: {
+      marginTop: 16,
+      flexDirection: 'row',
+    },
+    heroChip: {
+      backgroundColor: c.background,
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: 999,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: subtleBorder,
+    },
+    heroChipText: {
+      color: c.tint,
+      fontWeight: '600',
+      fontSize: 13,
+    },
+    heroStatsRow: {
+      flexDirection: 'row',
+      marginTop: 12,
+    },
+    heroStat: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      backgroundColor: c.background,
+      borderRadius: 12,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: subtleBorder,
+    },
+    heroStatSpacing: {
+      marginRight: 12,
+    },
+    heroStatValue: {
+      fontSize: 20,
+      fontWeight: '700',
+    },
+    heroStatLabel: {
+      fontSize: 12,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginTop: 2,
+      color: mutedText,
+    },
+    heroImpactSummary: {
+      marginTop: 14,
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    quickActionsHeader: {
+      marginTop: 18,
+    },
+    quickActionsTitle: {
+      fontSize: 15,
+      fontWeight: '700',
+    },
+    quickActionsSubtitle: {
+      marginTop: 2,
+      fontSize: 13,
+      color: mutedText,
+    },
+    quickActionScroll: {
+      paddingTop: 12,
+      paddingBottom: 4,
+      paddingLeft: 2,
+      paddingRight: 8,
+    },
+    quickActionCard: {
+      width: 160,
+      padding: 14,
+      borderRadius: 14,
+      borderWidth: StyleSheet.hairlineWidth,
+      marginRight: 12,
+    },
+    quickActionIconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 10,
+    },
+    quickActionLabel: {
+      fontWeight: '600',
+      fontSize: 14,
+    },
+    quickActionDescription: {
+      fontSize: 12,
+      lineHeight: 16,
+      marginTop: 4,
+    },
+    sectionSpacing: {
+      marginBottom: 24,
+    },
+    sectionHeader: {
+      marginBottom: 16,
+    },
+    sectionHeading: {
+      color: c.text,
+      fontWeight: '600',
+      fontSize: 18,
+    },
+    sectionDescription: {
+      color: mutedText,
+      fontSize: 13,
+      marginTop: 4,
+    },
+    feedIntroCard: {
+      padding: 18,
+      borderRadius: 16,
+      borderWidth: StyleSheet.hairlineWidth,
+      marginBottom: 24,
+    },
+    feedIntroText: {
+      marginBottom: 12,
+    },
+    newPostsWrapper: {
+      width: '100%',
+      alignItems: 'center',
+    },
+    newPostsCard: {
+      backgroundColor: c.tint,
+      borderRadius: 999,
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+    },
+    newPostsShadow: {
+      shadowColor: '#000',
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 3,
+    },
+    newPostsButton: {
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+    },
+    newPostsText: {
+      color: c.background,
+      fontWeight: '700',
+    },
+    newPostsDismiss: {
+      paddingRight: 10,
+      paddingVertical: 8,
+      paddingLeft: 4,
+    },
+    errorCard: {
+      padding: 16,
+      borderRadius: 12,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: subtleBorder,
+      marginBottom: 24,
+    },
+    errorText: {
+      color: c.text,
+      textAlign: 'center',
+      marginBottom: 12,
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    errorButton: {
+      alignSelf: 'center',
+      backgroundColor: c.tint,
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      borderRadius: 999,
+    },
+    errorButtonText: {
+      color: c.background,
+      fontWeight: '700',
     },
     quoteBanner: {
       backgroundColor: c.input,
@@ -1756,24 +2464,6 @@ const createStyles = (c: (typeof Colors)['light'] & { name: string }) =>
       top: 8,
       padding: 4,
       borderRadius: 12,
-    },
-    title: {
-      fontSize: 28,
-      fontWeight: 'bold',
-      color: c.text,
-      textAlign: 'center',
-      marginBottom: 4,
-    },
-    subtitle: {
-      fontSize: 14,
-      color: c.text,
-      textAlign: 'center',
-      marginBottom: 20,
-    },
-    streak: {
-      color: c.tint,
-      textAlign: 'center',
-      marginBottom: 10,
     },
     label: {
       color: c.text,
@@ -1893,3 +2583,4 @@ const createStyles = (c: (typeof Colors)['light'] & { name: string }) =>
       borderRadius: 10,
     },
   });
+};

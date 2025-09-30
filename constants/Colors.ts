@@ -16,6 +16,7 @@ export const Colors = {
     tabIconSelected: tintColorLight,
     input: '#f0f0f0',
     placeholder: '#11181C99',
+    card: '#f7f7f8',
   },
   dark: {
     text: '#ECEDEE',
@@ -26,6 +27,7 @@ export const Colors = {
     tabIconSelected: tintColorDark,
     input: '#1e1e1e',
     placeholder: '#ECEDEE99',
+    card: '#1c1d1f',
   },
   sunset: {
     text: '#7c2d12',
@@ -36,6 +38,7 @@ export const Colors = {
     tabIconSelected: '#fb923c',
     input: '#fde68a',
     placeholder: '#7c2d1299',
+    card: '#fdebc0',
   },
   ocean: {
     text: '#083344',
@@ -46,6 +49,7 @@ export const Colors = {
     tabIconSelected: '#0e7490',
     input: '#a5f3fc',
     placeholder: '#08334499',
+    card: '#b9f5fd',
   },
   neon: {
     text: '#F0F0F0',
@@ -56,6 +60,7 @@ export const Colors = {
     tabIconSelected: '#ff00ff',
     input: '#333333',
     placeholder: '#F0F0F099',
+    card: '#1a1a1a',
   },
   roseQuartz: {
     text: '#403635',
@@ -66,6 +71,7 @@ export const Colors = {
     tabIconSelected: '#bd5d82',
     input: '#f3d7d9',
     placeholder: '#40363599',
+    card: '#f6dee1',
   },
   cyberpunk: {
     text: '#e0e0e0',
@@ -76,6 +82,7 @@ export const Colors = {
     tabIconSelected: '#ff00ff',
     input: '#1a1a1a',
     placeholder: '#e0e0e099',
+    card: '#121212',
   },
   cottonCandy: {
     text: '#553c7b',
@@ -86,6 +93,7 @@ export const Colors = {
     tabIconSelected: '#66b2ff',
     input: '#ffdff1',
     placeholder: '#553c7b99',
+    card: '#ffe6f4',
   },
   emerald: {
     text: '#064e3b',
@@ -96,6 +104,7 @@ export const Colors = {
     tabIconSelected: '#059669',
     input: '#a7f3d0',
     placeholder: '#064e3b99',
+    card: '#bff5da',
   },
   sepia: {
     text: '#4b3413',
@@ -106,5 +115,6 @@ export const Colors = {
     tabIconSelected: '#8b5a2b',
     input: '#e8d8c3',
     placeholder: '#4b341399',
+    card: '#eedfcf',
   },
 };

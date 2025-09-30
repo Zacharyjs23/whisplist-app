@@ -28,7 +28,13 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>whisplist</string>
-          <string>com.anonymous.WhispList</string>
+          <string>com.zachary.whisplist</string>
+        </array>
+      </dict>
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>exp+whisplist</string>
         </array>
       </dict>
     </array>
@@ -46,7 +52,7 @@
       <true/>
     </dict>
     <key>NSMicrophoneUsageDescription</key>
-    <string>This app uses the microphone to record audio.</string>
+    <string>This app uses the microphone to record voice notes for your posts.</string>
     <key>NSUserActivityTypes</key>
     <array>
       <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>

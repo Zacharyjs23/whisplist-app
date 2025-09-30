@@ -16,6 +16,7 @@ import {
 import { db } from '../firebase';
 import type { Wish } from '../types/Wish';
 import * as logger from '../shared/logger';
+import { chunk as chunkArray } from './chunk';
 
 const converter: FirestoreDataConverter<Wish> = {
   toFirestore: ({ id, ...wish }: Wish) => wish,
@@ -25,17 +26,7 @@ const converter: FirestoreDataConverter<Wish> = {
     ({ id: snapshot.id, ...(snapshot.data() as Omit<Wish, 'id'>) } as Wish),
 };
 
-/**
- * Firestore `in` queries only accept up to 10 values. This helper splits an
- * array into chunks so we can query in batches that respect this limit.
- */
-function chunkArray<T>(items: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < items.length; i += size) {
-    chunks.push(items.slice(i, i + size));
-  }
-  return chunks;
-}
+// Note: Firestore 'in' supports up to 10 values; we batch using chunkArray
 
 export async function followUser(currentUser: string, targetUser: string) {
   const followerRef = doc(db, 'users', targetUser, 'followers', currentUser);
@@ -159,4 +150,3 @@ export async function getFollowingWishes(userId: string): Promise<Wish[]> {
     throw error;
   }
 }
-

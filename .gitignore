@@ -6,6 +6,9 @@ functions/node_modules/
 
 # Expo
 .expo/
+.expo-*
+*.expo
+*.expo?*
 dist/
 web-build/
 expo-env.d.ts
@@ -26,19 +29,25 @@ expo-env.d.ts
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+*.log
+*.pid
+
+# generated function bundles
+functions/lib/
 
 # editors
 .vscode/
+.idea/
 
 # macOS
 .DS_Store
 *.pem
 
 # local env files
+.env
 .env*.local
 
 # typescript
 *.tsbuildinfo
 
 app-example
-.env

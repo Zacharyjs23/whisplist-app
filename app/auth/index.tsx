@@ -1,6 +1,6 @@
 import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { useAuthFlows } from '@/contexts/AuthFlowsContext';
-import { useRouter, Link } from 'expo-router';
+import { useRouter, Link, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
@@ -13,6 +13,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 
 export default function Page() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ mode?: string }>();
   const { user } = useAuthSession();
   const {
     signIn,
@@ -27,6 +28,14 @@ export default function Page() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'login' | 'signup'>('login');
+
+  useEffect(() => {
+    if (params.mode === 'signup') {
+      setMode('signup');
+    } else if (params.mode === 'login') {
+      setMode('login');
+    }
+  }, [params.mode]);
   const handleSubmit = async () => {
     setAuthError(null);
     try {
@@ -157,14 +166,11 @@ export default function Page() {
       </Text>
 
       <View style={{ flexDirection: 'row', marginTop: 10 }}>
-        <Link
-          href="/terms"
-          style={[styles.linkText, { color: theme.tint, marginRight: 16 }]}
-        >
-          Terms
+        <Link href="/terms" asChild>
+          <Text style={[styles.linkText, { color: theme.tint, marginRight: 16 }]}>Terms</Text>
         </Link>
-        <Link href="/privacy" style={[styles.linkText, { color: theme.tint }]}>
-          Privacy
+        <Link href="/privacy" asChild>
+          <Text style={[styles.linkText, { color: theme.tint }]}>Privacy</Text>
         </Link>
       </View>
     </View>

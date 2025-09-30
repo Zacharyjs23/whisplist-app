@@ -26,21 +26,59 @@
     "supportedBy": "Supported by {{count}} people",
     "giftMessageReceived": "You received a gift message",
     "hoursLeft": "{{hours}}h left",
-    "report": "Report"
+    "fundingProgress": "${{raised}} raised of ${{goal}} goal",
+    "fundingPercent": "{{percent}}% funded",
+    "fundingSupporters": "{{count}} supporters so far",
+    "fundingBeFirst": "Be the first to chip in",
+    "fundingAria": "Funding progress",
+    "fundingCta": "Chip in",
+    "fundingQuickAmounts": "Quick amounts",
+    "fundingCustomPlaceholder": "Custom amount",
+    "fundingCustomCta": "Send",
+    "report": "Report",
+    "comment": "Comment",
+    "commentPosted": "Comment posted",
+    "signInToComment": "Sign in to comment",
+    "timeAgo": "{{time}}",
+    "commentLabel": "Comment",
+    "replyLabel": "Reply",
+    "placeholderComment": "Share your thoughts",
+    "placeholderReply": "Write your reply",
+    "nicknamePlaceholder": "Nickname or emoji",
+    "commentWithProfile": "Comment with profile",
+    "sendComment": "Send comment",
+    "sendReply": "Send reply",
+    "deleteSuccess": "Wish deleted",
+    "deleteFailed": "Could not delete wish"
   },
   "onboarding": {
-    "slide1Title": "Post anonymously",
-    "slide2Title": "Hear others",
-    "slide3Title": "Be fulfilled",
-    "slide4Title": "Why It Matters",
-    "slide4Subtitle": "WhispList promises a caring space to share dreams and worries without judgement.",
+    "slide1Title": "Share without judgement",
+    "slide1Subtitle": "Share celebrations, goals, honest struggles, and advice requests anonymously.",
+    "slide1Point1": "Daily prompts keep you inspired.",
+    "slide1Point2": "Audio notes let your voice be heard privately.",
+    "slide2Title": "Connect with support",
+    "slide2Subtitle": "A caring community is ready to listen, offer advice, and lift you up.",
+    "slide2Point1": "Earn hugs, hearts, and boosts from supporters.",
+    "slide2Point2": "Send thanks and keep DMs going.",
+    "slide3Title": "Grow every day",
+    "slide3Subtitle": "Track your streaks, journal reflections, and celebrate wins.",
+    "slide3Point1": "See milestone streaks and personal impact stats.",
+    "slide3Point2": "Save drafts to finish whenever you feel ready.",
+    "title": "Welcome to WhispList",
+    "tagline": "A caring space to share dreams, reflections, and support.",
+    "stepCounter": "Step {{current}} of {{total}}",
+    "swipeHint": "Swipe or tap next to explore the journey.",
+    "next": "Next",
     "skip": "Skip",
     "skipOnboarding": "Skip Onboarding",
     "agree1": "I agree to the",
     "terms": " Terms of Service ",
     "and": "and",
     "privacy": " Privacy Policy",
-    "getStarted": "Get Started"
+    "primaryCta": "Start sharing",
+    "googleCta": "Continue with Google",
+    "guestCta": "Keep it anonymous",
+    "signinCta": "I already have an account"
   },
   "tabs": {
     "home": "Home",
@@ -48,30 +86,91 @@
     "journal": "Journal",
     "profile": "Profile",
     "inbox": "Inbox",
-    "settings": "Settings"
+    "messages": "Messages",
+    "settings": "Settings",
+    "subscriptions": "Subscriptions"
   },
   "settings": {
     "title": "Settings",
     "sections": {
+      "account": "Account Info",
       "privacy": "Privacy & Profile",
       "notifications": "Notifications",
       "developer": "Advanced / Developer",
       "system": "System & Account",
-      "theme": "Theme"
+      "theme": "Theme",
+      "legal": "Legal"
+    },
+    "account": {
+      "editProfileDescription": "Update your name, photo, and bio."
+    },
+    "hero": {
+      "greeting": "Welcome back",
+      "changePhoto": "Update photo",
+      "uploadingPhoto": "Uploading…",
+      "progress": "{{percent}}% uploaded"
+    },
+    "membership": {
+      "badge": {
+        "loading": "Checking…",
+        "free": "Free",
+        "active": "Active",
+        "trial": "Trial",
+        "pastDue": "Past Due",
+        "canceled": "Canceled",
+        "unpaid": "Unpaid",
+        "canceling": "Canceling"
+      },
+      "detail": {
+        "loading": "We're refreshing your membership status.",
+        "free": "Unlock premium experiences with WhispList+.",
+        "active": "Membership is active.",
+        "renews": "Renews on {{date}}",
+        "canceling": "Ends on {{date}}"
+      },
+      "cta": "Manage membership"
+    },
+    "legal": {
+      "termsUpdated": "Last updated: Sep 3, 2025",
+      "termsDescription": "Review the agreement that keeps WhispList safe for everyone.",
+      "privacyUpdated": "Last updated: Sep 3, 2025",
+      "privacyDescription": "Understand how we store, process, and protect your data."
     },
     "privacy": {
       "anonymize": "Anonymize Username",
+      "anonymizeDescription": "Hide your name and avatar on new wishes.",
+      "shareAnalytics": "Share anonymous analytics",
+      "shareAnalyticsDescription": "Help us improve WhispList with aggregated usage insights.",
       "publicProfile": "Public Profile Enabled",
-      "stripeGifting": "Enable Stripe Gifting"
+      "publicProfileDescription": "Let other Whispers explore your public profile page.",
+      "stripeGifting": "Enable Stripe Gifting",
+      "stripeGiftingDescription": "Enable gifts and payouts through your Stripe account."
     },
     "notifications": {
       "dailyQuote": "Daily Quote",
+      "dailyQuoteDescription": "Receive a daily affirmation inside WhispList.",
+      "quoteStyle": "Quote Style",
+      "quoteReminder": "Daily Quote Reminder",
+      "quoteReminderDescription": "Schedule a push alert for your favorite time of day.",
+      "quoteReminderTime": "Reminder Time",
       "boostNotifications": "Boost Notifications",
+      "boostNotificationsDescription": "Alerts when your wish is boosted or expires soon.",
       "commentNotifications": "Comment Notifications",
-      "referralBonuses": "Referral Bonuses"
+      "commentNotificationsDescription": "Know when someone reacts or comments on your wish.",
+      "giftNotifications": "Gift Notifications",
+      "giftNotificationsDescription": "Get notified when a supporter sends a gift.",
+      "referralBonuses": "Referral Bonuses",
+      "referralBonusesDescription": "Alerts when someone earns a referral reward from you.",
+      "test": "Send Test Notification",
+      "testTitle": "Test notification",
+      "testBody": "This is how notifications look.",
+      "testDescription": "Double-check your device can receive pushes.",
+      "openSettings": "Open OS Settings",
+      "openSettingsDescription": "Adjust notification permissions in your device settings."
     },
     "developer": {
       "developerMode": "Developer Mode",
+      "developerModeDescription": "Unlock internal tooling, analytics, and staging shortcuts.",
       "stats": {
         "totalWishes": "Total Wishes: {{count}}",
         "totalBoosts": "Total Boosts: {{count}}",
@@ -83,6 +182,7 @@
       "pickAvatar": "Pick Avatar",
       "earnedBoosts": "You've earned {{count}} free boosts!",
       "referFriend": "Refer a Friend",
+      "referFriendDescription": "Share your referral link to unlock more boosts.",
       "defaultCategory": "Default Category",
       "categories": {
         "general": "General",
@@ -95,16 +195,49 @@
         "en": "English",
         "es": "Spanish"
       },
+      "feedbackTitle": "Share feedback",
       "feedbackPlaceholder": "Send feedback",
       "submitFeedback": "Submit Feedback",
       "exportHistory": "Export History",
+      "exportHistoryDescription": "Create a personal backup of your wishes and comments.",
       "rateApp": "Rate this App",
+      "rateAppDescription": "Tell others what you love about WhispList.",
       "permissions": "Permissions",
+      "permissionsDescription": "Check microphone and notification permissions.",
+      "copyDiagnostics": "Copy Diagnostics",
+      "copyDiagnosticsDescription": "Copy device details to share with support.",
+      "debug": "Open Debug",
+      "debugDescription": "Inspect local caches, storage, and developer tools.",
+      "restorePurchases": "Restore Purchases",
+      "restoreSuccess": "Restored",
+      "restoreFailed": "Restore failed",
       "deleteContent": "Delete My Content",
+      "deleteContentDescription": "Remove every wish and comment posted under your nickname.",
       "resetData": "Reset App Data",
+      "resetDataDescription": "Clear cached preferences and local drafts from the app.",
+      "offlineQueue": "Offline Queue",
+      "queued": "Queued: {{count}}",
+      "oldest": "Oldest: {{mins}}m ago",
+      "nextRetry": "Next retry: in {{mins}}m",
+      "retryNow": "Retry Pending Now",
+      "retryResult": "Posted {{count}} queued",
+      "clearQueue": "Clear Pending",
+      "cleared": "Cleared",
+      "signOut": "Sign Out",
+      "signOutDescription": "Log out of WhispList on this device.",
+      "signedOut": "Signed out",
+      "signOutFailed": "Sign out failed",
+      "resetConfirmTitle": "Reset app data?",
+      "resetConfirmBody": "This will clear local preferences and drafts.",
       "aboutDescription": "WhispList promises a safe, anonymous place to share your dreams.",
       "terms": "Terms of Service",
       "privacy": "Privacy Policy"
+    },
+    "theme": {
+      "pickerLabel": "Theme preset"
+    },
+    "accessibility": {
+      "copyUserId": "Copy your user ID to the clipboard"
     },
     "alert": {
       "permissionRequiredTitle": "Permission required",
@@ -124,10 +257,575 @@
     "title": "404 - Not Found"
   },
   "inbox": {
-    "justNow": "just now"
+    "justNow": "just now",
+    "openMessages": "Open Direct Messages"
+  },
+  "messages": {
+    "title": "Direct Messages",
+    "heroSubtitle": "Stay in touch with people you follow.",
+    "statThreads": "Threads",
+    "statUnread": "Unread",
+    "searchLabel": "Start a conversation",
+    "startHint": "Type a @username to begin",
+    "quickHeader": "Quick start",
+    "openNotifications": "Open notifications",
+    "startWith": "Start DM with @displayName",
+    "start": "Start",
+    "open": "Open",
+    "openChatWith": "Open chat with {{name}}",
+    "type": "Type a message",
+    "uploading": "Uploading...",
+    "noMessages": "No messages yet",
+    "lastSeen": "Last seen {{time}}",
+    "typing": "Typing...",
+    "userNotFound": "User not found",
+    "quickStart": "Quick start",
+    "emptyTitle": "No conversations yet",
+    "emptySubtitle": "Send your first direct message to stay in touch with your favorite wishers."
+  },
+  "journal": {
+    "header": "Your Private Journal ✨",
+    "savedOfflineTitle": "Saved offline",
+    "savedOfflineMessage": "Your entry will sync when online.",
+    "heroSubtitle": "Capture a thought, track your mood.",
+    "streak": "{{count}}-day streak",
+    "stats": {
+      "entries": "Entries",
+      "streak": "Streak",
+      "week": "This week"
+    },
+    "promptTitle": "Daily prompt",
+    "promptRefresh": "Give me a different prompt",
+    "toggleFreeform": "Switch to freeform",
+    "togglePrompt": "Use prompt",
+    "selectMood": "Select mood",
+    "moodLabel": "Mood",
+    "searchPlaceholder": "Search your entries",
+    "searchResults": "Showing {{count}} of {{total}} entries",
+    "searchEmpty": "No entries match \"{{query}}\" yet.",
+    "clearSearch": "Clear search",
+    "placeholder": "Write your thoughts",
+    "saveEntry": "Save entry",
+    "weeklyInsightsTitle": "Weekly insights",
+    "weeklyInsightsAccessibility": "Weekly journaling insights",
+    "weeklyEntries": "Logged {{count}} time in the past 7 days.",
+    "weeklyEntries_plural": "Logged {{count}} times in the past 7 days.",
+    "weeklyEmpty": "No entries yet this week — start a new reflection!",
+    "topMood": "Most common mood: {{mood}}",
+    "avgLength": "Average entry length: {{chars}} characters",
+    "wishShared": "Wish posted!",
+    "promptRefreshed": "✨ That's a deep one.",
+    "expandEntry": "Read more",
+    "collapseEntry": "Show less",
+    "shareAsWish": "Share as wish",
+    "emptyState": "Your journal is waiting for its first entry.",
+    "emptyStateCta": "Write something now",
+    "justNow": "Just now"
   },
   "notifications": {
-    "dailyPromptTitle": "WhispList",
-    "dailyPromptBody": "Time to post your wish for today!"
+  "dailyPromptTitle": "WhispList",
+  "dailyPromptBody": "Time to share today’s story!",
+  "dailyQuoteBody": "Your daily dose of motivation is ready."
+  },
+  "userImpact": {
+    "title": "Your Impact",
+    "wishes": "You’ve posted {{count}} wishes",
+    "boosts": "Boosted {{count}} — earned {{likes}} likes",
+    "gifts": "Received {{count}} gifts — ${{total}}"
+  },
+  "composer": {
+    "title": "What do you want to share today?",
+    "placeholderWish": "Write your story...",
+    "thinking": "Thinking...",
+    "rephraseButton": "✨ Help me rephrase this",
+    "dailyPromptTitle": "Daily Prompt ✨",
+    "postType": "Post Type",
+    "type": {
+      "celebration": "Celebration 🎉",
+      "goal": "Goal 🌱",
+      "struggle": "Struggle 🌧️",
+      "advice": "Advice Request 🧠"
+    },
+    "typePromptTitle": "Need a spark?",
+    "typePrompts": {},
+    "support": {
+      "struggle": "Need immediate help? Tap here for support."
+    },
+    "placeholderByType": {
+      "celebration": "Share the moment you’re celebrating...",
+      "goal": "Describe the goal you’re working toward...",
+      "struggle": "Tell us what’s feeling heavy right now...",
+      "advice": "Explain the situation where you’d love advice..."
+    },
+    "advancedOptions": "Advanced options",
+    "pollMode": "Poll mode",
+    "optionA": "Option A",
+    "optionB": "Option B",
+    "includeAudio": "Include Audio",
+    "addExternalGiftOption": "Add External Gift Option",
+    "addGiftLinkLabel": "Add a gift link (e.g., Venmo, wishlist)",
+    "giftLinkPlaceholder": "Gift link (optional)",
+    "giftType": "Gift Type",
+    "giftTypePlaceholder": "kofi, paypal, etc",
+    "giftLabel": "Gift Label",
+    "giftLabelPlaceholder": "Support on Ko-fi",
+    "enableFunding": "Enable funding goal",
+    "fundingGoal": "Funding goal (USD)",
+    "fundingGoalPlaceholder": "Target amount",
+    "fundingPresets": "Suggested amounts",
+    "fundingPresetsPlaceholder": "e.g. 5,10,25",
+    "fundingPresetsHelper": "Use commas to separate quick amounts supporters can tap.",
+    "fundingGoalErrorTitle": "Set a goal",
+    "fundingGoalErrorBody": "Enter a positive goal amount to enable funding.",
+    "postWithProfile": "Post with profile",
+    "autoDelete24h": "Auto-delete after 24h",
+    "recordAudio": "Record Audio",
+    "stopRecording": "Stop Recording",
+    "changeImage": "Change Image",
+    "attachImage": "Attach Image",
+    "postWish": "Share it",
+    "goToAuth": "Go to Auth",
+    "invalidLink": "Link should start with http:// or https://",
+    "draftLoaded": "Draft loaded",
+    "discardDraft": "Discard",
+    "saveDraft": "Save as draft",
+    "savedJustNow": "just now",
+    "savedMinsAgo": "{{mins}}m ago",
+    "savedHoursAgo": "{{hrs}}h ago",
+    "uploading": "Uploading",
+    "uploadingAudio": "Uploading audio",
+    "uploadingImage": "Uploading image",
+    "deepPrompt": "✨ That's a deep one.",
+    "wishTooLongTitle": "Wish too long",
+    "wishTooLong": "Wish must be {{max}} characters or less.",
+    "linkTooLongTitle": "Link too long",
+    "linkTooLong": "Link must be {{max}} characters or less.",
+    "invalidLinkTitle": "Invalid link",
+    "draftSaved": "Draft saved",
+    "discardConfirmTitle": "Discard draft?",
+    "discardConfirmMessage": "This will remove your saved draft.",
+    "retry": "Retry upload"
+  },
+  "feed": {
+  "filters": {
+    "all": "All",
+    "allTypes": "All vibes",
+    "celebration": "Celebrations",
+    "goal": "Goals",
+    "struggle": "Struggles",
+    "advice": "Advice"
+  },
+    "searchPlaceholder": "Search stories...",
+    "searchLabel": "Search posts",
+    "title": "Community feed",
+    "categories": {
+      "all": "All"
+    },
+  "viewLabel": "View",
+  "typeLabel": "Post vibes",
+    "tabs": {
+      "latest": "Latest",
+      "boosted": "Boosted",
+      "trending": "Trending",
+      "forYou": "For You"
+    },
+    "tabCopy": {
+      "latest": "Fresh posts from across the community.",
+      "boosted": "Spot the posts currently getting extra love.",
+      "trending": "What everyone is reacting to most right now.",
+      "forYou": "Hand-picked posts based on who and what you follow."
+    },
+    "topWishes": {
+      "title": "Top posts"
+    },
+    "empty": {
+      "search": "No posts match your search just yet.",
+      "category": "No posts in this category yet.",
+      "boosted": "No boosted posts right now. Check back soon ✨",
+      "trending": "Trending is quiet at the moment. Come back later.",
+    "forYou": "We couldn't find a match yet. Try adjusting preferences.",
+    "default": "No posts here yet. Be the first to share ✨",
+    "typeFallback": "No posts in this vibe yet. Try another.",
+      "clearSearch": "Clear search",
+      "openPreferences": "Edit preferences",
+      "adjustForYou": "Adjust For You preferences",
+      "type": {
+        "celebration": "No celebrations here yet. Share a win to brighten the feed.",
+        "goal": "No goals have surfaced. Be the first to set one in motion.",
+        "struggle": "No struggles shared yet. Offer your story when you’re ready.",
+        "advice": "No advice requests yet. Ask the community for perspective."
+      }
+    }
+  },
+  "home": {
+    "subtitle": "Post a wish and see what dreams grow 🌱",
+    "noResults": "No wishes here yet. Share one to start the conversation ✨",
+    "loadMore": "Load More",
+    "composeTitle": "Share something new",
+    "composeSubtitle": "Let a fresh wish float into the world.",
+    "impactTitle": "Your impact",
+    "impactSubtitle": "A quick snapshot of how your wishes are doing.",
+    "feedHeading": "Community feed",
+    "feedDescription": "See the latest wishes from people you follow.",
+    "engagement": {
+      "title": "Keep your streak alive",
+      "caption": "Badges unlock as you show up for the community.",
+      "loading": "Checking your momentum…",
+      "label": "Your engagement streaks",
+      "posting": "Posting streak",
+      "gifting": "Gifting streak",
+      "fulfillment": "Fulfillment streak",
+      "next": {
+        "posting": "Next badge at {{target}} days",
+        "gifting": "Next badge at {{target}} gifts",
+        "fulfillment": "Next badge at {{target}} wishes"
+      },
+      "complete": "All badges unlocked",
+      "rowLabel": "{{label}} — {{count}}",
+      "badgeProgress": "{{unlocked}} / {{total}} badges",
+      "units": {
+        "days": "{{count}} days",
+        "gifts": "{{count}} gifts",
+        "wishes": "{{count}} wishes"
+      }
+    },
+    "milestones": {
+      "title": "Milestone unlocked!",
+      "posting_1": "First wish posted!",
+      "posting_3": "Three-day posting streak!",
+      "posting_7": "Seven-day posting streak — you’re on fire!",
+      "posting_14": "14 days of sharing — incredible consistency!",
+      "posting_30": "30-day streak — a perfect month!",
+      "gifting_1": "First gift sent — you made someone’s day!",
+      "gifting_5": "5 gifts shared — kindness keeps flowing!",
+      "gifting_15": "15 gifts! You’re a top supporter.",
+      "fulfillment_1": "First wish fulfilled — dreams do come true.",
+      "fulfillment_3": "Three wishes fulfilled — amazing generosity!",
+      "fulfillment_10": "10 wishes fulfilled — a true community champion."
+    },
+    "communityPulse": {
+      "title": "Community pulse",
+      "subtitle": "Here’s what friends are celebrating right now.",
+      "loading": "Gathering the latest wins…",
+      "boosts": "🚀 Fresh boosts",
+      "boostItem": " boosted ",
+      "boostWish": " '{{wish}}'",
+      "fulfilled": "✨ Wishes fulfilled",
+      "fulfillmentItem": " completed ",
+      "aWish": "a wish",
+      "supporters": "🏅 Top supporters",
+      "supporterMeta": "{{gifts}} gifts · ${{amount}}",
+      "supporterTier": " · {{tier}}",
+      "supporterShoutOut": "{{badge}} {{tier}} keeping wishes thriving",
+      "supporterTiers": {
+        "platinum": "Platinum Ally",
+        "gold": "Gold Champion",
+        "silver": "Silver Supporter",
+        "bronze": "Bronze Friend"
+      },
+      "empty": "Activity updates will appear here soon.",
+      "label": "Community highlights"
+    },
+    "prompts": {
+      "title": "Keep the love going",
+      "streakMessage": "Share today to keep your streak alive.",
+      "streakCta": "Compose",
+      "supporterMessage": "Thank {{name}} for their gift.",
+      "supporterCta": "Send thanks"
+    },
+    "quickActions": {
+      "title": "Quick shortcuts",
+      "subtitle": "Jump back into your routine",
+      "feed": "Explore wishes",
+      "feedDescription": "See what the community is sharing",
+      "journal": "Daily journal",
+      "journalDescription": "Reflect privately",
+      "messages": "Messages",
+      "messagesDescription": "Catch up with friends",
+      "profile": "Profile",
+      "profileDescription": "Update your space"
+    },
+    "heroImpactSummary": {
+      "empty": "Start your story with today’s wish.",
+      "stats": "So far: {{wishes}} wishes, {{boosts}} boosts, {{gifts}} gifts."
+    }
+  },
+  "postConfirm": {
+    "sent": "💭 Your wish has been sent into the world.",
+    "viewFeed": "View in Feed",
+    "postAnother": "Post another wish"
+  },
+  "errors": {
+    "uploadFailed": "Upload failed. Please try again."
+  },
+  "offline": {
+    "postedOne": "Your saved wish was posted.",
+    "postedCount": "{{count}} saved wishes were posted."
+  },
+  "gifts": {
+    "success": "🎁 Thank you for your support!",
+    "cancelled": "Gift checkout canceled",
+    "enterAmountTitle": "Enter amount",
+    "enterAmountBody": "Please enter an amount to contribute.",
+    "invalidAmountTitle": "Invalid amount",
+    "invalidAmountBody": "Enter a valid amount greater than zero.",
+    "limitTitle": "Amount too high",
+    "limitBody": "The maximum contribution is $10,000.",
+    "confirmAmount": "Send ${{amount}} to this wish?",
+    "confirmGift": "Confirm sending gift?"
+  },
+  "dailyQuote": {
+    "title": "Motivation",
+    "quotes": [
+      "Believe in yourself!",
+      "Dream big and dare to fail.",
+      "Every day is a second chance."
+    ],
+    "dismiss": "Dismiss",
+    "turnOffToday": "Turn off for today",
+    "openSettings": "Settings",
+    "styles": {
+      "uplifting": "Uplifting",
+      "stoic": "Stoic",
+      "growth": "Growth"
+    },
+    "quotesByStyle": {
+      "uplifting": [
+        "Believe in yourself!",
+        "Dream big and dare to fail.",
+        "Every day is a second chance."
+      ],
+      "stoic": [
+        "Focus on what you can control.",
+        "Calm mind, steady heart.",
+        "Accept, adapt, advance."
+      ],
+      "growth": [
+        "Small steps, big progress.",
+        "Learn, iterate, improve.",
+        "Progress over perfection."
+      ]
+    },
+    "generator": {
+      "starts": [
+        "Remember,",
+        "Today,",
+        "Every day,",
+        "You,",
+        "Choose",
+        "Let",
+        "Keep",
+        "Small steps",
+        "Progress",
+        "Be kind to",
+        "Trust",
+        "Your",
+        "Don't",
+        "Make",
+        "Start",
+        "Believe",
+        "Focus on",
+        "Celebrate",
+        "You are",
+        "Strength comes from",
+        "Growth begins when",
+        "Calm your",
+        "Fear less,",
+        "Create space for",
+        "Keep moving",
+        "Stay curious,",
+        "Keep going,",
+        "You've got",
+        "One step",
+        "Breathe in",
+        "Honor"
+      ],
+      "actions": [
+        "you are stronger than you think",
+        "your effort compounds",
+        "progress over perfection",
+        "what you can control",
+        "the present moment",
+        "your values",
+        "learning from mistakes",
+        "showing up",
+        "your small wins",
+        "consistency",
+        "tiny improvements",
+        "being brave",
+        "kindness to yourself",
+        "your breath",
+        "your journey",
+        "the process",
+        "your curiosity",
+        "finding balance",
+        "being patient",
+        "listening deeply",
+        "rest and reset",
+        "gratitude",
+        "letting go",
+        "self-compassion",
+        "taking action",
+        "asking for help",
+        "embracing change",
+        "begin again",
+        "being honest",
+        "clarity"
+      ],
+      "endings": [
+        "and the rest will follow.",
+        "and keep going.",
+        "and trust the process.",
+        "and take the next step.",
+        "and breathe.",
+        "and be gentle with yourself.",
+        "and watch momentum build.",
+        "and stay consistent.",
+        "— even slowly is progress.",
+        "and celebrate the small wins.",
+        "and focus on what matters.",
+        "— you are enough.",
+        "and keep learning.",
+        "with patience and courage.",
+        "and choose growth.",
+        "with calm and clarity.",
+        "— your pace is perfect.",
+        "and stay present.",
+        "and keep it simple.",
+        "and let go of the rest.",
+        "— you can do hard things.",
+        "and keep your heart open.",
+        "and honor your energy.",
+        "and show up today.",
+        "and trust your timing."
+      ]
+    }
+  },
+  "profile": {
+    "changePhoto": "Change Photo",
+    "followCounts": "You follow {{following}} people · Followed by {{followers}}",
+    "displayNameLabel": "Display Name",
+    "displayNamePlaceholder": "Display Name",
+    "bioLabel": "Bio",
+    "bioPlaceholder": "Bio",
+    "saving": "Saving...",
+    "saveProfile": "Save Profile",
+    "openJournal": "Open Journal",
+    "tabs": {
+      "posted": "📝 Posted",
+      "saved": "💾 Saved",
+      "gifts": "💝 Gifts Received"
+    },
+    "boosts": {
+      "title": "🔥 Boosts",
+      "count": "You've boosted {{count}} wishes 🌟",
+      "impact": "Your boosts earned ❤️ {{likes}} likes, 💬 {{comments}} comments"
+    },
+    "streak": {
+      "title": "📅 Streak",
+      "text": "🔥 {{count}}-day streak — you're on fire!"
+    },
+    "gifts": {
+      "title": "💝 Gifts",
+      "text": "You've received {{count}} gifts 🎁 (${{total}} total)"
+    },
+    "giftMessages": {
+      "title": "💌 Messages from Supporters"
+    },
+    "referrals": {
+      "title": "🎁 Referrals",
+      "text": "You've invited {{count}} people — {{remaining}} more to unlock another reward"
+    },
+    "public": {
+      "title": "🌐 Public Profile",
+      "desc": "Your profile is public. This is what others see.",
+      "copyLink": "Copy Link",
+      "preview": "Preview My Public Profile",
+      "share": "Share Profile"
+    },
+    "reflections": {
+      "title": "🧠 Your reflections this week"
+    },
+    "reflection": {
+      "title": "🧠 Reflection",
+      "yesterday": "Yesterday, you said: '{{text}}'"
+    },
+    "reminder": {
+      "title": "⏰ Daily Prompt Reminder",
+      "text": "Remind me to post a wish daily"
+    },
+    "signOut": "Sign Out",
+    "email": "Email: {{email}}",
+    "anonymous": "Anonymous",
+    "loggedInAnonymously": "Logged in anonymously",
+    "saved": "Profile saved",
+    "linkCopied": "Link copied",
+    "saveFailed": "Failed to save profile"
+  }
+  ,
+  "subscriptions": {
+    "signIn": "Sign in to manage your subscription",
+    "title": "Support WhispList",
+    "subtitle": "Keep the lights on and unlock warm fuzzies. Cancel anytime.",
+    "status": "Status",
+    "renewsOn": "Renews on {{date}}",
+    "manage": "Manage Subscription",
+    "subscribe": "Subscribe",
+    "errorStart": "Could not start checkout.",
+    "errorPortal": "Could not open billing portal.",
+    "missingPrice": "Missing price configuration",
+    "setupHelp": "Add the billing identifiers for {{plan}} in the environment settings.",
+    "success": "Thank you for supporting WhispList!",
+    "cancelled": "Checkout canceled",
+    "benefits": {
+      "rephrase": "Rephrase assistant",
+      "badge": "Supporter badge",
+      "image": "Higher image quality",
+      "early": "Early access to features",
+      "supporterImpact": "Keep WhispList independent and ad-free",
+      "patron": {
+        "allSupporter": "Everything in Supporter",
+        "communityImpact": "Helps fund new community spotlights and wish boosts",
+        "priorityAccess": "Priority access to our next experimental tools"
+      },
+      "annual": {
+        "allPatron": "Everything in Patron",
+        "savings": "Two months free compared to paying monthly",
+        "badge": "Limited edition annual Patron badge",
+        "checkIns": "Seasonal behind-the-scenes update from the team"
+      }
+    },
+    "plan": "Plan",
+    "cancelsOn": "Cancels on {{date}}",
+    "trialEndsOn": "Trial ends on {{date}}",
+    "loadingPlans": "Loading plans…",
+    "manageAppStore": "Manage in App Store",
+    "restore": "Restore Purchases",
+    "restoreFailed": "Restore failed",
+    "unconfiguredCta": "Finish billing setup"
+    ,
+    "badges": {
+      "monthly": "Monthly",
+      "annual": "Annual",
+      "weekly": "Weekly",
+      "lifetime": "Lifetime",
+      "3mo": "3-Month",
+      "6mo": "6-Month",
+      "mostPopular": "Most popular",
+      "bestValue": "Best value"
+    },
+    "planNames": {
+      "supporter": "Supporter",
+      "patron": "Patron",
+      "patronAnnual": "Patron Annual"
+    }
+  },
+  "premium": {
+    "rephrase": {
+      "title": "Supporter feature",
+      "body": "Rephrase is available for supporters. Open subscriptions to join?",
+      "cancel": "Not now",
+      "open": "Open Subscriptions"
+    }
   }
 }

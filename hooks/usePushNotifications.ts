@@ -26,6 +26,10 @@ export default function usePushNotifications() {
 
   useEffect(() => {
     if (!user) return;
+    if (Platform.OS === 'web') {
+      logger.warn('Skipping push notification registration on web: VAPID key not configured');
+      return;
+    }
     const register = async () => {
       if (!Device.isDevice) return;
       let { status } = await Notifications.getPermissionsAsync();
@@ -43,7 +47,8 @@ export default function usePushNotifications() {
         return;
       }
       try {
-        await updateDoc(doc(db, 'users', user.uid), { fcmToken: data });
+        // Save Expo push token under `pushToken` for server-side Expo delivery.
+        await updateDoc(doc(db, 'users', user.uid), { pushToken: data });
       } catch (err) {
         logger.error('Failed to save push token', err);
       }

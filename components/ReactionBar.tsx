@@ -2,7 +2,6 @@ import React, { useRef } from 'react';
 import { View, Text, TouchableOpacity, Animated, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/contexts/ThemeContext';
-import type { Wish } from '../types/Wish';
 
 const CAN_USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -16,19 +15,21 @@ export const reactionMap = {
 export type ReactionKey = keyof typeof reactionMap;
 
 interface ReactionBarProps {
-  wish: Wish;
+  counts: Record<ReactionKey, number>;
   userReaction: ReactionKey | null;
   onReact: (key: ReactionKey) => void;
   onToggleSave: () => void;
   isSaved: boolean;
+  disabled?: boolean;
 }
 
 export const ReactionBar: React.FC<ReactionBarProps> = ({
-  wish,
+  counts,
   userReaction,
   onReact,
   onToggleSave,
   isSaved,
+  disabled = false,
 }) => {
   const { theme } = useTheme();
   const reactionScales = useRef(
@@ -44,26 +45,33 @@ export const ReactionBar: React.FC<ReactionBarProps> = ({
         <Animated.View key={key} style={{ transform: [{ scale: reactionScales[key] }] }}>
           <TouchableOpacity
             testID={`reaction-${key}`}
-            onPressIn={() =>
+            disabled={disabled}
+            accessibilityState={disabled ? { disabled: true } : undefined}
+            onPressIn={() => {
+              if (disabled) return;
               Animated.spring(reactionScales[key], {
                 toValue: 1.2,
                 useNativeDriver: CAN_USE_NATIVE_DRIVER,
-              }).start()
-            }
-            onPressOut={() =>
+              }).start();
+            }}
+            onPressOut={() => {
+              if (disabled) return;
               Animated.spring(reactionScales[key], {
                 toValue: 1,
                 useNativeDriver: CAN_USE_NATIVE_DRIVER,
-              }).start()
-            }
-            onPress={() => onReact(key)}
+              }).start();
+            }}
+            onPress={() => {
+              if (disabled) return;
+              onReact(key);
+            }}
             style={[
               styles.reactionButton,
               userReaction === key && { backgroundColor: theme.input },
             ]}
           >
             <Text style={styles.reactionText}>
-              {reactionMap[key]} {wish.reactions?.[key] || 0}
+              {reactionMap[key]} {counts[key] ?? 0}
             </Text>
           </TouchableOpacity>
         </Animated.View>

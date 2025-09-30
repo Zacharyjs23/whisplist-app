@@ -180,22 +180,24 @@ describe('checkout helpers', () => {
       'user2',
       'http://gift-success',
       'http://gift-cancel',
+      'supporter-1',
     );
 
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(global.fetch).toHaveBeenCalled();
+    const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toBe(
       'https://us-central1-testproj.cloudfunctions.net/createGiftCheckoutSession',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          wishId: 'wish1',
-          amount: 5,
-          recipientId: 'user2',
-          successUrl: 'http://gift-success',
-          cancelUrl: 'http://gift-cancel',
-        }),
-      },
     );
+    expect(options.method).toBe('POST');
+    expect(options.headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(JSON.parse(options.body)).toEqual({
+      wishId: 'wish1',
+      amount: 5,
+      recipientId: 'user2',
+      successUrl: 'http://gift-success',
+      cancelUrl: 'http://gift-cancel',
+      supporterId: 'supporter-1',
+    });
     expect(result).toEqual({ url: 'http://gift' });
   });
 });
@@ -220,4 +222,3 @@ describe('deleteWish', () => {
     await expect(deleteWish('w1')).rejects.toThrow(err);
   });
 });
-

@@ -1,16 +1,16 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
-import * as logger from '../../shared/logger.ts';
+// Use Cloud Functions logger
 import { STRIPE_SECRET_KEY } from './secrets';
 
-let stripe: Stripe;
+let stripe: any;
 
 const db = admin.firestore();
 
 export const createStripeAccountLink = functions
   .runWith({ secrets: [STRIPE_SECRET_KEY] })
-  .https.onRequest(async (req, res) => {
+  .https.onRequest(async (req: any, res: any) => {
     if (req.method !== 'POST') {
       res.status(405).send('Method not allowed');
       return;
@@ -22,7 +22,7 @@ export const createStripeAccountLink = functions
       return;
     }
 
-    try {
+  try {
       if (!stripe) {
         stripe = new Stripe(STRIPE_SECRET_KEY.value(), {
           apiVersion: '2022-11-15',
@@ -37,15 +37,17 @@ export const createStripeAccountLink = functions
         accountId = account.id;
         await ref.update({ stripeAccountId: accountId });
       }
+      const refreshUrl = process.env.STRIPE_ACCOUNT_LINK_REFRESH_URL || 'https://example.com/reauth';
+      const returnUrl = process.env.STRIPE_ACCOUNT_LINK_RETURN_URL || 'https://example.com/return';
       const link = await stripe.accountLinks.create({
         account: accountId,
-        refresh_url: 'https://example.com/reauth',
-        return_url: 'https://example.com/return',
+        refresh_url: refreshUrl,
+        return_url: returnUrl,
         type: 'account_onboarding',
       });
       res.json({ url: link.url, accountId });
     } catch (err) {
-      logger.error('Error creating account link', err);
+      functions.logger.error('Error creating account link', err);
       res.status(500).send('Internal error');
     }
   });

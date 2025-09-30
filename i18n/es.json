@@ -26,21 +26,59 @@
     "supportedBy": "Apoyado por {{count}} personas",
     "giftMessageReceived": "Recibiste un mensaje de regalo",
     "hoursLeft": "Quedan {{hours}}h",
-    "report": "Reportar"
+    "fundingProgress": "${{raised}} recaudados de ${{goal}}",
+    "fundingPercent": "{{percent}}% financiado",
+    "fundingSupporters": "{{count}} personas han contribuido",
+    "fundingBeFirst": "Sé la primera persona en apoyar",
+    "fundingAria": "Progreso de financiación",
+    "fundingCta": "Contribuir",
+    "fundingQuickAmounts": "Montos rápidos",
+    "fundingCustomPlaceholder": "Monto personalizado",
+    "fundingCustomCta": "Enviar",
+    "report": "Reportar",
+    "comment": "Comentar",
+    "commentPosted": "Comentario publicado",
+    "signInToComment": "Inicia sesión para comentar",
+    "timeAgo": "{{time}}",
+    "commentLabel": "Comentario",
+    "replyLabel": "Respuesta",
+    "placeholderComment": "Comparte tus pensamientos",
+    "placeholderReply": "Escribe tu respuesta",
+    "nicknamePlaceholder": "Apodo o emoji",
+    "commentWithProfile": "Comentar con perfil",
+    "sendComment": "Enviar comentario",
+    "sendReply": "Enviar respuesta",
+    "deleteSuccess": "Deseo eliminado",
+    "deleteFailed": "No se pudo eliminar el deseo"
   },
   "onboarding": {
-    "slide1Title": "Publica anónimamente",
-    "slide2Title": "Escucha a otros",
-    "slide3Title": "Sé realizado",
-    "slide4Title": "Por qué importa",
-    "slide4Subtitle": "WhispList promete un espacio de cuidado para compartir sueños y preocupaciones sin juicio.",
+    "slide1Title": "Comparte sin juicios",
+    "slide1Subtitle": "Comparte celebraciones, metas, retos sinceros y pide consejos de forma anónima.",
+    "slide1Point1": "Las indicaciones diarias te inspiran cada día.",
+    "slide1Point2": "Las notas de audio dejan que tu voz se escuche en privado.",
+    "slide2Title": "Conecta con apoyo",
+    "slide2Subtitle": "Una comunidad cariñosa está lista para escucharte, darte consejo y animarte.",
+    "slide2Point1": "Recibe abrazos, corazones y boosts de quienes te apoyan.",
+    "slide2Point2": "Envía agradecimientos y continúa la conversación en mensajes.",
+    "slide3Title": "Crece cada día",
+    "slide3Subtitle": "Sigue tus rachas, registra reflexiones y celebra tus logros.",
+    "slide3Point1": "Observa tus hitos y estadísticas de impacto.",
+    "slide3Point2": "Guarda borradores y vuelve cuando estés listo.",
+    "title": "Bienvenido a WhispList",
+    "tagline": "Un espacio de cuidado para compartir sueños, reflexiones y apoyo.",
+    "stepCounter": "Paso {{current}} de {{total}}",
+    "swipeHint": "Desliza o toca siguiente para explorar el recorrido.",
+    "next": "Siguiente",
     "skip": "Saltar",
     "skipOnboarding": "Saltar introducción",
     "agree1": "Acepto los",
     "terms": " Términos de Servicio ",
     "and": "y",
     "privacy": " Política de Privacidad",
-    "getStarted": "Comenzar"
+    "primaryCta": "Comenzar a compartir",
+    "googleCta": "Continuar con Google",
+    "guestCta": "Seguir en anónimo",
+    "signinCta": "Ya tengo una cuenta"
   },
   "tabs": {
     "home": "Inicio",
@@ -48,30 +86,91 @@
     "journal": "Diario",
     "profile": "Perfil",
     "inbox": "Bandeja",
-    "settings": "Ajustes"
+    "messages": "Mensajes",
+    "settings": "Ajustes",
+    "subscriptions": "Suscripciones"
   },
   "settings": {
     "title": "Ajustes",
     "sections": {
+      "account": "Información de la cuenta",
       "privacy": "Privacidad y Perfil",
       "notifications": "Notificaciones",
       "developer": "Avanzado / Desarrollador",
       "system": "Sistema y Cuenta",
-      "theme": "Tema"
+      "theme": "Tema",
+      "legal": "Legal"
+    },
+    "account": {
+      "editProfileDescription": "Actualiza tu nombre, foto y biografía."
+    },
+    "hero": {
+      "greeting": "Bienvenido de nuevo",
+      "changePhoto": "Actualizar foto",
+      "uploadingPhoto": "Subiendo…",
+      "progress": "{{percent}}% subido"
+    },
+    "membership": {
+      "badge": {
+        "loading": "Comprobando…",
+        "free": "Gratis",
+        "active": "Activa",
+        "trial": "Prueba",
+        "pastDue": "Vencida",
+        "canceled": "Cancelada",
+        "unpaid": "No pagada",
+        "canceling": "Cancelando"
+      },
+      "detail": {
+        "loading": "Estamos actualizando tu estado de membresía.",
+        "free": "Desbloquea experiencias premium con WhispList+.",
+        "active": "La membresía está activa.",
+        "renews": "Renueva el {{date}}",
+        "canceling": "Termina el {{date}}"
+      },
+      "cta": "Gestionar membresía"
+    },
+    "legal": {
+      "termsUpdated": "Última actualización: 3 Sep 2025",
+      "termsDescription": "Revisa el acuerdo que mantiene WhispList seguro para todos.",
+      "privacyUpdated": "Última actualización: 3 Sep 2025",
+      "privacyDescription": "Entiende cómo almacenamos, procesamos y protegemos tus datos."
     },
     "privacy": {
       "anonymize": "Anonimizar nombre de usuario",
+      "anonymizeDescription": "Oculta tu nombre y avatar en los nuevos deseos.",
+      "shareAnalytics": "Compartir analíticas anónimas",
+      "shareAnalyticsDescription": "Ayúdanos a mejorar WhispList con estadísticas agregadas.",
       "publicProfile": "Perfil público habilitado",
-      "stripeGifting": "Habilitar regalos con Stripe"
+      "publicProfileDescription": "Permite que otros Whispers exploren tu perfil público.",
+      "stripeGifting": "Habilitar regalos con Stripe",
+      "stripeGiftingDescription": "Habilita regalos y pagos a través de tu cuenta de Stripe."
     },
     "notifications": {
       "dailyQuote": "Frase diaria",
+      "dailyQuoteDescription": "Recibe una afirmación diaria dentro de WhispList.",
+      "quoteStyle": "Estilo de frase",
+      "quoteReminder": "Recordatorio de frase diaria",
+      "quoteReminderDescription": "Programa una alerta a tu hora favorita.",
+      "quoteReminderTime": "Hora del recordatorio",
       "boostNotifications": "Notificaciones de impulso",
+      "boostNotificationsDescription": "Avisos cuando tu deseo se impulsa o está por expirar.",
       "commentNotifications": "Notificaciones de comentarios",
-      "referralBonuses": "Bonos por referidos"
+      "commentNotificationsDescription": "Entérate cuando alguien reacciona o comenta tu deseo.",
+      "giftNotifications": "Notificaciones de regalos",
+      "giftNotificationsDescription": "Recibe avisos cuando un seguidor envía un regalo.",
+      "referralBonuses": "Bonos por referidos",
+      "referralBonusesDescription": "Avisos cuando alguien obtiene una recompensa por tu referido.",
+      "test": "Enviar notificación de prueba",
+      "testTitle": "Notificación de prueba",
+      "testBody": "Así se ven las notificaciones.",
+      "testDescription": "Comprueba que tu dispositivo puede recibir notificaciones.",
+      "openSettings": "Abrir ajustes del sistema",
+      "openSettingsDescription": "Ajusta los permisos de notificaciones en tu dispositivo."
     },
     "developer": {
       "developerMode": "Modo desarrollador",
+      "developerModeDescription": "Desbloquea herramientas internas, analíticas y accesos a staging.",
       "stats": {
         "totalWishes": "Deseos totales: {{count}}",
         "totalBoosts": "Impulsos totales: {{count}}",
@@ -83,6 +182,7 @@
       "pickAvatar": "Elegir avatar",
       "earnedBoosts": "Has ganado {{count}} impulsos gratis!",
       "referFriend": "Referir a un amigo",
+      "referFriendDescription": "Comparte tu enlace de referidos para desbloquear más impulsos.",
       "defaultCategory": "Categoría predeterminada",
       "categories": {
         "general": "General",
@@ -95,16 +195,49 @@
         "en": "Inglés",
         "es": "Español"
       },
+      "feedbackTitle": "Compartir comentarios",
       "feedbackPlaceholder": "Enviar comentarios",
       "submitFeedback": "Enviar comentarios",
       "exportHistory": "Exportar historial",
+      "exportHistoryDescription": "Crea una copia personal de tus deseos y comentarios.",
       "rateApp": "Calificar esta app",
+      "rateAppDescription": "Cuéntales a otros qué te gusta de WhispList.",
       "permissions": "Permisos",
+      "permissionsDescription": "Consulta los permisos del micrófono y las notificaciones.",
+      "copyDiagnostics": "Copiar diagnóstico",
+      "copyDiagnosticsDescription": "Copia detalles del dispositivo para compartir con soporte.",
+      "debug": "Abrir depuración",
+      "debugDescription": "Inspecciona cachés locales, almacenamiento y herramientas de desarrollo.",
+      "restorePurchases": "Restaurar compras",
+      "restoreSuccess": "Restaurado",
+      "restoreFailed": "La restauración falló",
       "deleteContent": "Eliminar mi contenido",
+      "deleteContentDescription": "Elimina todos los deseos y comentarios publicados con tu apodo.",
       "resetData": "Restablecer datos de la app",
+      "resetDataDescription": "Borra preferencias en caché y borradores locales.",
+      "offlineQueue": "Cola sin conexión",
+      "queued": "En cola: {{count}}",
+      "oldest": "Más antiguo: hace {{mins}}m",
+      "nextRetry": "Próximo intento: en {{mins}}m",
+      "retryNow": "Reintentar pendientes ahora",
+      "retryResult": "Se publicaron {{count}} pendientes",
+      "clearQueue": "Limpiar pendientes",
+      "cleared": "Limpiado",
+      "signOut": "Cerrar sesión",
+      "signOutDescription": "Cierra sesión de WhispList en este dispositivo.",
+      "signedOut": "Sesión cerrada",
+      "signOutFailed": "Error al cerrar sesión",
+      "resetConfirmTitle": "¿Restablecer los datos de la app?",
+      "resetConfirmBody": "Esto borrará las preferencias locales y los borradores.",
       "aboutDescription": "WhispList promete un lugar seguro y anónimo para compartir tus sueños.",
       "terms": "Términos de servicio",
       "privacy": "Política de privacidad"
+    },
+    "theme": {
+      "pickerLabel": "Tema predefinido"
+    },
+    "accessibility": {
+      "copyUserId": "Copiar tu ID de usuario al portapapeles"
     },
     "alert": {
       "permissionRequiredTitle": "Se requiere permiso",
@@ -124,10 +257,574 @@
     "title": "404 - No encontrado"
   },
   "inbox": {
-    "justNow": "justo ahora"
+    "justNow": "justo ahora",
+    "openMessages": "Abrir mensajes directos"
+  },
+  "messages": {
+    "title": "Mensajes directos",
+    "heroSubtitle": "Mantente en contacto con quienes sigues.",
+    "statThreads": "Conversaciones",
+    "statUnread": "Sin leer",
+    "searchLabel": "Inicia una conversación",
+    "startHint": "Escribe un @usuario para comenzar",
+    "quickHeader": "Inicio rápido",
+    "openNotifications": "Abrir notificaciones",
+    "startWith": "Iniciar MD con @displayName",
+    "start": "Iniciar",
+    "open": "Abrir",
+    "openChatWith": "Abrir chat con {{name}}",
+    "type": "Escribe un mensaje",
+    "uploading": "Subiendo...",
+    "noMessages": "Sin mensajes aún",
+    "lastSeen": "Visto por última vez {{time}}",
+    "typing": "Escribiendo...",
+    "userNotFound": "Usuario no encontrado",
+    "quickStart": "Inicio rápido",
+    "emptyTitle": "Aún no hay conversaciones",
+    "emptySubtitle": "Envía tu primer mensaje directo para mantenerte en contacto con tus whispers favoritos."
+  },
+  "journal": {
+    "header": "Tu diario privado ✨",
+    "savedOfflineTitle": "Guardado sin conexión",
+    "savedOfflineMessage": "Tu entrada se sincronizará cuando estés en línea.",
+    "heroSubtitle": "Captura un pensamiento y sigue tu estado de ánimo.",
+    "streak": "{{count}} días seguidos",
+    "stats": {
+      "entries": "Entradas",
+      "streak": "Racha",
+      "week": "Esta semana"
+    },
+    "promptTitle": "Prompt diario",
+    "promptRefresh": "Dame otro prompt",
+    "toggleFreeform": "Cambiar a libre",
+    "togglePrompt": "Usar prompt",
+    "selectMood": "Seleccionar estado",
+    "moodLabel": "Estado",
+    "searchPlaceholder": "Busca en tus entradas",
+    "searchResults": "Mostrando {{count}} de {{total}} entradas",
+    "searchEmpty": "Ninguna entrada coincide con \"{{query}}\".",
+    "clearSearch": "Borrar búsqueda",
+    "placeholder": "Escribe lo que piensas",
+    "saveEntry": "Guardar entrada",
+    "weeklyInsightsTitle": "Resumen semanal",
+    "weeklyInsightsAccessibility": "Resumen semanal del diario",
+    "weeklyEntries": "Registraste {{count}} vez en los últimos 7 días.",
+    "weeklyEntries_plural": "Registraste {{count}} veces en los últimos 7 días.",
+    "weeklyEmpty": "Aún no hay entradas esta semana — comienza una nueva reflexión.",
+    "topMood": "Estado más común: {{mood}}",
+    "avgLength": "Longitud promedio: {{chars}} caracteres",
+    "wishShared": "¡Deseo publicado!",
+    "promptRefreshed": "✨ Ese sí que es profundo.",
+    "expandEntry": "Leer más",
+    "collapseEntry": "Mostrar menos",
+    "shareAsWish": "Compartir como deseo",
+    "emptyState": "Tu diario espera su primera entrada.",
+    "emptyStateCta": "Escribe algo ahora",
+    "justNow": "Justo ahora"
   },
   "notifications": {
-    "dailyPromptTitle": "WhispList",
-    "dailyPromptBody": "¡Es hora de publicar tu deseo de hoy!"
+  "dailyPromptTitle": "WhispList",
+  "dailyPromptBody": "¡Es hora de compartir tu historia de hoy!",
+  "dailyQuoteBody": "Tu dosis diaria de motivación está lista."
+  },
+  "userImpact": {
+    "title": "Tu impacto",
+    "wishes": "Has publicado {{count}} deseos",
+    "boosts": "Impulsado {{count}} — has obtenido {{likes}} me gusta",
+    "gifts": "Has recibido {{count}} regalos — ${{total}}"
+  },
+  "composer": {
+    "title": "¿Qué quieres compartir hoy?",
+    "placeholderWish": "Escribe tu historia...",
+    "thinking": "Pensando...",
+    "rephraseButton": "✨ Ayúdame a reformular",
+    "dailyPromptTitle": "Indicador diario ✨",
+    "postType": "Tipo de publicación",
+    "type": {
+      "celebration": "Celebración 🎉",
+      "goal": "Meta 🌱",
+      "struggle": "Dificultad 🌧️",
+      "advice": "Pedir consejo 🧠"
+    },
+    "typePromptTitle": "¿Necesitas inspiración?",
+    "typePrompts": {},
+    "support": {
+      "struggle": "¿Necesitas ayuda inmediata? Toca aquí para recibir apoyo."
+    },
+    "placeholderByType": {
+      "celebration": "Comparte el momento que estás celebrando...",
+      "goal": "Describe la meta en la que trabajas...",
+      "struggle": "Cuéntanos qué te está pesando ahora...",
+      "advice": "Explica la situación sobre la que necesitas consejo..."
+    },
+    "advancedOptions": "Opciones avanzadas",
+    "pollMode": "Modo encuesta",
+    "optionA": "Opción A",
+    "optionB": "Opción B",
+    "includeAudio": "Incluir audio",
+    "addExternalGiftOption": "Añadir opción de regalo externo",
+    "addGiftLinkLabel": "Añade un enlace de regalo (p. ej., Venmo, wishlist)",
+    "giftLinkPlaceholder": "Enlace de regalo (opcional)",
+    "giftType": "Tipo de regalo",
+    "giftTypePlaceholder": "kofi, paypal, etc",
+    "giftLabel": "Etiqueta de regalo",
+    "giftLabelPlaceholder": "Apoyar en Ko-fi",
+    "enableFunding": "Activar meta de financiación",
+    "fundingGoal": "Meta de financiación (USD)",
+    "fundingGoalPlaceholder": "Monto objetivo",
+    "fundingPresets": "Cantidades sugeridas",
+    "fundingPresetsPlaceholder": "ej. 5,10,25",
+    "fundingPresetsHelper": "Separa con comas las cantidades rápidas que podrán elegir.",
+    "fundingGoalErrorTitle": "Define una meta",
+    "fundingGoalErrorBody": "Ingresa una meta positiva para activar la financiación.",
+    "postWithProfile": "Publicar con perfil",
+    "autoDelete24h": "Autoeliminar después de 24h",
+    "recordAudio": "Grabar audio",
+    "stopRecording": "Detener grabación",
+    "changeImage": "Cambiar imagen",
+    "attachImage": "Adjuntar imagen",
+    "postWish": "Compartir",
+    "goToAuth": "Ir a Autenticación",
+    "invalidLink": "El enlace debe comenzar con http:// o https://",
+    "draftLoaded": "Borrador cargado",
+    "discardDraft": "Descartar",
+    "saveDraft": "Guardar como borrador",
+    "savedJustNow": "justo ahora",
+    "savedMinsAgo": "hace {{mins}}m",
+    "savedHoursAgo": "hace {{hrs}}h",
+    "uploading": "Subiendo",
+    "uploadingAudio": "Subiendo audio",
+    "uploadingImage": "Subiendo imagen",
+    "deepPrompt": "✨ Esa es profunda.",
+    "wishTooLongTitle": "Deseo demasiado largo",
+    "wishTooLong": "El deseo debe tener {{max}} caracteres o menos.",
+    "linkTooLongTitle": "Enlace demasiado largo",
+    "linkTooLong": "El enlace debe tener {{max}} caracteres o menos.",
+    "invalidLinkTitle": "Enlace inválido",
+    "draftSaved": "Borrador guardado",
+    "discardConfirmTitle": "¿Descartar borrador?",
+    "discardConfirmMessage": "Esto eliminará tu borrador guardado.",
+    "retry": "Reintentar subida"
+  },
+  "feed": {
+  "filters": {
+    "all": "Todo",
+    "allTypes": "Todas las vibras",
+    "celebration": "Celebraciones",
+    "goal": "Metas",
+    "struggle": "Retos",
+    "advice": "Consejos"
+  },
+    "searchPlaceholder": "Buscar historias...",
+    "searchLabel": "Buscar publicaciones",
+    "title": "Feed de la comunidad",
+    "categories": {
+      "all": "Todo"
+    },
+  "viewLabel": "Ver",
+  "typeLabel": "Vibra de la publicación",
+    "tabs": {
+      "latest": "Recientes",
+      "boosted": "Impulsadas",
+      "trending": "Tendencias",
+      "forYou": "Para ti"
+    },
+    "tabCopy": {
+      "latest": "Publicaciones recientes de toda la comunidad.",
+      "boosted": "Detecta las publicaciones que reciben cariño extra.",
+      "trending": "Lo que más reacciones está generando ahora mismo.",
+      "forYou": "Publicaciones seleccionadas según a quién y qué sigues."
+    },
+    "topWishes": {
+      "title": "Publicaciones destacadas"
+    },
+    "empty": {
+      "search": "Ninguna publicación coincide con tu búsqueda todavía.",
+      "category": "Aún no hay publicaciones en esta categoría.",
+      "boosted": "No hay publicaciones impulsadas por ahora. Vuelve pronto ✨",
+      "trending": "Las tendencias están tranquilas por el momento. Regresa más tarde.",
+    "forYou": "Aún no encontramos una coincidencia para ti. Ajusta tus preferencias.",
+    "default": "Aún no hay publicaciones aquí. Sé la primera persona en compartir ✨",
+    "typeFallback": "No hay publicaciones con esta vibra. Prueba otra.",
+      "clearSearch": "Limpiar búsqueda",
+      "openPreferences": "Editar preferencias",
+      "adjustForYou": "Ajustar preferencias de Para ti",
+      "type": {
+        "celebration": "Aún no hay celebraciones aquí. Comparte una victoria para animar el feed.",
+        "goal": "Aún no aparecen metas. Sé la primera persona en poner una en marcha.",
+        "struggle": "Todavía no hay dificultades compartidas. Cuando quieras, cuenta lo que sientes.",
+        "advice": "No hay solicitudes de consejo todavía. Pide una perspectiva a la comunidad."
+      }
+    }
+  },
+  "home": {
+    "subtitle": "Publica un deseo y mira crecer los sueños 🌱",
+    "noResults": "Aún no hay deseos aquí. Comparte uno y comienza la conversación ✨",
+    "loadMore": "Cargar más",
+    "composeTitle": "Comparte algo nuevo",
+    "composeSubtitle": "Deja que un nuevo deseo flote en el mundo.",
+    "impactTitle": "Tu impacto",
+    "impactSubtitle": "Un vistazo rápido a cómo van tus deseos.",
+    "feedHeading": "Feed de la comunidad",
+    "feedDescription": "Mira los deseos más recientes de quienes sigues.",
+    "engagement": {
+      "title": "Mantén viva tu racha",
+      "caption": "Desbloquea insignias al seguir presente en la comunidad.",
+      "loading": "Revisando tu impulso…",
+      "label": "Tus rachas de participación",
+      "posting": "Racha de publicaciones",
+      "gifting": "Racha de regalos",
+      "fulfillment": "Racha de cumplimientos",
+      "next": {
+        "posting": "Siguiente insignia en {{target}} días",
+        "gifting": "Siguiente insignia con {{target}} regalos",
+        "fulfillment": "Siguiente insignia tras {{target}} cumplimientos"
+      },
+      "complete": "Todas las insignias desbloqueadas",
+      "rowLabel": "{{label}} — {{count}}",
+      "badgeProgress": "{{unlocked}} / {{total}} insignias",
+      "units": {
+        "days": "{{count}} días",
+        "gifts": "{{count}} regalos",
+        "wishes": "{{count}} cumplimientos"
+      }
+    },
+    "milestones": {
+      "title": "¡Insignia desbloqueada!",
+      "posting_1": "¡Primer deseo publicado!",
+      "posting_3": "¡Racha de tres días publicando!",
+      "posting_7": "¡Racha de siete días — vas con todo!",
+      "posting_14": "14 días compartiendo — ¡constancia increíble!",
+      "posting_30": "¡30 días consecutivos — un mes perfecto!",
+      "gifting_1": "¡Primer regalo enviado — alegraste a alguien!",
+      "gifting_5": "¡5 regalos compartidos — la amabilidad fluye!",
+      "gifting_15": "15 regalos — eres un gran apoyo.",
+      "fulfillment_1": "Primer deseo cumplido — los sueños se hacen realidad.",
+      "fulfillment_3": "Tres deseos cumplidos — ¡generosidad increíble!",
+      "fulfillment_10": "10 deseos cumplidos — eres un campeón de la comunidad."
+    },
+    "communityPulse": {
+      "title": "Pulso de la comunidad",
+      "subtitle": "Esto es lo que la comunidad celebra ahora mismo.",
+      "loading": "Recopilando las últimas novedades…",
+      "boosts": "🚀 Impulsos recientes",
+      "boostItem": " impulsó a ",
+      "boostWish": " '{{wish}}'",
+      "fulfilled": "✨ Deseos cumplidos",
+      "fulfillmentItem": " completó ",
+      "aWish": "un deseo",
+      "supporters": "🏅 Mayores patrocinadores",
+      "supporterMeta": "{{gifts}} regalos · ${{amount}}",
+      "supporterTier": " · {{tier}}",
+      "supporterShoutOut": "{{badge}} {{tier}} mantiene vivos los deseos",
+      "supporterTiers": {
+        "platinum": "Aliado Platino",
+        "gold": "Campeón de Oro",
+        "silver": "Aliado de Plata",
+        "bronze": "Amigo de Bronce"
+      },
+      "empty": "Pronto verás aquí la actividad más reciente.",
+      "label": "Destacados de la comunidad"
+    },
+    "prompts": {
+      "title": "Mantén el cariño",
+      "streakMessage": "Comparte hoy para mantener tu racha.",
+      "streakCta": "Crear deseo",
+      "supporterMessage": "Agradece a {{name}} su regalo.",
+      "supporterCta": "Enviar gracias"
+    },
+    "quickActions": {
+      "title": "Accesos rápidos",
+      "subtitle": "Retoma tu rutina al instante",
+      "feed": "Explorar deseos",
+      "feedDescription": "Descubre lo que comparte la comunidad",
+      "journal": "Diario",
+      "journalDescription": "Reflexiona en privado",
+      "messages": "Mensajes",
+      "messagesDescription": "Ponte al día con tus amigos",
+      "profile": "Perfil",
+      "profileDescription": "Actualiza tu espacio"
+    },
+    "heroImpactSummary": {
+      "empty": "Comienza tu historia con el deseo de hoy.",
+      "stats": "Hasta ahora: {{wishes}} deseos, {{boosts}} impulsos, {{gifts}} regalos."
+    }
+  },
+  "postConfirm": {
+    "sent": "💭 Tu deseo ha sido enviado al mundo.",
+    "viewFeed": "Ver en el feed",
+    "postAnother": "Publicar otro deseo"
+  },
+  "errors": {
+    "uploadFailed": "La subida falló. Inténtalo de nuevo."
+  },
+  "offline": {
+    "postedOne": "Tu deseo guardado se ha publicado.",
+    "postedCount": "Se publicaron {{count}} deseos guardados."
+  },
+  "gifts": {
+    "success": "🎁 ¡Gracias por tu apoyo!",
+    "cancelled": "Pago de regalo cancelado",
+    "enterAmountTitle": "Ingresa un monto",
+    "enterAmountBody": "Ingresa un monto para contribuir.",
+    "invalidAmountTitle": "Monto no válido",
+    "invalidAmountBody": "Ingresa un monto mayor que cero.",
+    "limitTitle": "Monto demasiado alto",
+    "limitBody": "El aporte máximo es de $10,000.",
+    "confirmAmount": "¿Enviar ${{amount}} a este deseo?",
+    "confirmGift": "¿Confirmar envío del regalo?"
+  },
+  "dailyQuote": {
+    "title": "Motivación",
+    "quotes": [
+      "¡Cree en ti mismo!",
+      "Sueña en grande y atrévete a fallar.",
+      "Cada día es una segunda oportunidad."
+    ],
+    "dismiss": "Cerrar",
+    "turnOffToday": "Desactivar por hoy",
+    "openSettings": "Ajustes",
+    "styles": {
+      "uplifting": "Inspirador",
+      "stoic": "Estoico",
+      "growth": "Crecimiento"
+    },
+    "quotesByStyle": {
+      "uplifting": [
+        "¡Cree en ti mismo!",
+        "Sueña en grande y atrévete a fallar.",
+        "Cada día es una segunda oportunidad."
+      ],
+      "stoic": [
+        "Concéntrate en lo que puedes controlar.",
+        "Mente calmada, corazón firme.",
+        "Acepta, adapta, avanza."
+      ],
+      "growth": [
+        "Pequeños pasos, gran progreso.",
+        "Aprende, itera, mejora.",
+        "Progreso sobre perfección."
+      ]
+    },
+    "generator": {
+      "starts": [
+        "Recuerda,",
+        "Hoy,",
+        "Cada día,",
+        "Tú,",
+        "Elige",
+        "Deja",
+        "Sigue",
+        "Pequeños pasos",
+        "El progreso",
+        "Sé amable con",
+        "Confía en",
+        "Tu",
+        "No",
+        "Haz",
+        "Empieza",
+        "Cree",
+        "Enfócate en",
+        "Celebra",
+        "Eres",
+        "La fuerza viene de",
+        "El crecimiento comienza cuando",
+        "Calma tu",
+        "Teme menos,",
+        "Crea espacio para",
+        "Sigue avanzando",
+        "Mantén la curiosidad,",
+        "Sigue,",
+        "Tienes",
+        "Un paso",
+        "Inhala",
+        "Honra"
+      ],
+      "actions": [
+        "eres más fuerte de lo que crees",
+        "tu esfuerzo se compone",
+        "progreso sobre perfección",
+        "lo que puedes controlar",
+        "el momento presente",
+        "tus valores",
+        "aprender de los errores",
+        "presentarte",
+        "tus pequeñas victorias",
+        "la constancia",
+        "mejoras diminutas",
+        "ser valiente",
+        "la amabilidad contigo mismo",
+        "tu respiración",
+        "tu camino",
+        "el proceso",
+        "tu curiosidad",
+        "encontrar equilibrio",
+        "tener paciencia",
+        "escuchar profundamente",
+        "descansar y reiniciar",
+        "la gratitud",
+        "soltar",
+        "la autocompasión",
+        "tomar acción",
+        "pedir ayuda",
+        "abrazar el cambio",
+        "comenzar de nuevo",
+        "ser honesto",
+        "claridad"
+      ],
+      "endings": [
+        "y lo demás seguirá.",
+        "y sigue adelante.",
+        "y confía en el proceso.",
+        "y da el siguiente paso.",
+        "y respira.",
+        "y sé amable contigo.",
+        "y observa cómo crece el impulso.",
+        "y mantén la constancia.",
+        "— incluso lento es progreso.",
+        "y celebra las pequeñas victorias.",
+        "y enfócate en lo que importa.",
+        "— eres suficiente.",
+        "y sigue aprendiendo.",
+        "con paciencia y valentía.",
+        "y elige crecer.",
+        "con calma y claridad.",
+        "— tu ritmo es perfecto.",
+        "y permanece presente.",
+        "y mantenlo simple.",
+        "y suelta el resto.",
+        "— puedes con cosas difíciles.",
+        "y mantén el corazón abierto.",
+        "y honra tu energía.",
+        "y preséntate hoy.",
+        "y confía en tus tiempos."
+      ]
+    }
+  },
+  "profile": {
+    "changePhoto": "Cambiar foto",
+    "followCounts": "Sigues a {{following}} personas · Seguidores {{followers}}",
+    "displayNameLabel": "Nombre para mostrar",
+    "displayNamePlaceholder": "Nombre para mostrar",
+    "bioLabel": "Bio",
+    "bioPlaceholder": "Bio",
+    "saving": "Guardando...",
+    "saveProfile": "Guardar perfil",
+    "openJournal": "Abrir diario",
+    "tabs": {
+      "posted": "📝 Publicados",
+      "saved": "💾 Guardados",
+      "gifts": "💝 Regalos recibidos"
+    },
+    "boosts": {
+      "title": "🔥 Impulsos",
+      "count": "Has impulsado {{count}} deseos 🌟",
+      "impact": "Tus impulsos lograron ❤️ {{likes}} me gusta, 💬 {{comments}} comentarios"
+    },
+    "streak": {
+      "title": "📅 Racha",
+      "text": "🔥 Racha de {{count}} días — ¡vas con todo!"
+    },
+    "gifts": {
+      "title": "💝 Regalos",
+      "text": "Has recibido {{count}} regalos 🎁 (${{total}} total)"
+    },
+    "giftMessages": {
+      "title": "💌 Mensajes de seguidores"
+    },
+    "referrals": {
+      "title": "🎁 Referidos",
+      "text": "Has invitado a {{count}} personas — faltan {{remaining}} para desbloquear otra recompensa"
+    },
+    "public": {
+      "title": "🌐 Perfil público",
+      "desc": "Tu perfil es público. Esto es lo que otros ven.",
+      "copyLink": "Copiar enlace",
+      "preview": "Vista previa de mi perfil público",
+      "share": "Compartir perfil"
+    },
+    "reflections": {
+      "title": "🧠 Tus reflexiones de esta semana"
+    },
+    "reflection": {
+      "title": "🧠 Reflexión",
+      "yesterday": "Ayer dijiste: '{{text}}'"
+    },
+    "reminder": {
+      "title": "⏰ Recordatorio diario de deseo",
+      "text": "Recuérdame publicar un deseo diario"
+    },
+    "signOut": "Cerrar sesión",
+    "email": "Correo: {{email}}",
+    "anonymous": "Anónimo",
+    "loggedInAnonymously": "Conectado anónimamente",
+    "saved": "Perfil guardado",
+    "linkCopied": "Enlace copiado",
+    "saveFailed": "No se pudo guardar el perfil"
+  }
+  ,
+  "subscriptions": {
+    "signIn": "Inicia sesión para gestionar tu suscripción",
+    "title": "Apoya WhispList",
+    "subtitle": "Ayúdanos a continuar y recibe beneficios. Cancela cuando quieras.",
+    "status": "Estado",
+    "renewsOn": "Renueva el {{date}}",
+    "manage": "Gestionar suscripción",
+    "subscribe": "Suscribirse",
+    "errorStart": "No se pudo iniciar el pago.",
+    "errorPortal": "No se pudo abrir el portal de facturación.",
+    "missingPrice": "Falta configurar el precio",
+    "setupHelp": "Agrega los identificadores de facturación para {{plan}} en la configuración del entorno.",
+    "success": "¡Gracias por apoyar WhispList!",
+    "cancelled": "Pago cancelado",
+    "benefits": {
+      "rephrase": "Asistente de reformulación",
+      "badge": "Insignia de simpatizante",
+      "image": "Mayor calidad de imagen",
+      "early": "Acceso anticipado a funciones",
+      "supporterImpact": "Mantén a WhispList independiente y sin anuncios",
+      "patron": {
+        "allSupporter": "Todo lo del plan Simpatizante",
+        "communityImpact": "Ayuda a financiar nuevas vitrinas comunitarias y deseos impulsados",
+        "priorityAccess": "Acceso prioritario a nuestras próximas herramientas experimentales"
+      },
+      "annual": {
+        "allPatron": "Todo lo del plan Patrón",
+        "savings": "Dos meses gratis comparado con pagar mensualmente",
+        "badge": "Insignia anual de Patrón de edición limitada",
+        "checkIns": "Actualización estacional tras bambalinas del equipo"
+      }
+    },
+    "plan": "Plan",
+    "cancelsOn": "Se cancela el {{date}}",
+    "trialEndsOn": "La prueba termina el {{date}}",
+    "loadingPlans": "Cargando planes…",
+    "manageAppStore": "Gestionar en App Store",
+    "restore": "Restaurar compras",
+    "restoreFailed": "La restauración falló",
+    "unconfiguredCta": "Completa la configuración de pagos",
+    "badges": {
+      "monthly": "Mensual",
+      "annual": "Anual",
+      "weekly": "Semanal",
+      "lifetime": "De por vida",
+      "3mo": "3 meses",
+      "6mo": "6 meses",
+      "mostPopular": "Más popular",
+      "bestValue": "Mejor valor"
+    },
+    "planNames": {
+      "supporter": "Simpatizante",
+      "patron": "Patrón",
+      "patronAnnual": "Patrón anual"
+    }
+  },
+  "premium": {
+    "rephrase": {
+      "title": "Función para simpatizantes",
+      "body": "La reformulación está disponible para simpatizantes. ¿Abrir suscripciones?",
+      "cancel": "Ahora no",
+      "open": "Abrir Suscripciones"
+    }
   }
 }

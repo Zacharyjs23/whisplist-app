@@ -7,7 +7,9 @@ describe('auth services', () => {
 
   describe('signUp', () => {
     it('signs up a user successfully', async () => {
-      const createUserWithEmailAndPassword = jest.fn().mockResolvedValue('user');
+      const createUserWithEmailAndPassword = jest
+        .fn<(...args: any[]) => Promise<string>>()
+        .mockResolvedValue('user');
       jest.doMock('firebase/auth', () => ({ createUserWithEmailAndPassword }));
       const authInstance = {};
       jest.doMock('@/firebase', () => ({ auth: authInstance }));
@@ -24,7 +26,7 @@ describe('auth services', () => {
     it('propagates errors from Firebase', async () => {
       const error = new Error('failed');
       const createUserWithEmailAndPassword = jest
-        .fn()
+        .fn<(...args: any[]) => Promise<unknown>>()
         .mockRejectedValue(error);
       jest.doMock('firebase/auth', () => ({ createUserWithEmailAndPassword }));
       jest.doMock('@/firebase', () => ({ auth: {} }));
@@ -48,7 +50,9 @@ describe('auth services', () => {
 
   describe('signIn', () => {
     it('signs in a user successfully', async () => {
-      const signInWithEmailAndPassword = jest.fn().mockResolvedValue('user');
+      const signInWithEmailAndPassword = jest
+        .fn<(...args: any[]) => Promise<string>>()
+        .mockResolvedValue('user');
       jest.doMock('firebase/auth', () => ({ signInWithEmailAndPassword }));
       const authInstance = {};
       jest.doMock('@/firebase', () => ({ auth: authInstance }));
@@ -65,7 +69,7 @@ describe('auth services', () => {
     it('propagates errors from Firebase', async () => {
       const error = new Error('failed');
       const signInWithEmailAndPassword = jest
-        .fn()
+        .fn<(...args: any[]) => Promise<unknown>>()
         .mockRejectedValue(error);
       jest.doMock('firebase/auth', () => ({ signInWithEmailAndPassword }));
       jest.doMock('@/firebase', () => ({ auth: {} }));
@@ -89,7 +93,9 @@ describe('auth services', () => {
 
   describe('signInAnonymouslyService', () => {
     it('signs in anonymously successfully', async () => {
-      const signInAnonymously = jest.fn().mockResolvedValue('anon');
+      const signInAnonymously = jest
+        .fn<(...args: any[]) => Promise<string>>()
+        .mockResolvedValue('anon');
       jest.doMock('firebase/auth', () => ({ signInAnonymously }));
       const authInstance = {};
       jest.doMock('@/firebase', () => ({ auth: authInstance }));
@@ -101,7 +107,9 @@ describe('auth services', () => {
 
     it('propagates errors from Firebase', async () => {
       const error = new Error('failed');
-      const signInAnonymously = jest.fn().mockRejectedValue(error);
+      const signInAnonymously = jest
+        .fn<(...args: any[]) => Promise<unknown>>()
+        .mockRejectedValue(error);
       jest.doMock('firebase/auth', () => ({ signInAnonymously }));
       jest.doMock('@/firebase', () => ({ auth: {} }));
 
@@ -124,7 +132,9 @@ describe('auth services', () => {
 
   describe('resetPassword', () => {
     it('sends a password reset email successfully', async () => {
-      const sendPasswordResetEmail = jest.fn().mockResolvedValue('ok');
+      const sendPasswordResetEmail = jest
+        .fn<(...args: any[]) => Promise<string>>()
+        .mockResolvedValue('ok');
       jest.doMock('firebase/auth', () => ({ sendPasswordResetEmail }));
       const authInstance = {};
       jest.doMock('@/firebase', () => ({ auth: authInstance }));
@@ -139,7 +149,9 @@ describe('auth services', () => {
 
     it('propagates errors from Firebase', async () => {
       const error = new Error('failed');
-      const sendPasswordResetEmail = jest.fn().mockRejectedValue(error);
+      const sendPasswordResetEmail = jest
+        .fn<(...args: any[]) => Promise<unknown>>()
+        .mockRejectedValue(error);
       jest.doMock('firebase/auth', () => ({ sendPasswordResetEmail }));
       jest.doMock('@/firebase', () => ({ auth: {} }));
 
@@ -162,7 +174,9 @@ describe('auth services', () => {
 
   describe('signInWithGoogle', () => {
     it('signs in with Google successfully', async () => {
-      const signInWithCredential = jest.fn().mockResolvedValue('ok');
+      const signInWithCredential = jest
+        .fn<(...args: any[]) => Promise<string>>()
+        .mockResolvedValue('ok');
       const GoogleAuthProvider = { credential: jest.fn().mockReturnValue('cred') };
       jest.doMock('firebase/auth', () => ({
         GoogleAuthProvider,
@@ -172,7 +186,7 @@ describe('auth services', () => {
       jest.doMock('@/firebase', () => ({ auth: authInstance }));
 
       const promptAsync = jest
-        .fn()
+        .fn<(...args: any[]) => Promise<any>>()
         .mockResolvedValue({
           type: 'success',
           authentication: { idToken: 'token' },
@@ -187,7 +201,9 @@ describe('auth services', () => {
 
     it('propagates errors from signInWithCredential', async () => {
       const error = new Error('failed');
-      const signInWithCredential = jest.fn().mockRejectedValue(error);
+      const signInWithCredential = jest
+        .fn<(...args: any[]) => Promise<unknown>>()
+        .mockRejectedValue(error);
       const GoogleAuthProvider = { credential: jest.fn().mockReturnValue('cred') };
       jest.doMock('firebase/auth', () => ({
         GoogleAuthProvider,
@@ -196,7 +212,7 @@ describe('auth services', () => {
       jest.doMock('@/firebase', () => ({ auth: {} }));
 
       const promptAsync = jest
-        .fn()
+        .fn<(...args: any[]) => Promise<any>>()
         .mockResolvedValue({
           type: 'success',
           authentication: { idToken: 'token' },
@@ -225,4 +241,3 @@ describe('auth services', () => {
     });
   });
 });
-

@@ -6,13 +6,13 @@ const globals = require('globals');
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ['dist/*', '.expo/**'],
+    ignores: ['dist/*', '.expo/**', 'functions/lib/**', '**/*.log', '**/*.pid', '.idea/**'],
   },
   // Allow optional native modules that are dynamically imported and not always installed
   {
     files: [
-      'app/(tabs)/settings/subscriptions.tsx',
-      'app/(tabs)/settings.tsx',
+      'app/(tabs)/profile/settings/subscriptions.tsx',
+      'app/(tabs)/profile/settings/index.tsx',
       'contexts/SubscriptionContext.tsx',
     ],
     rules: {

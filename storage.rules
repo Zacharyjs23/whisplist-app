@@ -1,16 +1,50 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    function signedIn() { return request.auth != null; }
+    function isImage() { return request.resource != null && request.resource.contentType.matches('image/.*'); }
+    function isAudio() { return request.resource != null && request.resource.contentType.matches('audio/.*'); }
+    function under10MB() { return request.resource != null && request.resource.size < 10 * 1024 * 1024; }
+
     // Allow signed-in users to upload profile images under users/{uid}/...
     match /users/{userId}/{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow write: if signedIn() && request.auth.uid == userId && under10MB() && (isImage() || isAudio());
     }
 
     // Allow any signed-in user to upload to wishes/{wishId}/...
     match /wishes/{wishId}/{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if signedIn() && under10MB() && (isImage() || isAudio());
+    }
+    
+    // Public media buckets used by the app
+    match /avatars/{fileId} {
+      allow read: if true;
+      allow write: if signedIn() && under10MB() && isImage();
+    }
+
+    match /images/{fileId} {
+      allow read: if true;
+      allow write: if signedIn() && under10MB() && isImage();
+    }
+
+    match /audio/{fileId} {
+      allow read: if true;
+      allow write: if signedIn() && under10MB() && isAudio();
+    }
+
+    // DM images (temporary: restrict to signed-in users). Consider proxying for stricter access.
+    match /dm/{threadId}/{allPaths=**} {
+      // Only thread participants may read/write, limit to image/audio <10MB
+      allow read: if signedIn() && (
+        threadId.matches('^' + request.auth.uid + '_.+$') ||
+        threadId.matches('^.+_' + request.auth.uid + '$')
+      );
+      allow write: if signedIn() && under10MB() && (isImage() || isAudio()) && (
+        threadId.matches('^' + request.auth.uid + '_.+$') ||
+        threadId.matches('^.+_' + request.auth.uid + '$')
+      );
     }
 
     // Deny everything else
