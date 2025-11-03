@@ -6,7 +6,14 @@ const globals = require('globals');
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ['dist/*', '.expo/**', 'functions/lib/**', '**/*.log', '**/*.pid', '.idea/**'],
+    ignores: [
+      'dist/*',
+      '.expo/**',
+      'functions/lib/**',
+      '**/*.log',
+      '**/*.pid',
+      '.idea/**',
+    ],
   },
   // Allow optional native modules that are dynamically imported and not always installed
   {
@@ -31,7 +38,10 @@ module.exports = defineConfig([
   {
     files: ['tests/**/*.{js,ts,tsx}'],
     languageOptions: {
-      globals: globals.node,
+      globals: {
+        ...globals.node,
+        ...globals.jest,
+      },
     },
     rules: {
       'import/first': 'off',
