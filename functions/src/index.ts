@@ -1,99 +1,549 @@
-import * as functions from 'firebase-functions';
+import {
+  config as functionsConfig,
+  firestore,
+  logger,
+  pubsub,
+  region,
+  runWith,
+} from 'firebase-functions/v1';
 import type { Request, Response } from 'express';
 import * as admin from 'firebase-admin';
-import { Expo } from 'expo-server-sdk';
+import { createHmac, randomUUID } from 'node:crypto';
+import type { DocumentSnapshot } from 'firebase-admin/firestore';
 import { backfillPostTypes } from './backfillPostTypes';
+import { incrementEngagement } from './engagement';
+import { sendPush } from './notifications';
 // Use Cloud Functions logger for server-side logs
 
-admin.initializeApp();
-const db = admin.firestore();
-const expo = new Expo();
+let cachedRuntimeConfig: Record<string, any> | null = null;
 
-type PushType =
-  | 'wish_boosted'
-  | 'new_comment'
-  | 'referral_bonus'
-  | 'gift_received'
-  | 'generic';
-
-async function sendPush(
-  userId: string | undefined,
-  title: string,
-  body: string,
-  type: PushType = 'generic',
-  path?: string,
-) {
-  if (!userId) return null;
-  const userRef = db.collection('users').doc(userId);
-  const snap = await userRef.get();
+function readRuntimeConfig(): Record<string, any> {
+  if (cachedRuntimeConfig) return cachedRuntimeConfig;
   try {
-    const prefs = snap.get('notificationPrefs');
-    if (prefs && type !== 'generic' && prefs[type] === false) {
-      return null;
+    cachedRuntimeConfig =
+      typeof functionsConfig === 'function' ? functionsConfig() ?? {} : {};
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '';
+    if (message.includes('functions.config() is no longer available')) {
+      cachedRuntimeConfig = {};
+    } else {
+      throw err;
     }
-  } catch {}
-  const expoToken = snap.get('pushToken');
-  const fcmToken = snap.get('fcmToken');
-  const metaRef = userRef.collection('meta').doc('push');
-  const metaSnap = await metaRef.get();
-  const last = metaSnap.exists ? metaSnap.get('lastSent') : null;
-  const throttled = !!(last && Date.now() - last.toMillis() < 60000);
+  }
+  return cachedRuntimeConfig;
+}
 
-  // Always write to in-app inbox when allowed by prefs
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+const db = admin.firestore();
+
+const GIFT_TOKEN_TTL_MS = 5 * 60 * 1000;
+const MAX_GIFT_AMOUNT = 10_000;
+
+type GiftTokenPayload = {
+  giftId: string;
+  wishId: string;
+  tokenId: string;
+  amount: number;
+  exp: number;
+};
+
+type GiftStartBody = {
+  wishId?: unknown;
+  amount?: unknown;
+  variant?: unknown;
+  userId?: unknown;
+  platform?: unknown;
+};
+
+type GiftConfirmBody = {
+  token?: unknown;
+};
+
+type GiftConfig = {
+  secret: string;
+  venmoHandle: string;
+};
+
+let cachedGiftConfig: GiftConfig | null = null;
+
+function base64UrlEncode(input: Buffer | string): string {
+  return Buffer.from(input)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/u, '');
+}
+
+function base64UrlDecode(input: string): Buffer {
+  const normalized = input.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = normalized.length % 4;
+  const padded = pad ? `${normalized}${'='.repeat(4 - pad)}` : normalized;
+  return Buffer.from(padded, 'base64');
+}
+
+function getGiftConfig(): GiftConfig {
+  if (cachedGiftConfig) return cachedGiftConfig;
+  const cfg = readRuntimeConfig();
+  const secret =
+    cfg?.gifts?.secret || process.env.GIFT_TOKEN_SECRET || undefined;
+  if (!secret) {
+    throw new Error(
+      'Gift token secret not configured. Set functions.config().gifts.secret or GIFT_TOKEN_SECRET.',
+    );
+  }
+  const venmoHandle =
+    cfg?.gifts?.venmo_handle ||
+    cfg?.gifts?.venmo ||
+    process.env.GIFT_VENMO_HANDLE ||
+    'whisplist';
+  cachedGiftConfig = { secret, venmoHandle };
+  return cachedGiftConfig;
+}
+
+function signGiftToken(payload: GiftTokenPayload): string {
+  const { secret } = getGiftConfig();
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const signature = createHmac('sha256', secret)
+    .update(encodedPayload)
+    .digest();
+  return `${encodedPayload}.${base64UrlEncode(signature)}`;
+}
+
+function verifyGiftToken(token: string): GiftTokenPayload {
+  const [encodedPayload, signature] = token.split('.');
+  if (!encodedPayload || !signature) {
+    throw new Error('malformed_token');
+  }
+  const expectedSignature = base64UrlEncode(
+    createHmac('sha256', getGiftConfig().secret)
+      .update(encodedPayload)
+      .digest(),
+  );
+  if (signature !== expectedSignature) {
+    throw new Error('signature_mismatch');
+  }
+  const decoded = base64UrlDecode(encodedPayload).toString('utf8');
+  const payload = JSON.parse(decoded) as GiftTokenPayload;
+  if (
+    !payload.giftId ||
+    !payload.tokenId ||
+    !payload.wishId ||
+    typeof payload.amount !== 'number' ||
+    typeof payload.exp !== 'number'
+  ) {
+    throw new Error('invalid_payload');
+  }
+  return payload;
+}
+
+function sanitizeAmount(input: unknown): number | null {
+  const amount = typeof input === 'string' ? Number(input) : Number(input);
+  if (!Number.isFinite(amount)) return null;
+  if (amount <= 0 || amount > MAX_GIFT_AMOUNT) return null;
+  return Math.round(amount * 100) / 100;
+}
+
+function truncateTitle(title: unknown): string {
+  const raw =
+    typeof title === 'string' && title.trim().length ? title.trim() : 'Wish';
+  return raw.length > 60 ? `${raw.slice(0, 57)}...` : raw;
+}
+
+function buildVenmoNote(title: unknown, amount: number): string {
+  return `Support "${truncateTitle(title)}" on WhispList – $${amount.toFixed(2)}`;
+}
+
+function applyCors(res: Response) {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+}
+
+async function giftStartHandler(req: Request, res: Response) {
+  applyCors(res);
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'method_not_allowed' });
+    return;
+  }
+  const body = (req.body || {}) as GiftStartBody;
+  const wishId = typeof body.wishId === 'string' ? body.wishId : null;
+  const amount = sanitizeAmount(body.amount);
+  if (!wishId || amount === null) {
+    res.status(400).json({ error: 'invalid_request' });
+    return;
+  }
+
   try {
-    await userRef.collection('notifications').doc().set({
-      type,
-      title,
-      message: body || title,
-      path: path || null,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      read: false,
+    const wishRef = db.collection('wishes').doc(wishId);
+    const wishSnap = await wishRef.get();
+    if (!wishSnap.exists) {
+      res.status(404).json({ error: 'wish_not_found' });
+      return;
+    }
+    const wish = wishSnap.data() ?? {};
+    const recipientId =
+      typeof wish.userId === 'string' ? (wish.userId as string) : null;
+    if (!recipientId) {
+      res.status(400).json({ error: 'missing_recipient' });
+      return;
+    }
+    const isPrivate =
+      wish.visibility === 'private' ||
+      wish.shareScope === 'private' ||
+      wish.isPrivate === true;
+    if (isPrivate) {
+      res.status(403).json({ error: 'wish_private' });
+      return;
+    }
+    const supporterId =
+      typeof body.userId === 'string' && body.userId ? body.userId : null;
+    const note = buildVenmoNote(wish.title ?? wish.text, amount);
+
+    let venmoHandle = getGiftConfig().venmoHandle;
+    try {
+      const ownerSnap = await db.collection('users').doc(recipientId).get();
+      const ownerHandle = ownerSnap.exists
+        ? ownerSnap.get('venmoHandle')
+        : null;
+      if (typeof ownerHandle === 'string' && ownerHandle.trim()) {
+        venmoHandle = ownerHandle.replace(/^@/, '').trim();
+      }
+    } catch (err) {
+    logger.warn('Unable to resolve owner Venmo handle', err, {
+        recipientId,
+      });
+    }
+
+    const giftId = randomUUID();
+    const tokenId = randomUUID();
+    const expiresAt = Date.now() + GIFT_TOKEN_TTL_MS;
+    const token = signGiftToken({
+      giftId,
+      wishId,
+      tokenId,
+      amount,
+      exp: expiresAt,
+    });
+
+    await db
+      .collection('gifts')
+      .doc(giftId)
+      .set({
+        wishId,
+        amount,
+        supporterId,
+        recipientId,
+        variant: 'venmo',
+        status: 'pending',
+        tokenId,
+        note,
+        venmoRecipient: venmoHandle,
+        platform: typeof body.platform === 'string' ? body.platform : null,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        expiresAt: admin.firestore.Timestamp.fromMillis(expiresAt),
+      });
+
+    res.json({
+      token,
+      giftId,
+      amount,
+      note,
+      recipient: venmoHandle,
+      expiresAt: new Date(expiresAt).toISOString(),
     });
   } catch (err) {
-    functions.logger.error('Error writing in-app notification', err);
+    logger.error('startGift failed', err, { wishId });
+    res.status(500).json({ error: 'internal' });
+  }
+}
+
+async function giftConfirmHandler(req: Request, res: Response) {
+  applyCors(res);
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'method_not_allowed' });
+    return;
+  }
+  const body = (req.body || {}) as GiftConfirmBody;
+  const token = typeof body.token === 'string' ? body.token : null;
+  if (!token) {
+    res.status(400).json({ error: 'invalid_request' });
+    return;
   }
 
-  if (throttled) return null;
-  if (expoToken && Expo.isExpoPushToken(expoToken)) {
-    const messages = [{ to: expoToken, sound: 'default', title, body }];
+  let payload: GiftTokenPayload;
+  try {
+    payload = verifyGiftToken(token);
+  } catch (err) {
+    logger.warn('Token verification failed', err);
+    res.status(401).json({ error: 'invalid_token' });
+    return;
+  }
+
+  const now = Date.now();
+  if (now > payload.exp) {
     try {
-      await expo.sendPushNotificationsAsync(messages);
-      await metaRef.set({
-        lastSent: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      await db.collection('gifts').doc(payload.giftId).set(
+        {
+          status: 'expired',
+          expiredAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
     } catch (err) {
-      functions.logger.error('Error sending Expo push notification', err);
-      if (fcmToken) {
-        try {
-          await admin
-            .messaging()
-            .send({ token: fcmToken, notification: { title, body } });
-          await metaRef.set({
-            lastSent: admin.firestore.FieldValue.serverTimestamp(),
-          });
-        } catch (err2) {
-          functions.logger.error('Error sending fallback FCM notification', err2);
-        }
-      }
+      logger.warn('Failed to mark gift expired', err, {
+        giftId: payload.giftId,
+      });
     }
-  } else if (fcmToken) {
-    try {
-      await admin
-        .messaging()
-        .send({ token: fcmToken, notification: { title, body } });
-      await metaRef.set({
-        lastSent: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    } catch (err) {
-      functions.logger.error('Error sending FCM notification', err);
+    res.status(410).json({ error: 'token_expired' });
+    return;
+  }
+
+  try {
+    const giftRef = db.collection('gifts').doc(payload.giftId);
+    const wishRef = db.collection('wishes').doc(payload.wishId);
+    const legacyRef = db
+      .collection('gifts')
+      .doc(payload.wishId)
+      .collection('gifts')
+      .doc(payload.giftId);
+    const wishGiftRef = wishRef.collection('gifts').doc(payload.giftId);
+
+    const result = await db.runTransaction(
+      async (tx: FirebaseFirestore.Transaction) => {
+        const giftSnap = (await tx.get(giftRef)) as unknown as DocumentSnapshot;
+        const wishSnap = (await tx.get(wishRef)) as unknown as DocumentSnapshot;
+        if (!giftSnap.exists) {
+          throw new Error('gift_not_found');
+        }
+        const giftData = giftSnap.data() ?? {};
+        if (giftData.tokenId !== payload.tokenId) {
+          throw new Error('token_mismatch');
+        }
+
+        const supporterId =
+          typeof giftData.supporterId === 'string' && giftData.supporterId
+            ? giftData.supporterId
+            : null;
+
+        if (giftData.status === 'confirmed') {
+          const total =
+            typeof wishSnap.get('giftTotal') === 'number'
+              ? (wishSnap.get('giftTotal') as number)
+              : 0;
+          return {
+            status: 'already_confirmed' as const,
+            supporterId,
+            giftTotal: total,
+          };
+        }
+
+        tx.update(giftRef, {
+          status: 'confirmed',
+          confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        const recipientId =
+          typeof giftData.recipientId === 'string'
+            ? (giftData.recipientId as string)
+            : null;
+
+        const sharedPayload = {
+          amount: payload.amount,
+          supporterId,
+          recipientId,
+          status: 'confirmed',
+          variant: 'venmo',
+          confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        tx.set(
+          wishGiftRef,
+          {
+            ...sharedPayload,
+            createdAt:
+              giftData.createdAt instanceof admin.firestore.Timestamp
+                ? giftData.createdAt
+                : admin.firestore.FieldValue.serverTimestamp(),
+            tokenId: payload.tokenId,
+          },
+          { merge: true },
+        );
+
+        tx.set(
+          legacyRef,
+          {
+            ...sharedPayload,
+            tokenId: payload.tokenId,
+          },
+          { merge: true },
+        );
+
+        const existingTotal =
+          typeof wishSnap.get('giftTotal') === 'number'
+            ? (wishSnap.get('giftTotal') as number)
+            : 0;
+
+        tx.set(
+          wishRef,
+          {
+            giftTotal: admin.firestore.FieldValue.increment(payload.amount),
+            fundingRaised: admin.firestore.FieldValue.increment(payload.amount),
+            fundingSupporters: admin.firestore.FieldValue.increment(1),
+          },
+          { merge: true },
+        );
+
+        return {
+          status: 'confirmed' as const,
+          supporterId,
+          giftTotal: existingTotal + payload.amount,
+        };
+      },
+    );
+
+    if (result.status === 'confirmed') {
+      await incrementEngagement(result.supporterId ?? undefined, 'gifting');
+    }
+
+    res.json({
+      status: result.status,
+      wishId: payload.wishId,
+      amount: payload.amount,
+      giftTotal: result.giftTotal,
+    });
+  } catch (err) {
+    logger.error('confirmGift failed', err, {
+      giftId: payload.giftId,
+    });
+    if ((err as Error).message === 'gift_not_found') {
+      res.status(404).json({ error: 'gift_not_found' });
+    } else if ((err as Error).message === 'token_mismatch') {
+      res.status(401).json({ error: 'invalid_token' });
+    } else {
+      res.status(500).json({ error: 'internal' });
     }
   }
-  return null;
 }
+
+async function upsertPinHandler(req: Request, res: Response) {
+  applyCors(res);
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'method_not_allowed' });
+    return;
+  }
+  const body = (req.body || {}) as {
+    userId?: unknown;
+    wishlistId?: unknown;
+    title?: unknown;
+    coverUri?: unknown;
+  };
+  const userId =
+    typeof body.userId === 'string' && body.userId.trim().length
+      ? body.userId.trim()
+      : null;
+  const wishlistId =
+    typeof body.wishlistId === 'string' && body.wishlistId.trim().length
+      ? body.wishlistId.trim()
+      : null;
+  if (!userId || !wishlistId) {
+    res.status(400).json({ error: 'invalid_request' });
+    return;
+  }
+  const payload: Record<string, unknown> = {
+    wishlistId,
+  };
+  if (typeof body.title === 'string') {
+    payload.title = body.title;
+  }
+  if (typeof body.coverUri === 'string') {
+    payload.coverUri = body.coverUri;
+  }
+  try {
+    const ref = db
+      .collection('users')
+      .doc(userId)
+      .collection('pinnedWishlists')
+      .doc(wishlistId);
+    await db.runTransaction(async (tx: FirebaseFirestore.Transaction) => {
+      const snap = (await tx.get(ref)) as unknown as DocumentSnapshot;
+      if (snap.exists) {
+        tx.set(ref, payload, { merge: true });
+      } else {
+        tx.set(
+          ref,
+          {
+            ...payload,
+            pinnedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: false },
+        );
+      }
+    });
+    res.json({ pinned: true });
+  } catch (err) {
+    logger.error('Failed to upsert pinned wishlist', err, {
+      userId,
+      wishlistId,
+    });
+    res.status(500).json({ error: 'internal' });
+  }
+}
+
+export const gifts = region('us-central1')
+  .https.onRequest(async (req: Request, res: Response) => {
+    applyCors(res);
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+    const path = (req.path || '').replace(/\/+$/, '');
+    if (path === '' || path === '/') {
+      res.status(200).json({ status: 'ok' });
+      return;
+    }
+    if (path === '/start') {
+      await giftStartHandler(req, res);
+      return;
+    }
+    if (path === '/confirm') {
+      await giftConfirmHandler(req, res);
+      return;
+    }
+    res.status(404).json({ error: 'not_found' });
+  });
+
+export const pins = region('us-central1')
+  .https.onRequest(async (req: Request, res: Response) => {
+    await upsertPinHandler(req, res);
+  });
+
+export const startGift = region('us-central1')
+  .https.onRequest(async (req: Request, res: Response) => {
+    await giftStartHandler(req, res);
+  });
+
+export const confirmGift = region('us-central1')
+  .https.onRequest(async (req: Request, res: Response) => {
+    await giftConfirmHandler(req, res);
+  });
 
 export const __test = { sendPush };
 
-export const notifyWishLike = functions.firestore
+export const notifyWishLike = firestore
   .document('wishes/{wishId}')
   .onUpdate(async (change: any, context: any) => {
     const before = change.before.data();
@@ -110,7 +560,7 @@ export const notifyWishLike = functions.firestore
     return null;
   });
 
-export const notifyWishComment = functions.firestore
+export const notifyWishComment = firestore
   .document('wishes/{wishId}/comments/{commentId}')
   .onCreate(async (snap: any, context: any) => {
     const wishId = context.params.wishId;
@@ -147,7 +597,7 @@ export const notifyWishComment = functions.firestore
     return null;
   });
 
-export const notifyWishBoost = functions.firestore
+export const notifyWishBoost = firestore
   .document('wishes/{wishId}')
   .onUpdate(async (change: any, context: any) => {
     const before = change.before.data();
@@ -170,13 +620,13 @@ export const notifyWishBoost = functions.firestore
     return null;
   });
 
-export const notifyGiftReceived = functions.firestore
+export const notifyGiftReceived = firestore
   .document('wishes/{wishId}/gifts/{giftId}')
   .onCreate(async (snap: any, context: any) => {
     const wishId = context.params.wishId;
     const wishSnap = await db.collection('wishes').doc(wishId).get();
     const wish = wishSnap.data();
-  if (wish && wish.userId && !wish.isAnonymous) {
+    if (wish && wish.userId && !wish.isAnonymous) {
       await sendPush(
         wish.userId,
         'You received a gift \ud83c\udf81',
@@ -188,7 +638,7 @@ export const notifyGiftReceived = functions.firestore
     return null;
   });
 
-export const notifyBoostEnd = functions.pubsub
+export const notifyBoostEnd = pubsub
   .schedule('every 60 minutes')
   .onRun(async () => {
     const now = admin.firestore.Timestamp.now();
@@ -216,7 +666,7 @@ export const notifyBoostEnd = functions.pubsub
     return null;
   });
 
-export const notifyDMMessage = functions.firestore
+export const notifyDMMessage = firestore
   .document('dmThreads/{threadId}/messages/{messageId}')
   .onCreate(async (snap: any, context: any) => {
     try {
@@ -237,15 +687,17 @@ export const notifyDMMessage = functions.firestore
         ),
       );
     } catch (err) {
-      functions.logger.error('Error notifying DM message', err);
+      logger.error('Error notifying DM message', err);
     }
     return null;
   });
 
-const runtimeConfig = (functions as unknown as { config?: () => any }).config?.() ?? {};
+const runtimeConfig = readRuntimeConfig();
 
-export const backfillPostTypesTask = functions
-  .runWith({ timeoutSeconds: 540, memory: '1GB' })
+export const backfillPostTypesTask = runWith({
+  timeoutSeconds: 540,
+  memory: '1GB',
+})
   .https.onRequest(async (req: Request, res: Response) => {
     if (req.method !== 'POST') {
       res.status(405).json({ error: 'method_not_allowed' });
@@ -254,9 +706,13 @@ export const backfillPostTypesTask = functions
 
     const configToken = runtimeConfig?.maintenance?.token;
     const headerToken = req.headers['x-maintenance-token'];
-    const providedHeader = Array.isArray(headerToken) ? headerToken[0] : headerToken;
+    const providedHeader = Array.isArray(headerToken)
+      ? headerToken[0]
+      : headerToken;
     const queryTokenRaw = req.query.token;
-    const providedQuery = Array.isArray(queryTokenRaw) ? queryTokenRaw[0] : queryTokenRaw;
+    const providedQuery = Array.isArray(queryTokenRaw)
+      ? queryTokenRaw[0]
+      : queryTokenRaw;
     const providedToken = providedHeader || providedQuery;
 
     if (configToken) {
@@ -269,17 +725,22 @@ export const backfillPostTypesTask = functions
     const rawDryRun = Array.isArray(req.query.dryRun)
       ? req.query.dryRun[0]
       : (req.query.dryRun as string | undefined);
-    const dryRun = rawDryRun === undefined ? true : !(rawDryRun === 'false' || rawDryRun === '0');
+    const dryRun =
+      rawDryRun === undefined
+        ? true
+        : !(rawDryRun === 'false' || rawDryRun === '0');
 
     try {
       const result = await backfillPostTypes(db, {
         dryRun,
-        log: (message, data) => functions.logger.info(message, data),
+        log: (message, data) => logger.info(message, data),
       });
       res.json({ dryRun, ...result });
     } catch (err) {
-      functions.logger.error('Post type backfill failed', err);
-      res.status(500).json({ error: err instanceof Error ? err.message : 'unknown_error' });
+      logger.error('Post type backfill failed', err);
+      res
+        .status(500)
+        .json({ error: err instanceof Error ? err.message : 'unknown_error' });
     }
   });
 
@@ -294,3 +755,8 @@ export { revenueCatWebhook } from './revenueCatWebhook';
 export { logTelemetry } from './logTelemetry';
 export { getCommunityPulse, getCommunityPulseHttp } from './communityPulse';
 export { getDeveloperMetrics } from './developerMetrics';
+export { createPledge } from './splitpay/createPledge';
+export { settleWish, settleSplitPayWishes } from './splitpay/settleWish';
+export { favoritesOnWrite, rateLimiter } from './anonFavorites';
+export { generateWishMatches } from './wishMatcher';
+export { createGiftTogetherInvite } from './splitpay/createInvite';
