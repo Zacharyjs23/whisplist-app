@@ -1,0 +1,11 @@
+{
+  "ephemeral_drop_push": {
+    "description": "Measure conversions from ephemeral drop push notifications into quick-checkout flow.",
+    "allocation_percent": {
+      "A": 50,
+      "B": 50
+    },
+    "start": "2024-11-01T00:00:00Z",
+    "end": "2024-12-01T00:00:00Z"
+  }
+}
