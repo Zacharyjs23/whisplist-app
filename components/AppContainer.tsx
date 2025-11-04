@@ -8,6 +8,7 @@ import usePushNotifications from '@/hooks/usePushNotifications';
 import useDailyQuote from '@/hooks/useDailyQuote';
 import { setTelemetry } from '@/shared/logger';
 import { sendTelemetry } from '@/services/telemetry';
+import { useWishlistDeepLinkHandler } from '@/apps/mobile/src/navigation/DeepLinkHandler';
 
 export const AppContainer: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -22,6 +23,7 @@ export const AppContainer: React.FC<{ children: React.ReactNode }> = ({
       : 'dark-content';
   usePushNotifications();
   useDailyQuote();
+  useWishlistDeepLinkHandler();
 
   useEffect(() => {
     if (process.env.EXPO_PUBLIC_ENV !== 'production') return;
@@ -50,7 +52,7 @@ export const AppContainer: React.FC<{ children: React.ReactNode }> = ({
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={[styles.container, { backgroundColor }]}> 
+      <SafeAreaView style={[styles.container, { backgroundColor }]}>
         <StatusBar barStyle={barStyle} />
         {children}
       </SafeAreaView>
