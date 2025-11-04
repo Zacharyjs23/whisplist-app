@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { trackEvent } from '@/helpers/analytics';
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from 'react';
 import { useRouter, type Href } from 'expo-router';
 import {
   View,
@@ -48,9 +55,16 @@ import {
 import { db } from '@/firebase';
 import type { Wish } from '@/types/Wish';
 import { useSavedWishes } from '@/contexts/SavedWishesContext';
+import { usePinnedWishlists } from '@/contexts/PinnedWishlistsContext';
 import * as logger from '@/shared/logger';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { getLocalDateKey } from '@/helpers/date';
+import { MicroListPanel } from '@/components/MicroListPanel';
+import {
+  PinnedRail,
+  type PinSummary,
+} from '@/apps/mobile/src/components/PinnedRail';
+import { RecentWishlistsSection } from '@/components/RecentWishlistsSection';
 
 const CAN_USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -81,9 +95,9 @@ export default function Page() {
   >([]);
   const [boostImpact, setBoostImpact] = useState({ likes: 0, comments: 0 });
   const [giftStats, setGiftStats] = useState({ count: 0, total: 0 });
-  const [giftMessages, setGiftMessages] = useState<{ text: string; ts: Timestamp }[]>(
-    [],
-  );
+  const [giftMessages, setGiftMessages] = useState<
+    { text: string; ts: Timestamp }[]
+  >([]);
   const [savedList, setSavedList] = useState<Wish[]>([]);
   const [postedList, setPostedList] = useState<Wish[]>([]);
   const [giftedList, setGiftedList] = useState<Wish[]>([]);
@@ -115,12 +129,32 @@ export default function Page() {
   const postingStats = engagementStats.posting;
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const { saved } = useSavedWishes();
+  const { pins: pinnedRaw, loading: pinnedLoading } = usePinnedWishlists();
   const { isActive: isSupporter } = useSubscription();
   const publicEnabled = profile?.publicProfileEnabled !== false;
   const profileDisplayName = profile?.displayName ?? '';
   const [editVisible, setEditVisible] = useState(false);
   const [editName, setEditName] = useState(displayName || '');
   const [editBio, setEditBio] = useState(bio || '');
+  const pinnedRailItems = useMemo<PinSummary[]>(
+    () =>
+      pinnedRaw
+        .map((pin) => ({
+          id: pin.wishlistId || pin.id,
+          title: pin.title ?? t('profile.pinned.fallbackTitle', 'Wishlist'),
+          coverUri: pin.coverUri ?? null,
+        }))
+        .filter((pin) => !!pin.id),
+    [pinnedRaw, t],
+  );
+  const handlePinnedPress = useCallback(
+    (pin: PinSummary) => {
+      if (!pin?.id) return;
+      router.push(`/wish/${pin.id}` as Href);
+    },
+    [router],
+  );
+  const showPinnedRail = !pinnedLoading;
   const togglePublicProfile = useCallback(
     async (val: boolean) => {
       try {
@@ -162,7 +196,10 @@ export default function Page() {
           }
         }
       };
-      const workers = Array.from({ length: Math.min(limit, items.length) }, worker);
+      const workers = Array.from(
+        { length: Math.min(limit, items.length) },
+        worker,
+      );
       await Promise.all(workers);
       return results;
     },
@@ -183,7 +220,10 @@ export default function Page() {
     try {
       await updateProfile({ displayName, bio });
       if (Platform.OS === 'android') {
-        ToastAndroid.show(t('profile.saved', 'Profile saved'), ToastAndroid.SHORT);
+        ToastAndroid.show(
+          t('profile.saved', 'Profile saved'),
+          ToastAndroid.SHORT,
+        );
       } else {
         alert(t('profile.saved', 'Profile saved'));
       }
@@ -241,7 +281,10 @@ export default function Page() {
       {
         key: 'edit',
         label: t('profile.quick.editLabel', 'Edit profile'),
-        description: t('profile.quick.editDescription', 'Update your name and bio'),
+        description: t(
+          'profile.quick.editDescription',
+          'Update your name and bio',
+        ),
         icon: 'create-outline',
         onPress: () => {
           setEditName(displayName || '');
@@ -259,7 +302,10 @@ export default function Page() {
       {
         key: 'copy',
         label: t('profile.quick.copyLink', 'Copy link'),
-        description: t('profile.quick.copyDescription', 'Copy your public profile URL'),
+        description: t(
+          'profile.quick.copyDescription',
+          'Copy your public profile URL',
+        ),
         icon: 'link-outline',
         onPress: handleCopyLink,
         disabled: !profileDisplayName,
@@ -267,7 +313,10 @@ export default function Page() {
       {
         key: 'share',
         label: t('profile.quick.share', 'Share profile'),
-        description: t('profile.quick.shareDescription', 'Send your profile to a friend'),
+        description: t(
+          'profile.quick.shareDescription',
+          'Send your profile to a friend',
+        ),
         icon: 'share-outline',
         onPress: handleShareProfile,
         disabled: !profileDisplayName,
@@ -275,15 +324,36 @@ export default function Page() {
       {
         key: 'preview',
         label: t('profile.quick.preview', 'Preview public view'),
-        description: t('profile.quick.previewDescription', 'See what others can view'),
+        description: t(
+          'profile.quick.previewDescription',
+          'See what others can view',
+        ),
         icon: 'eye-outline',
         onPress: handlePreviewProfile,
         disabled: !profileDisplayName,
       },
       {
+        key: 'support',
+        label: t('profile.quick.supportLabel', 'Find support'),
+        description: t(
+          'profile.quick.supportDescription',
+          'View helplines and safety resources',
+        ),
+        icon: 'heart-outline',
+        onPress: () => {
+          try {
+            trackEvent('profile_support_opened', { source: 'quick_action' });
+          } catch {}
+          router.push('/support' as Href);
+        },
+      },
+      {
         key: 'journal',
         label: t('profile.quick.journal', 'Open journal'),
-        description: t('profile.quick.journalDescription', 'Jump into your personal entries'),
+        description: t(
+          'profile.quick.journalDescription',
+          'Jump into your personal entries',
+        ),
         icon: 'book-outline',
         onPress: () => router.push('/journal'),
       },
@@ -292,9 +362,13 @@ export default function Page() {
       actions.unshift({
         key: 'supporter',
         label: t('profile.quick.supporter', 'Become a supporter'),
-        description: t('profile.quick.supporterDescription', 'Unlock higher-quality images, badges, and more'),
+        description: t(
+          'profile.quick.supporterDescription',
+          'Unlock higher-quality images, badges, and more',
+        ),
         icon: 'star-outline',
-        onPress: () => router.push('/(tabs)/profile/settings/subscriptions' as Href),
+        onPress: () =>
+          router.push('/(tabs)/profile/settings/subscriptions' as Href),
       });
     }
     return actions;
@@ -311,33 +385,36 @@ export default function Page() {
     t,
   ]);
 
-  const toggleReminder = useCallback(async (val: boolean) => {
-    if (val) {
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') {
-        return;
+  const toggleReminder = useCallback(
+    async (val: boolean) => {
+      if (val) {
+        const { status } = await Notifications.requestPermissionsAsync();
+        if (status !== 'granted') {
+          return;
+        }
       }
-    }
-    setDailyReminder(val);
-    await AsyncStorage.setItem('dailyPromptReminder', val ? 'true' : 'false');
-    const id = await AsyncStorage.getItem('dailyPromptReminderId');
-    if (id) await Notifications.cancelScheduledNotificationAsync(id);
-    if (val) {
-      const newId = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: t('notifications.dailyPromptTitle'),
-          body: t('notifications.dailyPromptBody'),
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-          hour: 9,
-          minute: 0,
-          repeats: true,
-        },
-      });
-      await AsyncStorage.setItem('dailyPromptReminderId', newId);
-    }
-  }, [t]);
+      setDailyReminder(val);
+      await AsyncStorage.setItem('dailyPromptReminder', val ? 'true' : 'false');
+      const id = await AsyncStorage.getItem('dailyPromptReminderId');
+      if (id) await Notifications.cancelScheduledNotificationAsync(id);
+      if (val) {
+        const newId = await Notifications.scheduleNotificationAsync({
+          content: {
+            title: t('notifications.dailyPromptTitle'),
+            body: t('notifications.dailyPromptBody'),
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+            hour: 9,
+            minute: 0,
+            repeats: true,
+          },
+        });
+        await AsyncStorage.setItem('dailyPromptReminderId', newId);
+      }
+    },
+    [t],
+  );
 
   const loadMorePosted = useCallback(async () => {
     if (!postLastDoc || !user?.uid) return;
@@ -389,21 +466,27 @@ export default function Page() {
         const parts = d.ref.path.split('/');
         if (parts.length >= 2) ids.add(parts[1]);
       });
-      const fetched = await mapWithConcurrency(Array.from(ids), 4, async (id) => {
-        try {
-          const w = await getDoc(doc(db, 'wishes', id));
-          if (w.exists()) {
-            return { id: w.id, ...(w.data() as Omit<Wish, 'id'>) } as Wish;
+      const fetched = await mapWithConcurrency(
+        Array.from(ids),
+        4,
+        async (id) => {
+          try {
+            const w = await getDoc(doc(db, 'wishes', id));
+            if (w.exists()) {
+              return { id: w.id, ...(w.data() as Omit<Wish, 'id'>) } as Wish;
+            }
+          } catch (err) {
+            logger.warn('Failed to load more gifted wish by id', { id, err });
           }
-        } catch (err) {
-          logger.warn('Failed to load more gifted wish by id', { id, err });
-        }
-        return undefined;
-      });
+          return undefined;
+        },
+      );
       const toAdd = (fetched.filter(Boolean) as Wish[]).filter(
         (wish) => !giftedList.find((g) => g.id === wish.id),
       );
-      toAdd.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+      toAdd.sort(
+        (a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0),
+      );
       setGiftedList((prev) => [...prev, ...toAdd]);
     } catch (err: any) {
       logger.warn('Failed to load more gifts', err);
@@ -424,7 +507,10 @@ export default function Page() {
         );
       } else {
         setError(
-          t('profile.errors.giftLoad', 'We could not load your gifts. Please try again soon.'),
+          t(
+            'profile.errors.giftLoad',
+            'We could not load your gifts. Please try again soon.',
+          ),
         );
       }
     } finally {
@@ -451,7 +537,9 @@ export default function Page() {
         return undefined;
       });
       const list = fetched.filter(Boolean) as Wish[];
-      list.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+      list.sort(
+        (a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0),
+      );
       setSavedList((prev) => [...prev, ...list]);
       setSavedNextIndex((idx) => idx + slice.length);
     } catch (err) {
@@ -619,17 +707,24 @@ export default function Page() {
         msgs.sort((a, b) => (b.ts?.seconds || 0) - (a.ts?.seconds || 0));
         setGiftMessages(msgs);
         if (ids.size > 0) {
-          const fetched = await mapWithConcurrency(Array.from(ids), 4, async (id) => {
-            try {
-              const d = await getDoc(doc(db, 'wishes', id));
-              if (d.exists()) {
-                return { id: d.id, ...(d.data() as Omit<Wish, 'id'>) } as Wish;
+          const fetched = await mapWithConcurrency(
+            Array.from(ids),
+            4,
+            async (id) => {
+              try {
+                const d = await getDoc(doc(db, 'wishes', id));
+                if (d.exists()) {
+                  return {
+                    id: d.id,
+                    ...(d.data() as Omit<Wish, 'id'>),
+                  } as Wish;
+                }
+              } catch (err) {
+                logger.warn('Failed to load gifted wish by id', { id, err });
               }
-            } catch (err) {
-              logger.warn('Failed to load gifted wish by id', { id, err });
-            }
-            return undefined;
-          });
+              return undefined;
+            },
+          );
           const wishes = fetched.filter(Boolean) as Wish[];
           wishes.sort(
             (a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0),
@@ -659,7 +754,10 @@ export default function Page() {
           );
         } else {
           setError(
-            t('profile.errors.giftLoad', 'We could not load your gifts. Please try again soon.'),
+            t(
+              'profile.errors.giftLoad',
+              'We could not load your gifts. Please try again soon.',
+            ),
           );
         }
       }
@@ -680,14 +778,17 @@ export default function Page() {
         const fetched = await mapWithConcurrency(slice, 4, async (id) => {
           try {
             const d = await getDoc(doc(db, 'wishes', id));
-            if (d.exists()) return { id: d.id, ...(d.data() as Omit<Wish, 'id'>) } as Wish;
+            if (d.exists())
+              return { id: d.id, ...(d.data() as Omit<Wish, 'id'>) } as Wish;
           } catch (err) {
             logger.warn('Failed to load saved wish by id', { id, err });
           }
           return undefined;
         });
         const list = fetched.filter(Boolean) as Wish[];
-        list.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+        list.sort(
+          (a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0),
+        );
         setSavedList(list);
         setSavedNextIndex(slice.length);
       } catch (err) {
@@ -706,7 +807,12 @@ export default function Page() {
     return giftedList;
   }, [activeTab, postedList, savedList, giftedList]);
 
-  const isLoadingTab = activeTab === 'posted' ? loadingPosted : activeTab === 'saved' ? loadingSaved : loadingGifts;
+  const isLoadingTab =
+    activeTab === 'posted'
+      ? loadingPosted
+      : activeTab === 'saved'
+        ? loadingSaved
+        : loadingGifts;
 
   const onEndReached = useCallback(() => {
     if (loadingMore || isLoadingTab) return;
@@ -714,7 +820,18 @@ export default function Page() {
     if (activeTab === 'saved' && savedNextIndex < Object.keys(saved).length)
       return void loadMoreSaved();
     if (activeTab === 'gifts' && giftLastDoc) return void loadMoreGifts();
-  }, [activeTab, giftLastDoc, postLastDoc, savedNextIndex, saved, loadMoreGifts, loadMorePosted, loadMoreSaved, loadingMore, isLoadingTab]);
+  }, [
+    activeTab,
+    giftLastDoc,
+    postLastDoc,
+    savedNextIndex,
+    saved,
+    loadMoreGifts,
+    loadMorePosted,
+    loadMoreSaved,
+    loadingMore,
+    isLoadingTab,
+  ]);
 
   const renderItem = useCallback(
     ({ item }: { item: Wish }) => {
@@ -734,7 +851,11 @@ export default function Page() {
             <Text style={styles.itemTitle} numberOfLines={3}>
               {item.text}
             </Text>
-            <Ionicons name="chevron-forward" size={16} style={styles.itemChevron} />
+            <Ionicons
+              name="chevron-forward"
+              size={16}
+              style={styles.itemChevron}
+            />
           </View>
           {createdAt ? (
             <Text style={styles.itemMeta}>
@@ -748,7 +869,14 @@ export default function Page() {
         </TouchableOpacity>
       );
     },
-    [router, styles.itemRow, styles.itemTitle, styles.itemChevron, styles.itemMeta, styles.itemHeaderRow],
+    [
+      router,
+      styles.itemRow,
+      styles.itemTitle,
+      styles.itemChevron,
+      styles.itemMeta,
+      styles.itemHeaderRow,
+    ],
   );
 
   const ListEmpty = useCallback(() => {
@@ -774,7 +902,15 @@ export default function Page() {
         <Text style={styles.emptyText}>{emptyText}</Text>
       </View>
     );
-  }, [activeTab, isLoadingTab, styles.emptyCard, styles.emptyText, styles.emptyIcon, styles.skeletonCard, t]);
+  }, [
+    activeTab,
+    isLoadingTab,
+    styles.emptyCard,
+    styles.emptyText,
+    styles.emptyIcon,
+    styles.skeletonCard,
+    t,
+  ]);
 
   const ListFooter = useCallback(() => {
     if (!loadingMore) return null;
@@ -787,537 +923,836 @@ export default function Page() {
     );
   }, [loadingMore, styles.skeletonCard]);
 
-  const renderHeader = useCallback(() => (
-    <View style={styles.headerSpacing}>
-      {error ? (
+  const renderHeader = useCallback(
+    () => (
+      <View style={styles.headerSpacing}>
+        {error ? (
+          <View
+            style={[
+              styles.alertCard,
+              {
+                backgroundColor: toRgba(theme.tint, 0.12),
+                borderColor: toRgba(theme.tint, 0.35),
+              },
+            ]}
+          >
+            <Ionicons
+              name="warning-outline"
+              size={18}
+              style={styles.alertIcon}
+            />
+            <Text style={[styles.alertText, { color: theme.text }]}>
+              {error}
+            </Text>
+          </View>
+        ) : null}
         <View
           style={[
-            styles.alertCard,
-            {
-              backgroundColor: toRgba(theme.tint, 0.12),
-              borderColor: toRgba(theme.tint, 0.35),
-            },
+            styles.heroCard,
+            { backgroundColor: theme.input, borderColor: theme.placeholder },
           ]}
         >
-          <Ionicons name="warning-outline" size={18} style={styles.alertIcon} />
-          <Text style={[styles.alertText, { color: theme.text }]}>{error}</Text>
-        </View>
-      ) : null}
-      <View
-        style={[
-          styles.heroCard,
-          { backgroundColor: theme.input, borderColor: theme.placeholder },
-        ]}
-      >
-        <View style={styles.heroHeaderRow}>
-          <View style={styles.heroAvatarColumn}>
-            <View style={boostCount > 0 || streakCount >= 7 ? styles.avatarGlow : undefined}>
-              {profile?.photoURL ? (
-                <Image source={{ uri: profile.photoURL }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, { backgroundColor: '#444' }]} />
-              )}
-              <TouchableOpacity
-                onPress={handleImage}
-                style={styles.avatarCamera}
-                accessibilityRole="button"
-                accessibilityLabel={t('profile.changePhoto', 'Change Photo')}
+          <View style={styles.heroHeaderRow}>
+            <View style={styles.heroAvatarColumn}>
+              <View
+                style={
+                  boostCount > 0 || streakCount >= 7
+                    ? styles.avatarGlow
+                    : undefined
+                }
               >
-                <Ionicons name="camera" size={16} color="#000" />
-              </TouchableOpacity>
+                {profile?.photoURL ? (
+                  <Image
+                    source={{ uri: profile.photoURL }}
+                    style={styles.avatar}
+                  />
+                ) : (
+                  <View style={[styles.avatar, { backgroundColor: '#444' }]} />
+                )}
+                <TouchableOpacity
+                  onPress={handleImage}
+                  style={styles.avatarCamera}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('profile.changePhoto', 'Change Photo')}
+                >
+                  <Ionicons name="camera" size={16} color="#000" />
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-          <View style={styles.heroInfoColumn}>
-            <View style={styles.heroInfoTop}>
-              <Text style={[styles.heroName, { color: theme.text }]}>
-                {displayName || t('profile.namePlaceholder', 'Set your name')}
-              </Text>
-              <TouchableOpacity
-                onPress={() => router.push('/(tabs)/profile/settings' as Href)}
-                accessibilityRole="button"
-                accessibilityLabel={t('profile.openSettings', 'Open settings')}
-                style={[styles.heroAction, { backgroundColor: theme.background, borderColor: theme.placeholder }]}
-              >
-                <Ionicons name="settings-outline" size={18} color={theme.tint} />
-              </TouchableOpacity>
-            </View>
-            {profileDisplayName ? (
-              <Text style={[styles.heroHandle, { color: theme.placeholder }]}>@{profileDisplayName}</Text>
-            ) : null}
-            {bio ? (
-              <Text style={[styles.heroBio, { color: theme.text }]}>{bio}</Text>
-            ) : (
-              <TouchableOpacity onPress={() => { setEditName(displayName || ''); setEditBio(bio || ''); setEditVisible(true); }}>
-                <Text style={[styles.heroBioLink, { color: theme.tint }]}>
-                  {t('profile.addBio', 'Add a bio')}
+            <View style={styles.heroInfoColumn}>
+              <View style={styles.heroInfoTop}>
+                <Text style={[styles.heroName, { color: theme.text }]}>
+                  {displayName || t('profile.namePlaceholder', 'Set your name')}
                 </Text>
-              </TouchableOpacity>
-            )}
-            <View style={styles.heroBadgeRow}>
-              {isSupporter ? (
-                <View style={[styles.supporterBadge, { backgroundColor: theme.background, borderColor: theme.placeholder }]}>
-                  <Text style={[styles.supporterText, { color: theme.tint }]}>
-                    {t('profile.supporterBadge', '⭐ Supporter')}
-                  </Text>
-                </View>
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push('/(tabs)/profile/settings' as Href)
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={t(
+                    'profile.openSettings',
+                    'Open settings',
+                  )}
+                  style={[
+                    styles.heroAction,
+                    {
+                      backgroundColor: theme.background,
+                      borderColor: theme.placeholder,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="settings-outline"
+                    size={18}
+                    color={theme.tint}
+                  />
+                </TouchableOpacity>
+              </View>
+              {profileDisplayName ? (
+                <Text style={[styles.heroHandle, { color: theme.placeholder }]}>
+                  @{profileDisplayName}
+                </Text>
+              ) : null}
+              {bio ? (
+                <Text style={[styles.heroBio, { color: theme.text }]}>
+                  {bio}
+                </Text>
               ) : (
                 <TouchableOpacity
-                  onPress={() => router.push('/(tabs)/profile/settings/subscriptions' as Href)}
-                  style={[styles.supporterButton, { borderColor: theme.tint }]}
+                  onPress={() => {
+                    setEditName(displayName || '');
+                    setEditBio(bio || '');
+                    setEditVisible(true);
+                  }}
                 >
-                  <Text style={[styles.supporterButtonText, { color: theme.tint }]}>
-                    {t('profile.becomeSupporter', 'Become a Supporter')}
+                  <Text style={[styles.heroBioLink, { color: theme.tint }]}>
+                    {t('profile.addBio', 'Add a bio')}
                   </Text>
                 </TouchableOpacity>
               )}
-              <View style={[styles.followChip, { borderColor: theme.placeholder, backgroundColor: theme.background }]}>
-                <Text style={[styles.followChipText, { color: theme.text }]}>
-                  {t('profile.followingCount', '{{count}} following', { count: followCounts.following })}
-                </Text>
-              </View>
-              <View style={[styles.followChip, { borderColor: theme.placeholder, backgroundColor: theme.background }]}>
-                <Text style={[styles.followChipText, { color: theme.text }]}>
-                  {t('profile.followerCount', '{{count}} followers', { count: followCounts.followers })}
-                </Text>
+              <View style={styles.heroBadgeRow}>
+                {isSupporter ? (
+                  <View
+                    style={[
+                      styles.supporterBadge,
+                      {
+                        backgroundColor: theme.background,
+                        borderColor: theme.placeholder,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.supporterText, { color: theme.tint }]}>
+                      {t('profile.supporterBadge', '⭐ Supporter')}
+                    </Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() =>
+                      router.push(
+                        '/(tabs)/profile/settings/subscriptions' as Href,
+                      )
+                    }
+                    style={[
+                      styles.supporterButton,
+                      { borderColor: theme.tint },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.supporterButtonText,
+                        { color: theme.tint },
+                      ]}
+                    >
+                      {t('profile.becomeSupporter', 'Become a Supporter')}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                <View
+                  style={[
+                    styles.followChip,
+                    {
+                      borderColor: theme.placeholder,
+                      backgroundColor: theme.background,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.followChipText, { color: theme.text }]}>
+                    {t('profile.followingCount', '{{count}} following', {
+                      count: followCounts.following,
+                    })}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.followChip,
+                    {
+                      borderColor: theme.placeholder,
+                      backgroundColor: theme.background,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.followChipText, { color: theme.text }]}>
+                    {t('profile.followerCount', '{{count}} followers', {
+                      count: followCounts.followers,
+                    })}
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
-        </View>
-        <View style={styles.heroStatsRow}>
-          <View
-            style={[
-              styles.heroStatCard,
-              { borderColor: theme.placeholder, backgroundColor: theme.background },
-            ]}
-          >
-            <Text style={[styles.heroStatValue, { color: theme.text }]}>{postedList.length}</Text>
-            <Text style={[styles.heroStatLabel, { color: theme.placeholder }]}>
-              {t('profile.stats.posts', 'Posts')}
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.heroStatCard,
-              { borderColor: theme.placeholder, backgroundColor: theme.background },
-            ]}
-          >
-            <Text style={[styles.heroStatValue, { color: theme.text }]}>{savedList.length}</Text>
-            <Text style={[styles.heroStatLabel, { color: theme.placeholder }]}>
-              {t('profile.stats.saved', 'Saved')}
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.heroStatCard,
-              { borderColor: theme.placeholder, backgroundColor: theme.background },
-            ]}
-          >
-            <Text style={[styles.heroStatValue, { color: theme.text }]}>{giftStats.count}</Text>
-            <Text style={[styles.heroStatLabel, { color: theme.placeholder }]}>
-              {t('profile.stats.gifts', 'Gifts')}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.completionBox}>
-          <View style={[styles.completionTrack, { backgroundColor: theme.background }]}
-          >
+          <View style={styles.heroStatsRow}>
             <View
-              style={[styles.completionFill, { width: `${profileCompletion}%`, backgroundColor: theme.tint }]}
-            />
-          </View>
-          <Text style={[styles.completionText, { color: theme.placeholder }]}>
-            {t('profile.completion', 'Profile completeness: {{pct}}%', { pct: profileCompletion })}
-          </Text>
-        </View>
-      </View>
-
-      {quickActions.length > 0 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.quickScrollContent}
-        >
-          {quickActions.map((action) => (
-            <TouchableOpacity
-              key={action.key}
               style={[
-                styles.quickActionCard,
+                styles.heroStatCard,
                 {
-                  backgroundColor: theme.input,
                   borderColor: theme.placeholder,
-                  opacity: action.disabled ? 0.5 : 1,
+                  backgroundColor: theme.background,
                 },
               ]}
-              onPress={action.onPress}
-              disabled={action.disabled}
+            >
+              <Text style={[styles.heroStatValue, { color: theme.text }]}>
+                {postedList.length}
+              </Text>
+              <Text
+                style={[styles.heroStatLabel, { color: theme.placeholder }]}
+              >
+                {t('profile.stats.posts', 'Posts')}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.heroStatCard,
+                {
+                  borderColor: theme.placeholder,
+                  backgroundColor: theme.background,
+                },
+              ]}
+            >
+              <Text style={[styles.heroStatValue, { color: theme.text }]}>
+                {savedList.length}
+              </Text>
+              <Text
+                style={[styles.heroStatLabel, { color: theme.placeholder }]}
+              >
+                {t('profile.stats.saved', 'Saved')}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.heroStatCard,
+                {
+                  borderColor: theme.placeholder,
+                  backgroundColor: theme.background,
+                },
+              ]}
+            >
+              <Text style={[styles.heroStatValue, { color: theme.text }]}>
+                {giftStats.count}
+              </Text>
+              <Text
+                style={[styles.heroStatLabel, { color: theme.placeholder }]}
+              >
+                {t('profile.stats.gifts', 'Gifts')}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.completionBox}>
+            <View
+              style={[
+                styles.completionTrack,
+                { backgroundColor: theme.background },
+              ]}
             >
               <View
-                style={[styles.quickIconWrap, { backgroundColor: theme.background }]}
+                style={[
+                  styles.completionFill,
+                  {
+                    width: `${profileCompletion}%`,
+                    backgroundColor: theme.tint,
+                  },
+                ]}
+              />
+            </View>
+            <Text style={[styles.completionText, { color: theme.placeholder }]}>
+              {t('profile.completion', 'Profile completeness: {{pct}}%', {
+                pct: profileCompletion,
+              })}
+            </Text>
+          </View>
+        </View>
+
+        <MicroListPanel
+          profileId={user?.uid ?? null}
+          postedWishes={postedList}
+          isOwner
+        />
+
+        <RecentWishlistsSection />
+
+        {showPinnedRail ? (
+          <View
+            style={[
+              styles.pinnedCard,
+              {
+                backgroundColor: theme.input,
+                borderColor: theme.placeholder,
+              },
+            ]}
+          >
+            <View style={styles.pinnedHeaderRow}>
+              <Text style={[styles.pinnedTitle, { color: theme.text }]}>
+                {t('profile.pinned.title', 'Pinned lists')}
+              </Text>
+              <Text
+                style={[styles.pinnedSubtitle, { color: theme.placeholder }]}
               >
-                <Ionicons name={action.icon} size={18} color={theme.tint} />
-              </View>
-              <Text style={[styles.quickLabelText, { color: theme.text }]}>
-                {action.key === 'copy' && copied
-                  ? t('profile.quick.copySuccess', 'Link copied')
-                  : action.label}
+                {t(
+                  'profile.pinned.subtitle',
+                  'Your saved wishlists sync across devices.',
+                )}
               </Text>
-              {action.description ? (
-                <Text style={[styles.quickDescription, { color: theme.placeholder }]}>
-                  {action.description}
+            </View>
+            <View style={styles.pinnedRailWrap}>
+              <PinnedRail
+                pins={pinnedRailItems}
+                onPinPress={handlePinnedPress}
+              />
+            </View>
+          </View>
+        ) : null}
+
+        {quickActions.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.quickScrollContent}
+          >
+            {quickActions.map((action) => (
+              <TouchableOpacity
+                key={action.key}
+                style={[
+                  styles.quickActionCard,
+                  {
+                    backgroundColor: theme.input,
+                    borderColor: theme.placeholder,
+                    opacity: action.disabled ? 0.5 : 1,
+                  },
+                ]}
+                onPress={action.onPress}
+                disabled={action.disabled}
+              >
+                <View
+                  style={[
+                    styles.quickIconWrap,
+                    { backgroundColor: theme.background },
+                  ]}
+                >
+                  <Ionicons name={action.icon} size={18} color={theme.tint} />
+                </View>
+                <Text style={[styles.quickLabelText, { color: theme.text }]}>
+                  {action.key === 'copy' && copied
+                    ? t('profile.quick.copySuccess', 'Link copied')
+                    : action.label}
                 </Text>
-              ) : null}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      ) : null}
+                {action.description ? (
+                  <Text
+                    style={[
+                      styles.quickDescription,
+                      { color: theme.placeholder },
+                    ]}
+                  >
+                    {action.description}
+                  </Text>
+                ) : null}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        ) : null}
 
-      <View
-        style={[
-          styles.preferenceCard,
-          { backgroundColor: theme.input, borderColor: theme.placeholder },
-        ]}
-      >
-        <View style={styles.preferenceRow}>
-          <View style={styles.preferenceCopy}>
-            <Text style={[styles.preferenceTitle, { color: theme.text }]}>
-              {t('settings.privacy.publicProfile', 'Public Profile Enabled')}
-            </Text>
-            <Text style={[styles.preferenceSubtitle, { color: theme.placeholder }]}>
-              {t('profile.publicDescription', 'Allow others to view your wishes and gifts.')}
-            </Text>
-          </View>
-          <Switch value={publicEnabled} onValueChange={togglePublicProfile} />
-        </View>
-        <View style={styles.preferenceRow}>
-          <View style={styles.preferenceCopy}>
-            <Text style={[styles.preferenceTitle, { color: theme.text }]}>
-              {t('profile.reminderTitle', 'Daily reminder')}
-            </Text>
-            <Text style={[styles.preferenceSubtitle, { color: theme.placeholder }]}>
-              {t('profile.reminderSubtitle', 'Nudge me to check my wishes each morning.')}
-            </Text>
-          </View>
-          <Switch value={dailyReminder} onValueChange={toggleReminder} />
-        </View>
-      </View>
-
-      <View
-        style={[
-          styles.detailsCard,
-          { backgroundColor: theme.input, borderColor: theme.placeholder },
-        ]}
-      >
-        <Text style={[styles.cardTitle, { color: theme.text }]}>
-          {t('profile.detailsTitle', 'Profile details')}
-        </Text>
-        <Text style={[styles.cardSubtitle, { color: theme.placeholder }]}>
-          {t('profile.detailsSubtitle', 'Update how you appear to others.')}
-        </Text>
-        <Text style={[styles.label, { marginTop: 12 }]}>
-          {t('profile.displayNameLabel', 'Display Name')}
-        </Text>
-        <TextInput
-          style={[styles.input, { borderColor: theme.placeholder, backgroundColor: theme.background, color: theme.text }]}
-          value={displayName}
-          onChangeText={(v) => setDisplayName(v.slice(0, DISPLAY_NAME_MAX))}
-          placeholder={t('profile.displayNamePlaceholder', 'Display Name')}
-          placeholderTextColor={theme.placeholder}
-          maxLength={DISPLAY_NAME_MAX}
-        />
-        <Text style={[styles.counter, { color: theme.placeholder }]}>
-          {displayName.length} / {DISPLAY_NAME_MAX}
-        </Text>
-        <Text style={styles.label}>{t('profile.bioLabel', 'Bio')}</Text>
-        <TextInput
-          style={[styles.input, { borderColor: theme.placeholder, backgroundColor: theme.background, color: theme.text, minHeight: 80 }]}
-          value={bio}
-          onChangeText={(v) => setBio(v.slice(0, BIO_MAX))}
-          placeholder={t('profile.bioPlaceholder', 'Bio')}
-          placeholderTextColor={theme.placeholder}
-          multiline
-          maxLength={BIO_MAX}
-        />
-        <Text style={[styles.counter, { color: theme.placeholder }]}>
-          {bio.length} / {BIO_MAX}
-        </Text>
-        <TouchableOpacity
-          style={[styles.primaryButton, { backgroundColor: theme.tint }]}
-          onPress={handleSave}
-          disabled={saving}
-          accessibilityRole="button"
-          accessibilityLabel={t('profile.saveProfile', 'Save Profile')}
+        <View
+          style={[
+            styles.preferenceCard,
+            { backgroundColor: theme.input, borderColor: theme.placeholder },
+          ]}
         >
-          <Text style={[styles.primaryButtonText, { color: theme.background }]}>
-            {saving ? t('profile.saving', 'Saving...') : t('profile.saveProfile', 'Save Profile')}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.secondaryButton, { borderColor: theme.placeholder }]}
-          onPress={() => router.push('/journal')}
-          accessibilityRole="button"
-          accessibilityLabel={t('profile.openJournal', 'Open Journal')}
-        >
-          <Text style={[styles.secondaryButtonText, { color: theme.tint }]}>
-            {t('profile.openJournal', 'Open Journal')}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.tabsCard}>
-        <View style={styles.tabsHeaderRow}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>
-            {t('profile.tabsTitle', 'Your wishes')}
-          </Text>
-        </View>
-        <View style={styles.tabs}>
-          {(['posted', 'saved', 'gifts'] as const).map((tabKey) => (
-            <TouchableOpacity
-              key={tabKey}
-              onPress={() => setActiveTab(tabKey)}
-              style={[styles.tabItem, activeTab === tabKey && styles.activeTabItem]}
-              accessibilityRole="button"
-              accessibilityLabel={
-                tabKey === 'posted'
-                  ? t('profile.tabs.posted', '📝 Posted')
-                  : tabKey === 'saved'
-                    ? t('profile.tabs.saved', '💾 Saved')
-                    : t('profile.tabs.gifts', '💝 Gifts Received')
-              }
-            >
-              <Text style={[styles.tabText, activeTab === tabKey && styles.activeTabText]}>
-                {tabKey === 'posted'
-                  ? t('profile.tabs.posted', '📝 Posted')
-                  : tabKey === 'saved'
-                    ? t('profile.tabs.saved', '💾 Saved')
-                    : t('profile.tabs.gifts', '💝 Gifts Received')}
+          <View style={styles.preferenceRow}>
+            <View style={styles.preferenceCopy}>
+              <Text style={[styles.preferenceTitle, { color: theme.text }]}>
+                {t('settings.privacy.publicProfile', 'Public Profile Enabled')}
               </Text>
-            </TouchableOpacity>
-          ))}
+              <Text
+                style={[
+                  styles.preferenceSubtitle,
+                  { color: theme.placeholder },
+                ]}
+              >
+                {t(
+                  'profile.publicDescription',
+                  'Allow others to view your wishes and gifts.',
+                )}
+              </Text>
+            </View>
+            <Switch value={publicEnabled} onValueChange={togglePublicProfile} />
+          </View>
+          <View style={styles.preferenceRow}>
+            <View style={styles.preferenceCopy}>
+              <Text style={[styles.preferenceTitle, { color: theme.text }]}>
+                {t('profile.reminderTitle', 'Daily reminder')}
+              </Text>
+              <Text
+                style={[
+                  styles.preferenceSubtitle,
+                  { color: theme.placeholder },
+                ]}
+              >
+                {t(
+                  'profile.reminderSubtitle',
+                  'Nudge me to check my wishes each morning.',
+                )}
+              </Text>
+            </View>
+            <Switch value={dailyReminder} onValueChange={toggleReminder} />
+          </View>
         </View>
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{t('profile.boosts.title', '🔥 Boosts')}</Text>
-        <Animated.Text style={[styles.boostCount, { transform: [{ scale: boostAnim }] }]}
+        <View
+          style={[
+            styles.detailsCard,
+            { backgroundColor: theme.input, borderColor: theme.placeholder },
+          ]}
         >
-          {t('profile.boosts.count', 'You\'ve boosted {{count}} wishes 🌟', { count: boostCount })}
-        </Animated.Text>
-        <Text style={styles.info}>
-          {t('profile.boosts.impact', 'Your boosts earned ❤️ {{likes}} likes, 💬 {{comments}} comments', {
-            likes: boostImpact.likes,
-            comments: boostImpact.comments,
-          })}
-        </Text>
-        {latestBoost && (
-          <View style={styles.boostPreview}>
-            <Text style={styles.previewText} numberOfLines={2}>
-              {latestBoost.text}
+          <Text style={[styles.cardTitle, { color: theme.text }]}>
+            {t('profile.detailsTitle', 'Profile details')}
+          </Text>
+          <Text style={[styles.cardSubtitle, { color: theme.placeholder }]}>
+            {t('profile.detailsSubtitle', 'Update how you appear to others.')}
+          </Text>
+          <Text style={[styles.label, { marginTop: 12 }]}>
+            {t('profile.displayNameLabel', 'Display Name')}
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                borderColor: theme.placeholder,
+                backgroundColor: theme.background,
+                color: theme.text,
+              },
+            ]}
+            value={displayName}
+            onChangeText={(v) => setDisplayName(v.slice(0, DISPLAY_NAME_MAX))}
+            placeholder={t('profile.displayNamePlaceholder', 'Display Name')}
+            placeholderTextColor={theme.placeholder}
+            maxLength={DISPLAY_NAME_MAX}
+          />
+          <Text style={[styles.counter, { color: theme.placeholder }]}>
+            {displayName.length} / {DISPLAY_NAME_MAX}
+          </Text>
+          <Text style={styles.label}>{t('profile.bioLabel', 'Bio')}</Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                borderColor: theme.placeholder,
+                backgroundColor: theme.background,
+                color: theme.text,
+                minHeight: 80,
+              },
+            ]}
+            value={bio}
+            onChangeText={(v) => setBio(v.slice(0, BIO_MAX))}
+            placeholder={t('profile.bioPlaceholder', 'Bio')}
+            placeholderTextColor={theme.placeholder}
+            multiline
+            maxLength={BIO_MAX}
+          />
+          <Text style={[styles.counter, { color: theme.placeholder }]}>
+            {bio.length} / {BIO_MAX}
+          </Text>
+          <TouchableOpacity
+            style={[styles.primaryButton, { backgroundColor: theme.tint }]}
+            onPress={handleSave}
+            disabled={saving}
+            accessibilityRole="button"
+            accessibilityLabel={t('profile.saveProfile', 'Save Profile')}
+          >
+            <Text
+              style={[styles.primaryButtonText, { color: theme.background }]}
+            >
+              {saving
+                ? t('profile.saving', 'Saving...')
+                : t('profile.saveProfile', 'Save Profile')}
             </Text>
-            <Text style={[styles.previewText, { color: theme.tint }]}>❤️ {latestBoost.likes}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.secondaryButton, { borderColor: theme.placeholder }]}
+            onPress={() => router.push('/journal')}
+            accessibilityRole="button"
+            accessibilityLabel={t('profile.openJournal', 'Open Journal')}
+          >
+            <Text style={[styles.secondaryButtonText, { color: theme.tint }]}>
+              {t('profile.openJournal', 'Open Journal')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.tabsCard}>
+          <View style={styles.tabsHeaderRow}>
+            <Text style={[styles.cardTitle, { color: theme.text }]}>
+              {t('profile.tabsTitle', 'Your wishes')}
+            </Text>
+          </View>
+          <View style={styles.tabs}>
+            {(['posted', 'saved', 'gifts'] as const).map((tabKey) => (
+              <TouchableOpacity
+                key={tabKey}
+                onPress={() => setActiveTab(tabKey)}
+                style={[
+                  styles.tabItem,
+                  activeTab === tabKey && styles.activeTabItem,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  tabKey === 'posted'
+                    ? t('profile.tabs.posted', '📝 Posted')
+                    : tabKey === 'saved'
+                      ? t('profile.tabs.saved', '💾 Saved')
+                      : t('profile.tabs.gifts', '💝 Gifts Received')
+                }
+              >
+                <Text
+                  style={[
+                    styles.tabText,
+                    activeTab === tabKey && styles.activeTabText,
+                  ]}
+                >
+                  {tabKey === 'posted'
+                    ? t('profile.tabs.posted', '📝 Posted')
+                    : tabKey === 'saved'
+                      ? t('profile.tabs.saved', '💾 Saved')
+                      : t('profile.tabs.gifts', '💝 Gifts Received')}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            {t('profile.boosts.title', '🔥 Boosts')}
+          </Text>
+          <Animated.Text
+            style={[styles.boostCount, { transform: [{ scale: boostAnim }] }]}
+          >
+            {t('profile.boosts.count', "You've boosted {{count}} wishes 🌟", {
+              count: boostCount,
+            })}
+          </Animated.Text>
+          <Text style={styles.info}>
+            {t(
+              'profile.boosts.impact',
+              'Your boosts earned ❤️ {{likes}} likes, 💬 {{comments}} comments',
+              {
+                likes: boostImpact.likes,
+                comments: boostImpact.comments,
+              },
+            )}
+          </Text>
+          {latestBoost && (
+            <View style={styles.boostPreview}>
+              <Text style={styles.previewText} numberOfLines={2}>
+                {latestBoost.text}
+              </Text>
+              <Text style={[styles.previewText, { color: theme.tint }]}>
+                ❤️ {latestBoost.likes}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {streakCount > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              {t('profile.streak.title', '📅 Streak')}
+            </Text>
+            <Text style={styles.info}>
+              {t(
+                'profile.streak.text',
+                "🔥 {{count}}-day streak — you're on fire!",
+                { count: streakCount },
+              )}
+            </Text>
+            {streakCount > 3 && (
+              <ConfettiCannon count={40} origin={{ x: 0, y: 0 }} fadeOut />
+            )}
           </View>
         )}
-      </View>
 
-      {streakCount > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('profile.streak.title', '📅 Streak')}</Text>
-          <Text style={styles.info}>
-            {t('profile.streak.text', '🔥 {{count}}-day streak — you\'re on fire!', { count: streakCount })}
-          </Text>
-          {streakCount > 3 && <ConfettiCannon count={40} origin={{ x: 0, y: 0 }} fadeOut />}
-        </View>
-      )}
-
-      {giftStats.count > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('profile.gifts.title', '💝 Gifts')}</Text>
-          <Text style={styles.info}>
-            {t('profile.gifts.text', "You've received {{count}} gifts 🎁 (${{total}} total)", {
-              count: giftStats.count,
-              total: giftStats.total,
-            })}
-          </Text>
-        </View>
-      )}
-
-      {giftMessages.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('profile.giftMessages.title', '💌 Messages from Supporters')}</Text>
-          {giftMessages.map((m, i) => (
-            <Text key={i} style={styles.info}>{m.text}</Text>
-          ))}
-        </View>
-      )}
-
-      {referralCount > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('profile.referrals.title', '🎁 Referrals')}</Text>
-          <Text style={styles.info}>
-            {t('profile.referrals.text', "You've invited {{count}} people — {{remaining}} more to unlock another reward", {
-              count: referralCount,
-              remaining: Math.max(0, 4 - referralCount),
-            })}
-          </Text>
-        </View>
-      )}
-
-      {profile?.publicProfileEnabled && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('profile.public.title', '🌐 Public Profile')}</Text>
-          {profileDisplayName ? (
-            <Text style={styles.info}>@{profileDisplayName}</Text>
-          ) : null}
-          {profile.bio && <Text style={styles.info}>{profile.bio}</Text>}
-          {latestWish && (
-            <Text style={styles.previewText} numberOfLines={2}>{latestWish.text}</Text>
-          )}
-          <Text style={styles.info}>{t('profile.public.desc', 'Your profile is public. This is what others see.')}</Text>
-          <TouchableOpacity
-            onPress={handleCopyLink}
-            style={[styles.button, { marginTop: 10 }]}
-            accessibilityRole="button"
-            accessibilityLabel={t('profile.public.copyLink', 'Copy Link')}
-          >
-            <Text style={styles.buttonText}>{t('profile.public.copyLink', 'Copy Link')}</Text>
-          </TouchableOpacity>
-          {copied && (
-            <Text style={[styles.info, { color: theme.tint, marginTop: 6 }]}>
-              {t('profile.linkCopied', 'Link copied')}
+        {giftStats.count > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              {t('profile.gifts.title', '💝 Gifts')}
             </Text>
-          )}
-          {profileDisplayName && (
+            <Text style={styles.info}>
+              {t(
+                'profile.gifts.text',
+                "You've received {{count}} gifts 🎁 (${{total}} total)",
+                {
+                  count: giftStats.count,
+                  total: giftStats.total,
+                },
+              )}
+            </Text>
+          </View>
+        )}
+
+        {giftMessages.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              {t('profile.giftMessages.title', '💌 Messages from Supporters')}
+            </Text>
+            {giftMessages.map((m, i) => (
+              <Text key={i} style={styles.info}>
+                {m.text}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        {referralCount > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              {t('profile.referrals.title', '🎁 Referrals')}
+            </Text>
+            <Text style={styles.info}>
+              {t(
+                'profile.referrals.text',
+                "You've invited {{count}} people — {{remaining}} more to unlock another reward",
+                {
+                  count: referralCount,
+                  remaining: Math.max(0, 4 - referralCount),
+                },
+              )}
+            </Text>
+          </View>
+        )}
+
+        {profile?.publicProfileEnabled && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              {t('profile.public.title', '🌐 Public Profile')}
+            </Text>
+            {profileDisplayName ? (
+              <Text style={styles.info}>@{profileDisplayName}</Text>
+            ) : null}
+            {profile.bio && <Text style={styles.info}>{profile.bio}</Text>}
+            {latestWish && (
+              <Text style={styles.previewText} numberOfLines={2}>
+                {latestWish.text}
+              </Text>
+            )}
+            <Text style={styles.info}>
+              {t(
+                'profile.public.desc',
+                'Your profile is public. This is what others see.',
+              )}
+            </Text>
             <TouchableOpacity
-              onPress={() =>
-                router.push(
-                  `/profile/${encodeURIComponent(profileDisplayName)}` as Href,
-                )
-              }
+              onPress={handleCopyLink}
               style={[styles.button, { marginTop: 10 }]}
               accessibilityRole="button"
-              accessibilityLabel={t('profile.public.preview', 'Preview My Public Profile')}
+              accessibilityLabel={t('profile.public.copyLink', 'Copy Link')}
             >
-              <Text style={styles.buttonText}>{t('profile.public.preview', 'Preview My Public Profile')}</Text>
+              <Text style={styles.buttonText}>
+                {t('profile.public.copyLink', 'Copy Link')}
+              </Text>
             </TouchableOpacity>
+            {copied && (
+              <Text style={[styles.info, { color: theme.tint, marginTop: 6 }]}>
+                {t('profile.linkCopied', 'Link copied')}
+              </Text>
+            )}
+            {profileDisplayName && (
+              <TouchableOpacity
+                onPress={() =>
+                  router.push(
+                    `/profile/${encodeURIComponent(profileDisplayName)}` as Href,
+                  )
+                }
+                style={[styles.button, { marginTop: 10 }]}
+                accessibilityRole="button"
+                accessibilityLabel={t(
+                  'profile.public.preview',
+                  'Preview My Public Profile',
+                )}
+              >
+                <Text style={styles.buttonText}>
+                  {t('profile.public.preview', 'Preview My Public Profile')}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {reflectionHistory.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              {t('profile.reflections.title', '🧠 Your reflections this week')}
+            </Text>
+            {reflectionHistory.slice(0, 3).map((r, i) => (
+              <Text key={i} style={styles.info}>
+                {new Date(r.timestamp).toLocaleDateString()} — {r.text}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        {dailyPrompt && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              {t('profile.reflection.title', '🧠 Reflection')}
+            </Text>
+            <Text style={styles.info}>
+              {t(
+                'profile.reflection.yesterday',
+                "Yesterday, you said: '{{text}}'",
+                { text: dailyPrompt },
+              )}
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            {t('profile.reminder.title', '⏰ Daily Prompt Reminder')}
+          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <Text style={styles.info}>
+              {t('profile.reminder.text', 'Remind me to post a wish daily')}
+            </Text>
+            <Switch
+              value={dailyReminder}
+              onValueChange={toggleReminder}
+              accessibilityRole="switch"
+              accessibilityLabel={t(
+                'profile.reminder.text',
+                'Remind me to post a wish daily',
+              )}
+            />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.signOutButton}
+            onPress={signOut}
+            accessibilityRole="button"
+            accessibilityLabel={t('profile.signOut', 'Sign Out')}
+          >
+            <Text style={styles.signOutText}>
+              {t('profile.signOut', 'Sign Out')}
+            </Text>
+          </TouchableOpacity>
+          <Text style={[styles.info, styles.sectionNote]}>
+            {t('profile.email', 'Email: {{email}}', {
+              email: user?.email || t('profile.anonymous', 'Anonymous'),
+            })}
+          </Text>
+          {profile?.isAnonymous && (
+            <Text style={[styles.info, styles.sectionNote]}>
+              {t('profile.loggedInAnonymously', 'Logged in anonymously')}
+            </Text>
           )}
         </View>
-      )}
-
-      {reflectionHistory.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('profile.reflections.title', '🧠 Your reflections this week')}</Text>
-          {reflectionHistory.slice(0, 3).map((r, i) => (
-            <Text key={i} style={styles.info}>
-              {new Date(r.timestamp).toLocaleDateString()} — {r.text}
-            </Text>
-          ))}
-        </View>
-      )}
-
-      {dailyPrompt && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('profile.reflection.title', '🧠 Reflection')}</Text>
-          <Text style={styles.info}>
-            {t('profile.reflection.yesterday', "Yesterday, you said: '{{text}}'", { text: dailyPrompt })}
-          </Text>
-        </View>
-      )}
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{t('profile.reminder.title', '⏰ Daily Prompt Reminder')}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text style={styles.info}>{t('profile.reminder.text', 'Remind me to post a wish daily')}</Text>
-          <Switch
-            value={dailyReminder}
-            onValueChange={toggleReminder}
-            accessibilityRole="switch"
-            accessibilityLabel={t('profile.reminder.text', 'Remind me to post a wish daily')}
-          />
-        </View>
       </View>
-
-      <View style={styles.section}>
-        <TouchableOpacity
-          style={styles.signOutButton}
-          onPress={signOut}
-          accessibilityRole="button"
-          accessibilityLabel={t('profile.signOut', 'Sign Out')}
-        >
-          <Text style={styles.signOutText}>{t('profile.signOut', 'Sign Out')}</Text>
-        </TouchableOpacity>
-        <Text style={[styles.info, styles.sectionNote]}>
-          {t('profile.email', 'Email: {{email}}', { email: user?.email || t('profile.anonymous', 'Anonymous') })}
-        </Text>
-        {profile?.isAnonymous && (
-          <Text style={[styles.info, styles.sectionNote]}>
-            {t('profile.loggedInAnonymously', 'Logged in anonymously')}
-          </Text>
-        )}
-      </View>
-    </View>
-  ), [
-    activeTab,
-    bio,
-    copied,
-    dailyPrompt,
-    displayName,
-    error,
-    followCounts.followers,
-    followCounts.following,
-    handleCopyLink,
-    handleImage,
-    latestBoost,
-    latestWish,
-    dailyReminder,
-    handleSave,
-    profile?.bio,
-    profile?.photoURL,
-    profile?.publicProfileEnabled,
-    profile?.isAnonymous,
-    profileDisplayName,
-    referralCount,
-    router,
-    saving,
-    signOut,
-    streakCount,
-    styles,
-    t,
-    isSupporter,
-    theme.tint,
-    theme.placeholder,
-    theme.input,
-    theme.background,
-    theme.text,
-    user?.email,
-    boostCount,
-    boostAnim,
-    boostImpact.likes,
-    boostImpact.comments,
-    giftMessages,
-    giftStats.count,
-    giftStats.total,
-    reflectionHistory,
-    toggleReminder,
-    postedList.length,
-    savedList.length,
-    profileCompletion,
-    publicEnabled,
-    togglePublicProfile,
-    quickActions,
-  ]);
+    ),
+    [
+      activeTab,
+      bio,
+      copied,
+      dailyPrompt,
+      displayName,
+      error,
+      followCounts.followers,
+      followCounts.following,
+      handleCopyLink,
+      handleImage,
+      latestBoost,
+      latestWish,
+      dailyReminder,
+      handleSave,
+      profile?.bio,
+      profile?.photoURL,
+      profile?.publicProfileEnabled,
+      profile?.isAnonymous,
+      profileDisplayName,
+      referralCount,
+      router,
+      saving,
+      signOut,
+      streakCount,
+      styles,
+      t,
+      isSupporter,
+      theme.tint,
+      theme.placeholder,
+      theme.input,
+      theme.background,
+      theme.text,
+      user?.email,
+      user?.uid,
+      boostCount,
+      boostAnim,
+      boostImpact.likes,
+      boostImpact.comments,
+      giftMessages,
+      giftStats.count,
+      giftStats.total,
+      reflectionHistory,
+      toggleReminder,
+      postedList,
+      savedList,
+      profileCompletion,
+      publicEnabled,
+      togglePublicProfile,
+      quickActions,
+      handlePinnedPress,
+      pinnedRailItems,
+      showPinnedRail,
+    ],
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
       {editVisible && (
-        <Modal transparent animationType="fade" visible onRequestClose={() => setEditVisible(false)}>
+        <Modal
+          transparent
+          animationType="fade"
+          visible
+          onRequestClose={() => setEditVisible(false)}
+        >
           <View style={styles.modalBackdrop}>
-            <View style={[styles.modalCard, { backgroundColor: theme.input }]}> 
-              <Text style={[styles.sectionTitle, { textAlign: 'center' }]}>{t('profile.editProfile', 'Edit Profile')}</Text>
-              <Text style={styles.label}>{t('profile.displayNameLabel', 'Display Name')}</Text>
+            <View style={[styles.modalCard, { backgroundColor: theme.input }]}>
+              <Text style={[styles.sectionTitle, { textAlign: 'center' }]}>
+                {t('profile.editProfile', 'Edit Profile')}
+              </Text>
+              <Text style={styles.label}>
+                {t('profile.displayNameLabel', 'Display Name')}
+              </Text>
               <TextInput
                 style={styles.input}
                 value={editName}
                 onChangeText={(v) => setEditName(v.slice(0, DISPLAY_NAME_MAX))}
-                placeholder={t('profile.displayNamePlaceholder', 'Display Name')}
+                placeholder={t(
+                  'profile.displayNamePlaceholder',
+                  'Display Name',
+                )}
                 placeholderTextColor={theme.placeholder}
                 maxLength={DISPLAY_NAME_MAX}
               />
@@ -1333,26 +1768,43 @@ export default function Page() {
               />
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <TouchableOpacity
-                  style={[styles.button, { flex: 1, backgroundColor: theme.input }]}
+                  style={[
+                    styles.button,
+                    { flex: 1, backgroundColor: theme.input },
+                  ]}
                   onPress={() => setEditVisible(false)}
                 >
-                  <Text style={[styles.buttonText, { color: theme.text }]}>{t('common.cancel', 'Cancel')}</Text>
+                  <Text style={[styles.buttonText, { color: theme.text }]}>
+                    {t('common.cancel', 'Cancel')}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.button, { flex: 1 }]}
                   onPress={async () => {
                     try {
-                      await updateProfile({ displayName: editName, bio: editBio });
+                      await updateProfile({
+                        displayName: editName,
+                        bio: editBio,
+                      });
                       setDisplayName(editName);
                       setBio(editBio);
                       setEditVisible(false);
-                      if (Platform.OS === 'android') { ToastAndroid.show(t('profile.saved', 'Profile saved'), ToastAndroid.SHORT); } else { alert(t('profile.saved', 'Profile saved')); }
+                      if (Platform.OS === 'android') {
+                        ToastAndroid.show(
+                          t('profile.saved', 'Profile saved'),
+                          ToastAndroid.SHORT,
+                        );
+                      } else {
+                        alert(t('profile.saved', 'Profile saved'));
+                      }
                     } catch (err) {
                       logger.warn('Failed to save profile (modal)', err);
                     }
                   }}
                 >
-                  <Text style={styles.buttonText}>{t('profile.saveProfile', 'Save Profile')}</Text>
+                  <Text style={styles.buttonText}>
+                    {t('profile.saveProfile', 'Save Profile')}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1591,6 +2043,27 @@ const createStyles = (c: (typeof Colors)['light'] & { name: string }) =>
       fontSize: 12,
       color: c.placeholder,
       textAlign: 'right',
+    },
+    pinnedCard: {
+      borderRadius: 18,
+      borderWidth: StyleSheet.hairlineWidth,
+      marginBottom: 16,
+    },
+    pinnedHeaderRow: {
+      paddingHorizontal: 20,
+      paddingTop: 16,
+      paddingBottom: 4,
+    },
+    pinnedTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    pinnedSubtitle: {
+      fontSize: 12,
+      marginTop: 4,
+    },
+    pinnedRailWrap: {
+      paddingBottom: 12,
     },
     quickScrollContent: {
       paddingHorizontal: 20,
@@ -1929,4 +2402,3 @@ const ShimmerRow: React.FC = () => {
     />
   );
 };
-      

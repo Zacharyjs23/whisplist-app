@@ -32,7 +32,25 @@ export async function postJson<T = any>(
     },
     body: JSON.stringify(body ?? {}),
   });
-  const data = await resp.json().catch(() => ({} as T));
+  const data = await resp.json().catch(() => ({}) as T);
+  if (!resp.ok) {
+    throw new Error((data as any)?.error || `Request failed: ${resp.status}`);
+  }
+  return data as T;
+}
+
+export async function getJson<T = any>(
+  name: string,
+  options: { headers?: Record<string, string> } = {},
+): Promise<T> {
+  const url = functionUrl(name);
+  const resp = await fetch(url, {
+    method: 'GET',
+    headers: {
+      ...(options.headers || {}),
+    },
+  });
+  const data = await resp.json().catch(() => ({}) as T);
   if (!resp.ok) {
     throw new Error((data as any)?.error || `Request failed: ${resp.status}`);
   }

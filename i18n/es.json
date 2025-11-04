@@ -15,7 +15,8 @@
   "common": {
     "cancel": "Cancelar",
     "ok": "Aceptar",
-    "delete": "Eliminar"
+    "delete": "Eliminar",
+    "saving": "Guardando..."
   },
   "auth": {
     "errorTitle": "Error de autenticación"
@@ -36,6 +37,11 @@
     "fundingCustomPlaceholder": "Monto personalizado",
     "fundingCustomCta": "Enviar",
     "report": "Reportar",
+    "favoritesTitle": "{{count}} favoritos",
+    "favoritesBeFirst": "Sé la primera persona en marcar como favorito",
+    "favoriteAddTitle": "Agrega una nota rápida (opcional)",
+    "favoriteAddPlaceholder": "¿Qué te encanta de este deseo?",
+    "favoriteAddConfirm": "Guardar favorito",
     "comment": "Comentar",
     "commentPosted": "Comentario publicado",
     "signInToComment": "Inicia sesión para comentar",
@@ -323,9 +329,9 @@
     "justNow": "Justo ahora"
   },
   "notifications": {
-  "dailyPromptTitle": "WhispList",
-  "dailyPromptBody": "¡Es hora de compartir tu historia de hoy!",
-  "dailyQuoteBody": "Tu dosis diaria de motivación está lista."
+    "dailyPromptTitle": "WhispList",
+    "dailyPromptBody": "¡Es hora de compartir tu historia de hoy!",
+    "dailyQuoteBody": "Tu dosis diaria de motivación está lista."
   },
   "userImpact": {
     "title": "Tu impacto",
@@ -342,7 +348,7 @@
     "postType": "Tipo de publicación",
     "type": {
       "celebration": "Celebración 🎉",
-      "goal": "Meta 🌱",
+      "goal": "Deseo 🌠",
       "struggle": "Dificultad 🌧️",
       "advice": "Pedir consejo 🧠"
     },
@@ -353,7 +359,7 @@
     },
     "placeholderByType": {
       "celebration": "Comparte el momento que estás celebrando...",
-      "goal": "Describe la meta en la que trabajas...",
+      "goal": "Describe el deseo en el que trabajas...",
       "struggle": "Cuéntanos qué te está pesando ahora...",
       "advice": "Explica la situación sobre la que necesitas consejo..."
     },
@@ -404,25 +410,38 @@
     "draftSaved": "Borrador guardado",
     "discardConfirmTitle": "¿Descartar borrador?",
     "discardConfirmMessage": "Esto eliminará tu borrador guardado.",
-    "retry": "Reintentar subida"
+    "retry": "Reintentar subida",
+    "circleNextReminderSoon": "El próximo recordatorio está por enviarse",
+    "circleNextReminderMinutes": {
+      "one": "Próximo recordatorio en {{count}} minuto",
+      "other": "Próximo recordatorio en {{count}} minutos"
+    },
+    "circleNextReminderHours": {
+      "one": "Próximo recordatorio en {{count}} hora",
+      "other": "Próximo recordatorio en {{count}} horas"
+    },
+    "circleNextReminderDays": {
+      "one": "Próximo recordatorio en {{count}} día",
+      "other": "Próximo recordatorio en {{count}} días"
+    }
   },
   "feed": {
-  "filters": {
-    "all": "Todo",
-    "allTypes": "Todas las vibras",
-    "celebration": "Celebraciones",
-    "goal": "Metas",
-    "struggle": "Retos",
-    "advice": "Consejos"
-  },
+    "filters": {
+      "all": "Todo",
+      "allTypes": "Todas las vibras",
+      "celebration": "Celebraciones",
+      "goal": "Deseos",
+      "struggle": "Retos",
+      "advice": "Consejos"
+    },
     "searchPlaceholder": "Buscar historias...",
     "searchLabel": "Buscar publicaciones",
     "title": "Feed de la comunidad",
     "categories": {
       "all": "Todo"
     },
-  "viewLabel": "Ver",
-  "typeLabel": "Vibra de la publicación",
+    "viewLabel": "Ver",
+    "typeLabel": "Vibra de la publicación",
     "tabs": {
       "latest": "Recientes",
       "boosted": "Impulsadas",
@@ -443,15 +462,15 @@
       "category": "Aún no hay publicaciones en esta categoría.",
       "boosted": "No hay publicaciones impulsadas por ahora. Vuelve pronto ✨",
       "trending": "Las tendencias están tranquilas por el momento. Regresa más tarde.",
-    "forYou": "Aún no encontramos una coincidencia para ti. Ajusta tus preferencias.",
-    "default": "Aún no hay publicaciones aquí. Sé la primera persona en compartir ✨",
-    "typeFallback": "No hay publicaciones con esta vibra. Prueba otra.",
+      "forYou": "Aún no encontramos una coincidencia para ti. Ajusta tus preferencias.",
+      "default": "Aún no hay publicaciones aquí. Sé la primera persona en compartir ✨",
+      "typeFallback": "No hay publicaciones con esta vibra. Prueba otra.",
       "clearSearch": "Limpiar búsqueda",
       "openPreferences": "Editar preferencias",
       "adjustForYou": "Ajustar preferencias de Para ti",
       "type": {
         "celebration": "Aún no hay celebraciones aquí. Comparte una victoria para animar el feed.",
-        "goal": "Aún no aparecen metas. Sé la primera persona en poner una en marcha.",
+        "goal": "Aún no aparecen deseos. Sé la primera persona en poner uno en marcha.",
         "struggle": "Todavía no hay dificultades compartidas. Cuando quieras, cuenta lo que sientes.",
         "advice": "No hay solicitudes de consejo todavía. Pide una perspectiva a la comunidad."
       }
@@ -732,6 +751,13 @@
     "giftMessages": {
       "title": "💌 Mensajes de seguidores"
     },
+    "recent": {
+      "title": "Listas recientes",
+      "subtitle": "Accede rápido a las listas que acabas de ver.",
+      "empty": "Abre una lista para verla aquí.",
+      "untitled": "Lista sin título",
+      "viewAll": "Muy pronto más"
+    },
     "referrals": {
       "title": "🎁 Referidos",
       "text": "Has invitado a {{count}} personas — faltan {{remaining}} para desbloquear otra recompensa"
@@ -761,8 +787,7 @@
     "saved": "Perfil guardado",
     "linkCopied": "Enlace copiado",
     "saveFailed": "No se pudo guardar el perfil"
-  }
-  ,
+  },
   "subscriptions": {
     "signIn": "Inicia sesión para gestionar tu suscripción",
     "title": "Apoya WhispList",
@@ -819,12 +844,106 @@
       "patronAnnual": "Patrón anual"
     }
   },
+  "safety": {
+    "cta": {
+      "title": "¿Necesitas apoyo?",
+      "body": "Toca recursos para acceder a líneas de ayuda moderadas o contacta emergencias si estás en peligro.",
+      "resources": "Recursos",
+      "emergencyButton": "Llamar al {{number}}",
+      "emergencyFallback": "Emergencias",
+      "resourcesA11y": "Abrir recursos de apoyo",
+      "emergencyA11y": "Llamar a servicios de emergencia",
+      "accessibilityLabel": "Aviso de seguridad de la comunidad"
+    }
+  },
   "premium": {
     "rephrase": {
       "title": "Función para simpatizantes",
       "body": "La reformulación está disponible para simpatizantes. ¿Abrir suscripciones?",
       "cancel": "Ahora no",
       "open": "Abrir Suscripciones"
+    }
+  },
+  "privacyScreen": {
+    "title": "Política de privacidad",
+    "intro": "Respetamos tu privacidad y solo recopilamos la información necesaria para operar WhispList.",
+    "items": {
+      "account": {
+        "title": "Datos de la cuenta",
+        "description": "Cuando te registras almacenamos tu correo electrónico y los datos de perfil que proporciones en Firebase. Puedes elegir permanecer en el anonimato."
+      },
+      "wishes": {
+        "title": "Deseos y comentarios",
+        "description": "El contenido que publicas se almacena de forma segura en Firebase hasta que lo elimines."
+      },
+      "analytics": {
+        "title": "Analíticas",
+        "description": "Usamos analíticas anónimas para comprender el uso de la app. Estos datos no te identifican personalmente."
+      },
+      "payments": {
+        "title": "Pagos",
+        "description": "Las transacciones de regalos se procesan mediante Stripe u otros enlaces externos. Nunca almacenamos tus datos de pago."
+      },
+      "choices": {
+        "title": "Tus opciones",
+        "description": "Puedes exportar o eliminar tus datos en cualquier momento desde la pantalla de ajustes. Contacta a support@example.com si tienes preguntas."
+      }
+    }
+  },
+  "termsScreen": {
+    "title": "Términos del servicio",
+    "items": {
+      "acceptance": {
+        "number": "1.",
+        "title": "Aceptación de los términos",
+        "description": "Al crear una cuenta o usar WhispList aceptas estos Términos del servicio y nuestra Política de privacidad."
+      },
+      "usage": {
+        "number": "2.",
+        "title": "Uso del servicio",
+        "description": "Puedes publicar deseos y comentarios para uso personal y no comercial. No publiques contenido ilegal, abusivo ni que infrinja derechos."
+      },
+      "accounts": {
+        "number": "3.",
+        "title": "Cuentas",
+        "description": "Eres responsable de mantener tus credenciales confidenciales. Puedes eliminar tu cuenta en cualquier momento."
+      },
+      "ownership": {
+        "number": "4.",
+        "title": "Propiedad del contenido",
+        "description": "Mantienes la propiedad del contenido que publicas. Concedes a WhispList una licencia para mostrar tu contenido en la app y servicios relacionados."
+      },
+      "termination": {
+        "number": "5.",
+        "title": "Terminación",
+        "description": "Podemos suspender o cancelar cuentas que violen estos términos o la ley aplicable."
+      },
+      "disclaimer": {
+        "number": "6.",
+        "title": "Descargo de responsabilidad",
+        "description": "El servicio se ofrece \"tal cual\" sin garantías de ningún tipo. No somos responsables de los daños derivados del uso de WhispList."
+      },
+      "changes": {
+        "number": "7.",
+        "title": "Cambios en los términos",
+        "description": "Podemos actualizar estos Términos periódicamente. El uso continuo del servicio después de los cambios implica la aceptación de los nuevos Términos."
+      }
+    }
+  },
+  "publicUsers": {
+    "heading": "Conoce las voces detrás de WhispList…",
+    "loading": "Cargando perfiles públicos…",
+    "error": "No pudimos cargar la comunidad. Inténtalo de nuevo más tarde.",
+    "empty": "Aún no hay perfiles públicos.",
+    "lastWish": "Último deseo: {{wish}}",
+    "wishCount_one": "{{count}} deseo",
+    "wishCount_other": "{{count}} deseos",
+    "accessibility": {
+      "listLabel": "Perfiles públicos de WhispList",
+      "openProfile": "Abrir el perfil público de @{{displayName}}",
+      "openProfileHint": "Abre el perfil público seleccionado",
+      "profilePhoto": "Foto de perfil de @{{displayName}}",
+      "noPhoto": "Avatar de perfil predeterminado"
     }
   }
 }

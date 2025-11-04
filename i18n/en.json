@@ -15,7 +15,8 @@
   "common": {
     "cancel": "Cancel",
     "ok": "OK",
-    "delete": "Delete"
+    "delete": "Delete",
+    "saving": "Saving..."
   },
   "auth": {
     "errorTitle": "Authentication Error"
@@ -36,6 +37,11 @@
     "fundingCustomPlaceholder": "Custom amount",
     "fundingCustomCta": "Send",
     "report": "Report",
+    "favoritesTitle": "{{count}} favorites",
+    "favoritesBeFirst": "Be the first to favorite",
+    "favoriteAddTitle": "Add a quick note (optional)",
+    "favoriteAddPlaceholder": "What do you love about this wish?",
+    "favoriteAddConfirm": "Save favorite",
     "comment": "Comment",
     "commentPosted": "Comment posted",
     "signInToComment": "Sign in to comment",
@@ -323,9 +329,9 @@
     "justNow": "Just now"
   },
   "notifications": {
-  "dailyPromptTitle": "WhispList",
-  "dailyPromptBody": "Time to share today’s story!",
-  "dailyQuoteBody": "Your daily dose of motivation is ready."
+    "dailyPromptTitle": "WhispList",
+    "dailyPromptBody": "Time to share today’s story!",
+    "dailyQuoteBody": "Your daily dose of motivation is ready."
   },
   "userImpact": {
     "title": "Your Impact",
@@ -342,7 +348,7 @@
     "postType": "Post Type",
     "type": {
       "celebration": "Celebration 🎉",
-      "goal": "Goal 🌱",
+      "goal": "Wish 🌠",
       "struggle": "Struggle 🌧️",
       "advice": "Advice Request 🧠"
     },
@@ -353,7 +359,7 @@
     },
     "placeholderByType": {
       "celebration": "Share the moment you’re celebrating...",
-      "goal": "Describe the goal you’re working toward...",
+      "goal": "Describe the wish you’re working toward...",
       "struggle": "Tell us what’s feeling heavy right now...",
       "advice": "Explain the situation where you’d love advice..."
     },
@@ -404,25 +410,38 @@
     "draftSaved": "Draft saved",
     "discardConfirmTitle": "Discard draft?",
     "discardConfirmMessage": "This will remove your saved draft.",
-    "retry": "Retry upload"
+    "retry": "Retry upload",
+    "circleNextReminderSoon": "Next reminder is queued now",
+    "circleNextReminderMinutes": {
+      "one": "Next reminder in {{count}} minute",
+      "other": "Next reminder in {{count}} minutes"
+    },
+    "circleNextReminderHours": {
+      "one": "Next reminder in {{count}} hour",
+      "other": "Next reminder in {{count}} hours"
+    },
+    "circleNextReminderDays": {
+      "one": "Next reminder in {{count}} day",
+      "other": "Next reminder in {{count}} days"
+    }
   },
   "feed": {
-  "filters": {
-    "all": "All",
-    "allTypes": "All vibes",
-    "celebration": "Celebrations",
-    "goal": "Goals",
-    "struggle": "Struggles",
-    "advice": "Advice"
-  },
+    "filters": {
+      "all": "All",
+      "allTypes": "All vibes",
+      "celebration": "Celebrations",
+      "goal": "Wishes",
+      "struggle": "Struggles",
+      "advice": "Advice"
+    },
     "searchPlaceholder": "Search stories...",
     "searchLabel": "Search posts",
     "title": "Community feed",
     "categories": {
       "all": "All"
     },
-  "viewLabel": "View",
-  "typeLabel": "Post vibes",
+    "viewLabel": "View",
+    "typeLabel": "Post vibes",
     "tabs": {
       "latest": "Latest",
       "boosted": "Boosted",
@@ -443,15 +462,15 @@
       "category": "No posts in this category yet.",
       "boosted": "No boosted posts right now. Check back soon ✨",
       "trending": "Trending is quiet at the moment. Come back later.",
-    "forYou": "We couldn't find a match yet. Try adjusting preferences.",
-    "default": "No posts here yet. Be the first to share ✨",
-    "typeFallback": "No posts in this vibe yet. Try another.",
+      "forYou": "We couldn't find a match yet. Try adjusting preferences.",
+      "default": "No posts here yet. Be the first to share ✨",
+      "typeFallback": "No posts in this vibe yet. Try another.",
       "clearSearch": "Clear search",
       "openPreferences": "Edit preferences",
       "adjustForYou": "Adjust For You preferences",
       "type": {
         "celebration": "No celebrations here yet. Share a win to brighten the feed.",
-        "goal": "No goals have surfaced. Be the first to set one in motion.",
+        "goal": "No wishes have surfaced. Be the first to set one in motion.",
         "struggle": "No struggles shared yet. Offer your story when you’re ready.",
         "advice": "No advice requests yet. Ask the community for perspective."
       }
@@ -732,6 +751,13 @@
     "giftMessages": {
       "title": "💌 Messages from Supporters"
     },
+    "recent": {
+      "title": "Recent wishlists",
+      "subtitle": "Quick access to the lists you just viewed.",
+      "empty": "Open a wishlist to see it appear here.",
+      "untitled": "Untitled wishlist",
+      "viewAll": "More coming soon"
+    },
     "referrals": {
       "title": "🎁 Referrals",
       "text": "You've invited {{count}} people — {{remaining}} more to unlock another reward"
@@ -761,8 +787,7 @@
     "saved": "Profile saved",
     "linkCopied": "Link copied",
     "saveFailed": "Failed to save profile"
-  }
-  ,
+  },
   "subscriptions": {
     "signIn": "Sign in to manage your subscription",
     "title": "Support WhispList",
@@ -802,8 +827,7 @@
     "manageAppStore": "Manage in App Store",
     "restore": "Restore Purchases",
     "restoreFailed": "Restore failed",
-    "unconfiguredCta": "Finish billing setup"
-    ,
+    "unconfiguredCta": "Finish billing setup",
     "badges": {
       "monthly": "Monthly",
       "annual": "Annual",
@@ -820,12 +844,106 @@
       "patronAnnual": "Patron Annual"
     }
   },
+  "safety": {
+    "cta": {
+      "title": "Need support?",
+      "body": "Tap resources for moderated helplines or reach emergency help if you’re in danger.",
+      "resources": "Resources",
+      "emergencyButton": "Call {{number}}",
+      "emergencyFallback": "Emergency",
+      "resourcesA11y": "Open support resources",
+      "emergencyA11y": "Call emergency services",
+      "accessibilityLabel": "Community safety notice"
+    }
+  },
   "premium": {
     "rephrase": {
       "title": "Supporter feature",
       "body": "Rephrase is available for supporters. Open subscriptions to join?",
       "cancel": "Not now",
       "open": "Open Subscriptions"
+    }
+  },
+  "privacyScreen": {
+    "title": "Privacy Policy",
+    "intro": "We respect your privacy and collect only the information needed to operate WhispList.",
+    "items": {
+      "account": {
+        "title": "Account Data",
+        "description": "When you sign up we store your email address and any profile details you provide in Firebase. You may choose to remain anonymous."
+      },
+      "wishes": {
+        "title": "Wishes and Comments",
+        "description": "Content you post is stored securely in Firebase until you delete it."
+      },
+      "analytics": {
+        "title": "Analytics",
+        "description": "We use anonymous analytics to understand app usage. This data does not identify you personally."
+      },
+      "payments": {
+        "title": "Payments",
+        "description": "Gift transactions are processed by Stripe or external links. We never store your payment details."
+      },
+      "choices": {
+        "title": "Your Choices",
+        "description": "You can export or delete your data at any time from the settings screen. Contact support@example.com with any questions."
+      }
+    }
+  },
+  "termsScreen": {
+    "title": "Terms of Service",
+    "items": {
+      "acceptance": {
+        "number": "1.",
+        "title": "Acceptance of Terms",
+        "description": "By creating an account or using WhispList you agree to these Terms of Service and our Privacy Policy."
+      },
+      "usage": {
+        "number": "2.",
+        "title": "Use of the Service",
+        "description": "You may post wishes and comments for personal, non-commercial use. Do not post illegal, abusive, or infringing content."
+      },
+      "accounts": {
+        "number": "3.",
+        "title": "Accounts",
+        "description": "You are responsible for keeping your credentials confidential. You may delete your account at any time."
+      },
+      "ownership": {
+        "number": "4.",
+        "title": "Content Ownership",
+        "description": "You retain ownership of content you post. You grant WhispList a license to display your content within the app and related services."
+      },
+      "termination": {
+        "number": "5.",
+        "title": "Termination",
+        "description": "We may suspend or terminate accounts that violate these terms or applicable law."
+      },
+      "disclaimer": {
+        "number": "6.",
+        "title": "Disclaimer",
+        "description": "The service is provided \"as is\" without warranties of any kind. We are not liable for any damages arising from your use of WhispList."
+      },
+      "changes": {
+        "number": "7.",
+        "title": "Changes to Terms",
+        "description": "We may update these Terms from time to time. Continued use of the service after changes constitutes acceptance of the new Terms."
+      }
+    }
+  },
+  "publicUsers": {
+    "heading": "Meet the voices behind WhispList…",
+    "loading": "Loading public profiles…",
+    "error": "We couldn't load the community right now. Please try again later.",
+    "empty": "No public profiles yet.",
+    "lastWish": "Last wish: {{wish}}",
+    "wishCount_one": "{{count}} wish",
+    "wishCount_other": "{{count}} wishes",
+    "accessibility": {
+      "listLabel": "Public WhispList profiles",
+      "openProfile": "Open @{{displayName}}'s public profile",
+      "openProfileHint": "Opens the selected public profile",
+      "profilePhoto": "Profile photo for @{{displayName}}",
+      "noPhoto": "Default profile avatar"
     }
   }
 }

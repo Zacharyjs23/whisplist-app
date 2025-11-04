@@ -9,7 +9,11 @@ import {
 import type { Request, Response } from 'express';
 import * as admin from 'firebase-admin';
 import { createHmac, randomUUID } from 'node:crypto';
-import type { DocumentSnapshot } from 'firebase-admin/firestore';
+import type { DecodedIdToken } from 'firebase-admin/auth';
+import type {
+  DocumentSnapshot,
+  QueryDocumentSnapshot,
+} from 'firebase-admin/firestore';
 import { backfillPostTypes } from './backfillPostTypes';
 import { incrementEngagement } from './engagement';
 import { sendPush } from './notifications';
@@ -158,7 +162,13 @@ function buildVenmoNote(title: unknown, amount: number): string {
 function applyCors(res: Response) {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+}
+
+function extractBearerToken(header?: string | null): string | null {
+  if (!header) return null;
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1] : null;
 }
 
 async function giftStartHandler(req: Request, res: Response) {
@@ -529,6 +539,80 @@ export const gifts = region('us-central1')
 export const pins = region('us-central1')
   .https.onRequest(async (req: Request, res: Response) => {
     await upsertPinHandler(req, res);
+  });
+
+export const recentlists = region('us-central1')
+  .https.onRequest(async (req: Request, res: Response) => {
+    applyCors(res);
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+    if (req.method !== 'GET') {
+      res.status(405).json({ error: 'method_not_allowed' });
+      return;
+    }
+
+    const token = extractBearerToken(req.get('Authorization'));
+    if (!token) {
+      res.status(401).json({ error: 'authentication_required' });
+      return;
+    }
+
+    let decoded: DecodedIdToken;
+    try {
+      decoded = await admin.auth().verifyIdToken(token);
+    } catch (err) {
+      logger.warn('Invalid token for recentlists request', err);
+      res.status(401).json({ error: 'authentication_required' });
+      return;
+    }
+
+    try {
+      const snapshot = await db
+        .collection('users')
+        .doc(decoded.uid)
+        .collection('recentWishlists')
+        .orderBy('updatedAt', 'desc')
+        .limit(10)
+        .get();
+
+      const items = snapshot.docs.map((docSnap: QueryDocumentSnapshot) => {
+        const data = docSnap.data() ?? {};
+        let updatedAt = Date.now();
+        try {
+          if (data.updatedAt instanceof admin.firestore.Timestamp) {
+            updatedAt = data.updatedAt.toMillis();
+          } else if (typeof data.updatedAt === 'number') {
+            updatedAt = data.updatedAt;
+          }
+        } catch {
+          updatedAt = Date.now();
+        }
+        const title =
+          typeof data.title === 'string' && data.title.trim().length
+            ? data.title.trim()
+            : null;
+        const coverUri =
+          typeof data.coverUri === 'string' && data.coverUri.trim().length
+            ? data.coverUri.trim()
+            : null;
+        return {
+          id: docSnap.id,
+          title,
+          coverUri,
+          updatedAt,
+        };
+      });
+
+      res.status(200).json({ items });
+    } catch (err) {
+      logger.error('Failed to load recent wishlists (HTTP)', err, {
+        severity: 'medium',
+        userId: decoded.uid,
+      });
+      res.status(500).json({ error: 'internal' });
+    }
   });
 
 export const startGift = region('us-central1')

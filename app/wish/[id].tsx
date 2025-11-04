@@ -9,7 +9,6 @@ import { createPlayer, type AudioPlayer } from 'expo-audio';
 import {
   getWish,
   setFulfillmentLink,
-  createGiftCheckout,
   updateWish,
   deleteWish,
 } from '../../helpers/wishes';
@@ -36,9 +35,16 @@ import {
   collectionGroup,
   updateDoc,
   setDoc,
+  Timestamp,
 } from 'firebase/firestore'; // ✅ Keep only if used directly in this file
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   Animated,
   ActivityIndicator,
@@ -61,6 +67,7 @@ import {
   Linking as RNLinking,
   Share,
   ToastAndroid,
+  LayoutAnimation,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
@@ -72,10 +79,33 @@ import FulfillmentLinkDialog from '../../components/FulfillmentLinkDialog';
 import { db } from '../../firebase';
 import type { Wish } from '../../types/Wish';
 import { useAuthSession } from '@/contexts/AuthSessionContext';
+import { useFeatureFlags } from '@/contexts/FeatureFlagsContext';
 import { trackEvent } from '@/helpers/analytics';
 import { useWishMeta } from '@/hooks/useWishMeta';
+import { clearWishMetaCache } from '@/helpers/wishMeta';
 import * as logger from '@/shared/logger';
 import { POST_TYPE_META, normalizePostType } from '@/types/post';
+import { useWishStages } from '@/hooks/useWishStages';
+import type { WishStage } from '@/types/WishStage';
+import { useAccountabilityCircles } from '@/hooks/useAccountabilityCircles';
+import { GiftCTA } from '@/src/features/gifting/GiftCTA';
+import { ChipInModal } from '@/app/components/splitpay/ChipInModal';
+import { SplitPayProgressBar } from '@/app/components/splitpay/ProgressBar';
+import { GiftTogetherModal } from '@/app/components/splitpay/GiftTogetherModal';
+import { formatCurrency } from '@/shared/numberFormat';
+import { logSplitPayShareClick, logSplitPayView } from '@/src/lib/analytics';
+import { ANALYTICS_EVENTS } from '@/src/lib/analytics/events';
+import { useAnonFavorite } from '@/hooks/useAnonFavorite';
+import { useWishStats } from '@/hooks/useWishStats';
+import { appConfig } from '@/appConfig';
+import { SimilarWhispsSection } from '@/components/SimilarWhispsSection';
+import {
+  listenWishMatches,
+  refreshWishMatches,
+  type WishMatch,
+  type WishMatchMeta,
+} from '@/services/WishMatcher';
+import { recordRecentWishlistView } from '@/src/features/wishlist/recentService';
 
 const formatTimeLeft = (d: Date) => {
   const ms = d.getTime() - Date.now();
@@ -89,11 +119,37 @@ const emojiOptions = ['❤️', '😂', '😢', '👍'];
 // Approximate height of a single comment item including margins
 const COMMENT_ITEM_HEIGHT = 80;
 const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
+const MIN_PLEDGE_CENTS = 500;
 
 const CAN_USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
+const withAlpha = (input: string, alpha: number): string => {
+  if (!input) return `rgba(255,255,255,${alpha})`;
+  if (input.startsWith('#')) {
+    const hex = input.replace('#', '');
+    const bigint = Number.parseInt(hex.length === 3 ? hex.repeat(2) : hex, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  if (input.startsWith('rgb')) {
+    return input.replace(/rgba?\(([^)]+)\)/, (_match, values) => {
+      const parts = values.split(',').map((v: string) => v.trim());
+      const [r, g, b] = parts;
+      return `rgba(${r},${g},${b},${alpha})`;
+    });
+  }
+  return input;
+};
+
 export default function Page() {
-  const params = useLocalSearchParams<{ id: string; gift?: string; comment?: string }>();
+  const params = useLocalSearchParams<{
+    id: string;
+    gift?: string;
+    comment?: string;
+    splitpay?: string;
+  }>();
   const { id } = params as any;
   const router = useRouter();
   const { theme } = useTheme();
@@ -104,6 +160,91 @@ export default function Page() {
     [wish?.type],
   );
   const typeMeta = POST_TYPE_META[normalizedType];
+  const {
+    stage,
+    stageMeta,
+    options: stageOptions,
+    changeStage,
+  } = useWishStages(wish);
+  const [pendingStage, setPendingStage] = useState<WishStage | null>(null);
+  const { recordCheckIn: recordCircleCheckIn, circlesById } =
+    useAccountabilityCircles();
+  const circleMeta = React.useMemo(
+    () =>
+      wish?.accountabilityCircleId
+        ? (circlesById[wish.accountabilityCircleId] ?? null)
+        : null,
+    [wish?.accountabilityCircleId, circlesById],
+  );
+  const {
+    enabled: anonFavEnabled,
+    toggled: anonFavorited,
+    loading: anonFavLoading,
+    toggle: toggleAnonFavorite,
+  } = useAnonFavorite(wish?.id ?? null);
+  const { stats: anonStats } = useWishStats(
+    anonFavEnabled && wish?.id ? wish.id : null,
+  );
+  const [favoriteModalVisible, setFavoriteModalVisible] = useState(false);
+  const [favoriteNote, setFavoriteNote] = useState('');
+  const [sampleNoteIndex, setSampleNoteIndex] = useState(0);
+  const supportRequestAmount =
+    typeof wish?.supportRequest?.amount === 'number' &&
+    wish.supportRequest.amount > 0
+      ? wish.supportRequest.amount
+      : null;
+  const supportRequestReason =
+    typeof wish?.supportRequest?.reason === 'string'
+      ? wish.supportRequest.reason.trim()
+      : '';
+  const handleStageChange = useCallback(
+    async (nextStage: WishStage) => {
+      if (!wish?.id || nextStage === stage) return;
+      setPendingStage(nextStage);
+      try {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      } catch {
+        // Layout animation may fail on Android if not enabled; ignore.
+      }
+      try {
+        await changeStage(nextStage);
+        setWish((prev) =>
+          prev && prev.id === wish.id
+            ? {
+                ...prev,
+                stage: nextStage,
+                stageUpdatedAt: Timestamp.now(),
+              }
+            : prev,
+        );
+      } catch (err) {
+        logger.warn('Stage update failed', err);
+      } finally {
+        setPendingStage(null);
+      }
+    },
+    [wish, changeStage, stage],
+  );
+
+  const handleCircleCheckIn = useCallback(async () => {
+    if (!wish?.accountabilityCircleId) return;
+    try {
+      await recordCircleCheckIn(wish.accountabilityCircleId);
+      Alert.alert(
+        tr('wish.circleCheckInSuccessTitle', 'Check-in logged'),
+        tr(
+          'wish.circleCheckInSuccessBody',
+          'We will remind you when the next cadence hits.',
+        ),
+      );
+    } catch (err) {
+      logger.warn('Circle check-in failed', err);
+      Alert.alert(
+        tr('wish.circleCheckInFailureTitle', 'Could not log check-in'),
+        tr('wish.circleCheckInFailureBody', 'Please try again in a moment.'),
+      );
+    }
+  }, [wish?.accountabilityCircleId, recordCircleCheckIn, tr]);
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
@@ -116,22 +257,14 @@ export default function Page() {
   const [reportVisible, setReportVisible] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
   const [fulfillmentVisible, setFulfillmentVisible] = useState(false);
+  const [chipInVisible, setChipInVisible] = useState(false);
+  const [giftTogetherVisible, setGiftTogetherVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [player, setPlayer] = useState<AudioPlayer | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [postingComment, setPostingComment] = useState(false);
   const [useProfileComment, setUseProfileComment] = useState(true);
-  const [confirmGift, setConfirmGift] = useState<{
-    link?: string;
-    amount?: number;
-    wishId?: string;
-    recipientId?: string;
-  } | null>(null);
-  const [showThanks, setShowThanks] = useState(false);
-  const [thanksMessage, setThanksMessage] = useState('');
-  const [thanksContext, setThanksContext] = useState<{ wishId: string } | null>(null);
-  const [customAmount, setCustomAmount] = useState('');
   const [nickname, setNickname] = useState('');
   const [owner, setOwner] = useState<any | null>(null);
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
@@ -143,17 +276,184 @@ export default function Page() {
   const [editText, setEditText] = useState('');
   const [editCategory, setEditCategory] = useState('');
   const { user, profile } = useAuthSession();
+  const { giftPot: giftPotEnabled } = useFeatureFlags();
+  const experimentBucket = giftPotEnabled ? 'split_pay_on' : 'split_pay_off';
   const [giftBanner, setGiftBanner] = useState<string | null>(null);
+  const wishMatcherEnabled = appConfig.features.wishMatcher;
+  const [similarWhisps, setSimilarWhisps] = useState<WishMatch[]>([]);
+  const [wishMatchMeta, setWishMatchMeta] = useState<WishMatchMeta | null>(
+    null,
+  );
+  const [wishMatchStatus, setWishMatchStatus] = useState<
+    'idle' | 'loading' | 'ready' | 'empty' | 'error'
+  >('idle');
+  const [wishMatchError, setWishMatchError] = useState<string | null>(null);
   const commentInputRef = useRef<TextInput | null>(null);
+  const analyticsFlags = useRef({
+    viewLogged: false,
+    fulfilledLogged: false,
+    expiredLogged: false,
+  });
   const autoScrollRef = useRef(false);
   const [shouldFocusComposer, setShouldFocusComposer] = useState(false);
   const [commentSuccess, setCommentSuccess] = useState<string | null>(null);
   const successOpacity = useRef(new Animated.Value(0)).current;
-  const { giftCount: metaGiftCount, giftTotal: metaGiftTotal } = useWishMeta(wish);
+  const { giftCount: metaGiftCount, giftTotal: metaGiftTotal } =
+    useWishMeta(wish);
+
+  useEffect(() => {
+    const notes = anonStats.sampleNotes;
+    if (!notes.length) {
+      setSampleNoteIndex(0);
+      return;
+    }
+    setSampleNoteIndex((prev) => (prev >= notes.length ? 0 : prev));
+    const interval = setInterval(() => {
+      setSampleNoteIndex((prev) => (prev + 1) % notes.length);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [anonStats.sampleNotes]);
+
+  const favoriteSampleNote = React.useMemo(() => {
+    const notes = anonStats.sampleNotes;
+    if (!notes.length) return null;
+    return notes[sampleNoteIndex % notes.length] ?? null;
+  }, [anonStats.sampleNotes, sampleNoteIndex]);
+
+  const handleFavoritePress = useCallback(async () => {
+    if (!anonFavEnabled || !wish?.id) return;
+    if (anonFavorited) {
+      const success = await toggleAnonFavorite(false);
+      if (success) {
+        trackEvent('favorite_toggled', { wish_id: wish.id, state: 'off' });
+      }
+      return;
+    }
+    setFavoriteNote('');
+    setFavoriteModalVisible(true);
+  }, [anonFavEnabled, anonFavorited, toggleAnonFavorite, wish?.id]);
+
+  const handleFavoriteConfirm = useCallback(async () => {
+    if (!wish?.id) return;
+    const success = await toggleAnonFavorite(true, { note: favoriteNote });
+    if (success) {
+      trackEvent('favorite_toggled', { wish_id: wish.id, state: 'on' });
+      setFavoriteModalVisible(false);
+      setFavoriteNote('');
+    }
+  }, [favoriteNote, toggleAnonFavorite, wish?.id]);
+  useEffect(() => {
+    if (!wish?.id) return;
+    const active =
+      giftPotEnabled &&
+      wish.splitPayEnabled === true &&
+      typeof wish.targetAmount === 'number' &&
+      wish.targetAmount > 0;
+    if (active && !analyticsFlags.current.viewLogged) {
+      logSplitPayView({
+        wishId: wish.id,
+        amount:
+          typeof wish.fundedAmount === 'number'
+            ? wish.fundedAmount / 100
+            : undefined,
+        experiment: experimentBucket,
+      });
+      analyticsFlags.current.viewLogged = true;
+    }
+    if (
+      active &&
+      wish.status === 'fulfilled' &&
+      !analyticsFlags.current.fulfilledLogged
+    ) {
+      trackEvent(ANALYTICS_EVENTS.FUNDING_COMPLETED, { wishId: wish.id });
+      analyticsFlags.current.fulfilledLogged = true;
+    }
+    if (
+      active &&
+      wish.status === 'expired' &&
+      !analyticsFlags.current.expiredLogged
+    ) {
+      trackEvent(ANALYTICS_EVENTS.DEADLINE_PASSED, { wishId: wish.id });
+      analyticsFlags.current.expiredLogged = true;
+    }
+  }, [
+    experimentBucket,
+    giftPotEnabled,
+    wish?.fundedAmount,
+    wish?.id,
+    wish?.splitPayEnabled,
+    wish?.status,
+    wish?.targetAmount,
+  ]);
+  useEffect(() => {
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+
+    if (!wishMatcherEnabled || !wish?.id) {
+      setSimilarWhisps([]);
+      setWishMatchMeta(null);
+      setWishMatchStatus('idle');
+      setWishMatchError(null);
+      return () => {};
+    }
+
+    setWishMatchStatus('loading');
+    setWishMatchError(null);
+
+    unsubscribe = listenWishMatches(
+      wish.id,
+      (state) => {
+        if (cancelled) return;
+        setSimilarWhisps(state.matches);
+        setWishMatchMeta(state.meta ?? null);
+        const metaStatus = state.meta?.status ?? 'idle';
+        if (metaStatus === 'failed') {
+          setWishMatchStatus('error');
+          setWishMatchError(
+            state.meta?.error ??
+              tr('wish.matchError', 'Unable to load similar wishes right now.'),
+          );
+          return;
+        }
+        if (state.matches.length > 0) {
+          setWishMatchStatus('ready');
+          setWishMatchError(null);
+          return;
+        }
+        if (metaStatus === 'empty') {
+          setWishMatchStatus('empty');
+          setWishMatchError(null);
+          return;
+        }
+        if (metaStatus === 'processing' || metaStatus === 'idle') {
+          setWishMatchStatus('loading');
+          return;
+        }
+        setWishMatchStatus('loading');
+      },
+      (err) => {
+        if (cancelled) return;
+        logger.warn('Failed to subscribe to wish matcher', err, {
+          wishId: wish?.id,
+        });
+        setWishMatchError(
+          tr('wish.matchError', 'Unable to load similar wishes right now.'),
+        );
+        setWishMatchStatus('error');
+      },
+    );
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, [tr, wishMatcherEnabled, wish?.id]);
   useEffect(() => {
     const g = typeof params?.gift === 'string' ? params.gift : undefined;
-    if (g === 'success') setGiftBanner(tr('gifts.success', '🎁 Thank you for your support!'));
-    else if (g === 'cancel') setGiftBanner(tr('gifts.cancelled', 'Gift checkout canceled'));
+    if (g === 'success')
+      setGiftBanner(tr('gifts.success', '🎁 Thank you for your support!'));
+    else if (g === 'cancel')
+      setGiftBanner(tr('gifts.cancelled', 'Gift checkout canceled'));
     if (g) {
       const id = setTimeout(() => setGiftBanner(null), 4000);
       return () => clearTimeout(id);
@@ -211,11 +511,34 @@ export default function Page() {
           setCommentSuccess(null);
         }
       });
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
-        () => {},
-      );
+      void Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success,
+      ).catch(() => {});
     },
     [successOpacity],
+  );
+
+  const handleSimilarRefresh = useCallback(() => {
+    if (!wish?.id) return;
+    setWishMatchStatus('loading');
+    setWishMatchError(null);
+    refreshWishMatches(wish.id, { force: true }).catch((err) => {
+      logger.warn('Wish matcher manual refresh failed', err, {
+        wishId: wish.id,
+      });
+      setWishMatchError(
+        tr('wish.matchError', 'Unable to load similar wishes right now.'),
+      );
+      setWishMatchStatus('error');
+    });
+  }, [tr, wish?.id]);
+
+  const handleSimilarSelect = useCallback(
+    (targetId: string) => {
+      if (!targetId || targetId === wish?.id) return;
+      router.push(`/wish/${targetId}`);
+    },
+    [router, wish?.id],
   );
 
   const isBoosted =
@@ -225,6 +548,7 @@ export default function Page() {
   const isActiveWish =
     isBoosted || (wish?.likes || 0) > 5 || wish?.active === true;
   const isLoggedIn = !!user?.uid;
+  const isOwner = !!(user?.uid && wish?.userId === user.uid);
   const isReply = !!replyTo;
   const [timeLeft, setTimeLeft] = useState(
     isBoosted && wish?.boostedUntil
@@ -301,6 +625,18 @@ export default function Page() {
       setLoading(false);
     }
   }, [id]);
+
+  useEffect(() => {
+    if (!wish?.id) return;
+    void recordRecentWishlistView({
+      userId: user?.uid ?? null,
+      wishlistId: wish.id,
+      title: wish.text,
+      coverUri: wish.imageUrl ?? null,
+    }).catch(() => {
+      /* non-fatal */
+    });
+  }, [user?.uid, wish?.id, wish?.imageUrl, wish?.text]);
 
   useEffect(() => {
     const checkVote = async () => {
@@ -509,9 +845,7 @@ export default function Page() {
       if (nickname) await AsyncStorage.setItem('nickname', nickname);
       showCommentSuccess(tr('wish.commentPosted', 'Comment posted'));
       setWish((prev) =>
-        prev
-          ? { ...prev, commentCount: (prev.commentCount || 0) + 1 }
-          : prev,
+        prev ? { ...prev, commentCount: (prev.commentCount || 0) + 1 } : prev,
       );
     } catch {
       // error handled in onError
@@ -561,13 +895,24 @@ export default function Page() {
     const trimmed = editingCommentText.trim();
     if (!trimmed) {
       if (Platform.OS === 'android') {
-        ToastAndroid.show(tr('comments.emptyWarning', 'Comment cannot be empty.'), ToastAndroid.SHORT);
+        ToastAndroid.show(
+          tr('comments.emptyWarning', 'Comment cannot be empty.'),
+          ToastAndroid.SHORT,
+        );
       } else if (Platform.OS === 'web') {
-        if (typeof globalThis !== 'undefined' && typeof (globalThis as any).alert === 'function') {
-          (globalThis as any).alert(tr('comments.emptyWarning', 'Comment cannot be empty.'));
+        if (
+          typeof globalThis !== 'undefined' &&
+          typeof (globalThis as any).alert === 'function'
+        ) {
+          (globalThis as any).alert(
+            tr('comments.emptyWarning', 'Comment cannot be empty.'),
+          );
         }
       } else {
-        Alert.alert(tr('common.error', 'Something went wrong'), tr('comments.emptyWarning', 'Comment cannot be empty.'));
+        Alert.alert(
+          tr('common.error', 'Something went wrong'),
+          tr('comments.emptyWarning', 'Comment cannot be empty.'),
+        );
       }
       return;
     }
@@ -585,7 +930,10 @@ export default function Page() {
   const handleDeleteComment = useCallback(
     (commentId: string) => {
       const title = tr('comments.deleteTitle', 'Delete Comment');
-      const message = tr('comments.deleteConfirm', 'Are you sure you want to delete this comment?');
+      const message = tr(
+        'comments.deleteConfirm',
+        'Are you sure you want to delete this comment?',
+      );
       const performDelete = async () => {
         try {
           await deleteComment(id as string, commentId);
@@ -708,79 +1056,175 @@ export default function Page() {
     router.push(`/boost/${wish.id}`);
   }, [router, wish]);
 
-  const openGiftLink = useCallback((link: string) => {
-    setConfirmGift({ link });
+  const openGiftLink = useCallback(async (link: string) => {
+    try {
+      await WebBrowser.openBrowserAsync(link);
+    } catch (err) {
+      logger.warn('Failed to open external gift link', err);
+      Alert.alert('Unable to open link', 'Please try again shortly.');
+    }
   }, []);
 
+  const legacyFundingGoal =
+    typeof wish?.fundingGoal === 'number' ? wish.fundingGoal : 0;
+  const legacyRaisedFromMeta =
+    typeof metaGiftTotal === 'number' ? metaGiftTotal : 0;
+  const legacySupportersFromMeta =
+    typeof metaGiftCount === 'number' ? metaGiftCount : 0;
+  const legacyRaisedFromWish =
+    typeof wish?.fundingRaised === 'number' ? wish.fundingRaised : 0;
+  const legacySupportersFromWish =
+    typeof wish?.fundingSupporters === 'number' ? wish.fundingSupporters : 0;
+  const legacyFundingRaised = Math.max(
+    legacyRaisedFromWish,
+    legacyRaisedFromMeta,
+    0,
+  );
+  const legacySupporters = Math.max(
+    legacySupportersFromWish,
+    legacySupportersFromMeta,
+    0,
+  );
+  const splitPayActive =
+    giftPotEnabled &&
+    wish?.splitPayEnabled === true &&
+    typeof wish?.targetAmount === 'number' &&
+    wish.targetAmount > 0;
+  const targetAmountCents = splitPayActive
+    ? Math.max(0, wish?.targetAmount ?? 0)
+    : Math.round(legacyFundingGoal * 100);
+  const fundedAmountCents = splitPayActive
+    ? Math.max(
+        0,
+        typeof wish?.fundedAmount === 'number' ? wish.fundedAmount : 0,
+      )
+    : Math.round(legacyFundingRaised * 100);
+  const supportersCount = splitPayActive
+    ? Math.max(
+        0,
+        typeof wish?.fundingSupporters === 'number'
+          ? wish.fundingSupporters
+          : 0,
+      )
+    : legacySupporters;
+  const currencyCode =
+    typeof wish?.fundingCurrency === 'string' ? wish.fundingCurrency : 'USD';
+  const remainingCents =
+    targetAmountCents > 0
+      ? Math.max(targetAmountCents - fundedAmountCents, 0)
+      : null;
+  const progressPercent =
+    targetAmountCents > 0
+      ? Math.min(100, (fundedAmountCents / targetAmountCents) * 100)
+      : 0;
+  const fundingPercentDisplay = Math.round(progressPercent);
+  const hasFundingGoal = targetAmountCents > 0;
+  const deadlineDate =
+    splitPayActive &&
+    wish?.deadline &&
+    typeof (wish.deadline as any).toDate === 'function'
+      ? (wish.deadline as any).toDate()
+      : null;
+  const deadlineLabel = deadlineDate
+    ? `Ends ${formatDistanceToNow(deadlineDate, { addSuffix: true })}`
+    : null;
+
+  useEffect(() => {
+    if (!splitPayActive) return;
+    const shouldOpen =
+      typeof params?.splitpay === 'string' &&
+      (params.splitpay === '1' || params.splitpay === 'true');
+    if (shouldOpen) {
+      setChipInVisible(true);
+    }
+  }, [params?.splitpay, splitPayActive]);
+
+  const statsSegments: string[] = [];
+  if (hasFundingGoal) {
+    statsSegments.push(
+      `${formatCurrency(fundedAmountCents / 100, currencyCode)} of ${formatCurrency(
+        targetAmountCents / 100,
+        currencyCode,
+      )}`,
+    );
+  }
+  if (supportersCount > 0) {
+    statsSegments.push(
+      `${supportersCount} ${supportersCount === 1 ? 'friend' : 'friends'} chipped in`,
+    );
+  }
+  if (typeof remainingCents === 'number' && remainingCents > 0) {
+    statsSegments.push(
+      `${formatCurrency(remainingCents / 100, currencyCode)} to go`,
+    );
+  }
+  const splitPayStatsText = statsSegments.join(' • ');
+  const giftTogetherEnabled = splitPayActive && appConfig.features.giftTogether;
+  const giftTogetherLink = useMemo(() => {
+    if (!wish?.id) return '';
+    const params =
+      giftPotEnabled && wish?.splitPayEnabled ? { splitpay: '1' } : undefined;
+    return Linking.createURL(`/wish/${wish.id}`, { queryParams: params });
+  }, [giftPotEnabled, wish?.id, wish?.splitPayEnabled]);
+
   const handleShare = useCallback(async () => {
-    if (!wish?.id) return;
-    const wishUrl = Linking.createURL(`/wish/${wish.id}`);
+    if (!wish?.id || !giftTogetherLink) return;
     try {
-      await Share.share({ message: wishUrl });
+      await Share.share({ message: giftTogetherLink });
+      if (giftPotEnabled && wish.splitPayEnabled) {
+        logSplitPayShareClick({
+          wishId: wish.id,
+          experiment: experimentBucket,
+        });
+      }
     } catch (err) {
       logger.warn('Failed to share wish', err);
     }
-  }, [wish?.id]);
+  }, [
+    experimentBucket,
+    giftPotEnabled,
+    giftTogetherLink,
+    wish?.id,
+    wish?.splitPayEnabled,
+  ]);
 
-  const handleSendMoney = useCallback(
-    (amount: number) => {
-      if (!wish || !wish.userId) return;
-      setConfirmGift({ amount, wishId: wish.id, recipientId: wish.userId });
-    },
-    [wish],
+  useEffect(() => {
+    if (!giftTogetherEnabled && giftTogetherVisible) {
+      setGiftTogetherVisible(false);
+    }
+  }, [giftTogetherEnabled, giftTogetherVisible]);
+
+  const friendsNeeded =
+    typeof remainingCents === 'number' && remainingCents > 0
+      ? Math.max(1, Math.ceil(remainingCents / MIN_PLEDGE_CENTS))
+      : null;
+  const baseDisplayAmount = formatCurrency(
+    MIN_PLEDGE_CENTS / 100,
+    currencyCode,
   );
-
-  const handleCustomAmountSubmit = useCallback(() => {
-    const input = customAmount.trim();
-    if (!input) {
-      Alert.alert(
-        tr('gifts.enterAmountTitle', 'Enter amount'),
-        tr('gifts.enterAmountBody', 'Please enter an amount to contribute.'),
-      );
-      return;
+  const wishStatus = (wish?.status as string | undefined) ?? 'open';
+  let splitPayCtaLabel: string | null = null;
+  if (splitPayActive) {
+    if (wishStatus === 'fulfilled') {
+      splitPayCtaLabel = supportersCount
+        ? `Funded by ${supportersCount} ${supportersCount === 1 ? 'friend' : 'friends'}`
+        : 'Wish funded!';
+    } else if (wishStatus === 'expired') {
+      splitPayCtaLabel = 'Not funded — no one was charged';
+    } else if (
+      typeof remainingCents === 'number' &&
+      remainingCents > 0 &&
+      remainingCents <= 1500
+    ) {
+      splitPayCtaLabel = `Only ${formatCurrency(remainingCents / 100, currencyCode)} left — finish it!`;
+    } else {
+      splitPayCtaLabel = friendsNeeded
+        ? `Chip in ${baseDisplayAmount} — ${friendsNeeded} friend${friendsNeeded === 1 ? '' : 's'} needed.`
+        : `Chip in ${baseDisplayAmount} today.`;
     }
-    const parsed = Number(input.replace(/[^0-9.]/g, ''));
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      Alert.alert(
-        tr('gifts.invalidAmountTitle', 'Invalid amount'),
-        tr('gifts.invalidAmountBody', 'Enter a valid amount greater than zero.'),
-      );
-      return;
-    }
-    if (parsed > 10_000) {
-      Alert.alert(
-        tr('gifts.limitTitle', 'Amount too high'),
-        tr('gifts.limitBody', 'The maximum contribution is $10,000.'),
-      );
-      return;
-    }
-    const normalized = Math.round(parsed * 100) / 100;
-    handleSendMoney(normalized);
-    setCustomAmount('');
-  }, [customAmount, handleSendMoney, tr]);
-
-  const fundingPresets = React.useMemo(() => {
-    if (wish?.fundingPresets && Array.isArray(wish.fundingPresets) && wish.fundingPresets.length) {
-      const cleaned = (wish.fundingPresets as number[]).filter((n) => typeof n === 'number' && n > 0);
-      if (cleaned.length) return cleaned;
-    }
-    if (wish?.fundingGoal && wish.fundingGoal > 0) {
-      const base = Math.max(5, Math.round(wish.fundingGoal / 5));
-      return [Math.max(3, Math.round(base * 0.5)), base, Math.round(base * 1.5)];
-    }
-    return [3, 5, 10];
-  }, [wish?.fundingPresets, wish?.fundingGoal]);
-
-  const fundingGoalAmount = typeof wish?.fundingGoal === 'number' ? wish.fundingGoal : 0;
-  const raisedFromMeta = typeof metaGiftTotal === 'number' ? metaGiftTotal : 0;
-  const supportersFromMeta = typeof metaGiftCount === 'number' ? metaGiftCount : 0;
-  const raisedFromWish = typeof wish?.fundingRaised === 'number' ? wish.fundingRaised : 0;
-  const supportersFromWish = typeof wish?.fundingSupporters === 'number' ? wish.fundingSupporters : 0;
-  const fundingRaised = Math.max(raisedFromWish, raisedFromMeta, 0);
-  const fundingSupporters = Math.max(supportersFromWish, supportersFromMeta, 0);
-  const fundingProgressPercent = fundingGoalAmount > 0 ? Math.min(100, (fundingRaised / fundingGoalAmount) * 100) : 0;
-  const fundingPercentDisplay = Math.round(fundingProgressPercent);
-  const hasFundingGoal = fundingGoalAmount > 0;
+  }
+  const canChipIn =
+    splitPayActive && wishStatus !== 'fulfilled' && wishStatus !== 'expired';
 
   const handleUpdateWish = useCallback(async () => {
     if (!wish) return;
@@ -926,10 +1370,10 @@ export default function Page() {
               </>
             ) : (
               <>
-                <Text style={[styles.comment, { color: theme.text }]}> 
+                <Text style={[styles.comment, { color: theme.text }]}>
                   {item.text}
                 </Text>
-                <Text style={[styles.timestamp, { color: theme.placeholder }]}> 
+                <Text style={[styles.timestamp, { color: theme.placeholder }]}>
                   {' '}
                   {/* theme fix */}
                   {item.timestamp?.seconds
@@ -1047,7 +1491,7 @@ export default function Page() {
       >
         <ScrollView contentContainerStyle={styles.contentContainer}>
           {giftBanner && (
-            <View style={[styles.banner, { backgroundColor: theme.input }]}> 
+            <View style={[styles.banner, { backgroundColor: theme.input }]}>
               <Text style={{ color: theme.text }}>{giftBanner}</Text>
             </View>
           )}
@@ -1087,25 +1531,220 @@ export default function Page() {
                     },
                   ]}
                 >
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Text style={[styles.wishCategory, { color: typeMeta.color }]}
+                  <View style={styles.wishHeaderRow}>
+                    <Text
+                      style={[styles.wishCategory, { color: typeMeta.color }]}
                     >
                       {typeMeta.emoji} #{wish.category}
                     </Text>
-                    <TouchableOpacity onPress={handleShare} hitSlop={HIT_SLOP}>
-                      <Ionicons
-                        name="share-outline"
-                        size={20}
-                        color={theme.tint}
-                      />
-                    </TouchableOpacity>
+                    <View style={styles.headerActions}>
+                      {anonFavEnabled ? (
+                        <TouchableOpacity
+                          onPress={() => {
+                            void handleFavoritePress();
+                          }}
+                          hitSlop={HIT_SLOP}
+                          accessibilityRole="button"
+                          accessibilityState={
+                            anonFavLoading ? { busy: true } : undefined
+                          }
+                          disabled={anonFavLoading}
+                        >
+                          <Ionicons
+                            name={anonFavorited ? 'heart' : 'heart-outline'}
+                            size={20}
+                            color={anonFavorited ? '#ef4444' : theme.tint}
+                          />
+                        </TouchableOpacity>
+                      ) : null}
+                      <TouchableOpacity
+                        onPress={handleShare}
+                        hitSlop={HIT_SLOP}
+                      >
+                        <Ionicons
+                          name="share-outline"
+                          size={20}
+                          color={theme.tint}
+                        />
+                      </TouchableOpacity>
+                    </View>
                   </View>
+                  <View style={styles.stageContainer}>
+                    {stageOptions.map((option) => {
+                      const isActive = option.value === stage;
+                      return (
+                        <TouchableOpacity
+                          key={option.value}
+                          style={[
+                            styles.stageChip,
+                            {
+                              backgroundColor: isActive
+                                ? withAlpha(typeMeta.color, 0.22)
+                                : withAlpha(theme.text, 0.06),
+                              borderColor: isActive
+                                ? typeMeta.color
+                                : withAlpha(theme.text, 0.15),
+                              opacity:
+                                pendingStage && pendingStage === option.value
+                                  ? 0.6
+                                  : 1,
+                            },
+                          ]}
+                          onPress={() => handleStageChange(option.value)}
+                          disabled={pendingStage !== null}
+                        >
+                          <Text
+                            style={[
+                              styles.stageChipText,
+                              { color: isActive ? typeMeta.color : theme.text },
+                            ]}
+                          >
+                            {option.title}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  <Text
+                    style={[
+                      styles.stageDescription,
+                      { color: theme.placeholder },
+                    ]}
+                  >
+                    {stageMeta.description}
+                  </Text>
+                  <Text style={[styles.stageNudge, { color: theme.tint }]}>
+                    {stageMeta.nudge}
+                  </Text>
+                  {anonFavEnabled ? (
+                    <View
+                      style={[
+                        styles.favoriteSummary,
+                        {
+                          borderColor: theme.placeholder,
+                          backgroundColor: theme.background,
+                        },
+                      ]}
+                    >
+                      <TouchableOpacity
+                        onPress={() => {
+                          void handleFavoritePress();
+                        }}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 8,
+                        }}
+                        accessibilityRole="button"
+                        accessibilityState={
+                          anonFavLoading ? { busy: true } : undefined
+                        }
+                        disabled={anonFavLoading}
+                      >
+                        <Ionicons
+                          name={anonFavorited ? 'heart' : 'heart-outline'}
+                          size={18}
+                          color={anonFavorited ? '#ef4444' : theme.tint}
+                        />
+                        <Text
+                          style={[
+                            styles.favoriteSummaryText,
+                            { color: theme.text },
+                          ]}
+                        >
+                          {anonStats.favorites > 0
+                            ? tr('wish.favoritesTitle', '{{count}} favorites', {
+                                count: anonStats.favorites,
+                              })
+                            : tr(
+                                'wish.favoritesBeFirst',
+                                'Be the first to favorite',
+                              )}
+                        </Text>
+                      </TouchableOpacity>
+                      {favoriteSampleNote ? (
+                        <Text
+                          style={[
+                            styles.favoriteQuote,
+                            { color: theme.placeholder },
+                          ]}
+                        >
+                          “{favoriteSampleNote}”
+                        </Text>
+                      ) : null}
+                    </View>
+                  ) : null}
+                  {wish.accountabilityCircleName ? (
+                    <View
+                      style={[
+                        styles.circleBanner,
+                        {
+                          borderColor: withAlpha(theme.tint, 0.4),
+                          backgroundColor: withAlpha(theme.tint, 0.08),
+                        },
+                      ]}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.circleBannerTitle,
+                            { color: theme.tint },
+                          ]}
+                        >
+                          👥 {wish.accountabilityCircleName}
+                        </Text>
+                        {circleMeta?.lastCheckInAt ? (
+                          <Text
+                            style={[
+                              styles.circleBannerSubtitle,
+                              { color: theme.placeholder },
+                            ]}
+                          >
+                            {tr(
+                              'wish.circleLastCheckIn',
+                              'Last check-in {{time}} ago',
+                              {
+                                time: formatDistanceToNow(
+                                  new Date(circleMeta.lastCheckInAt),
+                                ),
+                              },
+                            )}
+                          </Text>
+                        ) : (
+                          <Text
+                            style={[
+                              styles.circleBannerSubtitle,
+                              { color: theme.placeholder },
+                            ]}
+                          >
+                            {tr(
+                              'wish.circlePrompt',
+                              'Keep the circle in the loop with short updates.',
+                            )}
+                          </Text>
+                        )}
+                      </View>
+                      {wish.accountabilityCircleId ? (
+                        <TouchableOpacity
+                          onPress={handleCircleCheckIn}
+                          style={[
+                            styles.circleBannerButton,
+                            { borderColor: theme.tint },
+                          ]}
+                          hitSlop={HIT_SLOP}
+                        >
+                          <Text
+                            style={[
+                              styles.circleBannerButtonText,
+                              { color: theme.tint },
+                            ]}
+                          >
+                            {tr('wish.circleLogCheckIn', 'Log check-in')}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                  ) : null}
                   <Text style={[styles.wishText, { color: theme.text }]}>
                     {wish.text}
                   </Text>
@@ -1214,47 +1853,212 @@ export default function Page() {
                     </TouchableOpacity>
                   )}
 
-                  {hasFundingGoal && (
-                    <View style={[styles.fundingCard, { backgroundColor: theme.input }]}>
-                      <View style={[styles.fundingProgressOuter, { backgroundColor: theme.background }]}>
+                  {splitPayActive ? (
+                    <View
+                      style={[
+                        styles.splitPayCard,
+                        { backgroundColor: theme.input },
+                      ]}
+                    >
+                      <SplitPayProgressBar progress={progressPercent / 100} />
+                      {splitPayStatsText ? (
+                        <Text
+                          style={[styles.splitPayStats, { color: theme.text }]}
+                        >
+                          {splitPayStatsText}
+                        </Text>
+                      ) : null}
+                      {deadlineLabel ? (
+                        <Text
+                          style={[
+                            styles.splitPayDeadline,
+                            { color: theme.placeholder },
+                          ]}
+                        >
+                          {deadlineLabel}
+                        </Text>
+                      ) : null}
+                      {splitPayCtaLabel ? (
+                        canChipIn ? (
+                          <TouchableOpacity
+                            onPress={() => setChipInVisible(true)}
+                            style={[
+                              styles.splitPayButton,
+                              { backgroundColor: theme.tint },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.splitPayButtonText,
+                                { color: theme.background },
+                              ]}
+                            >
+                              {splitPayCtaLabel}
+                            </Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <Text
+                            style={[
+                              styles.splitPayStatusText,
+                              { color: theme.placeholder },
+                            ]}
+                          >
+                            {splitPayCtaLabel}
+                          </Text>
+                        )
+                      ) : null}
+                      <View style={styles.splitPayActions}>
+                        {giftTogetherEnabled ? (
+                          <TouchableOpacity
+                            onPress={() => setGiftTogetherVisible(true)}
+                            style={[
+                              styles.splitPaySecondaryButton,
+                              { borderColor: theme.placeholder },
+                            ]}
+                            hitSlop={HIT_SLOP}
+                            accessibilityRole="button"
+                          >
+                            <Text
+                              style={[
+                                styles.splitPaySecondaryText,
+                                { color: theme.text },
+                              ]}
+                            >
+                              🎁 Gift Together
+                            </Text>
+                          </TouchableOpacity>
+                        ) : null}
+                        <TouchableOpacity
+                          onPress={handleShare}
+                          style={[
+                            styles.splitPaySecondaryButton,
+                            { borderColor: theme.placeholder },
+                          ]}
+                          hitSlop={HIT_SLOP}
+                          accessibilityRole="button"
+                        >
+                          <Text
+                            style={[
+                              styles.splitPaySecondaryText,
+                              { color: theme.text },
+                            ]}
+                          >
+                            Share link
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : hasFundingGoal ? (
+                    <View
+                      style={[
+                        styles.fundingCard,
+                        { backgroundColor: theme.input },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.fundingProgressOuter,
+                          { backgroundColor: theme.background },
+                        ]}
+                      >
                         <View
                           style={[
                             styles.fundingProgressInner,
-                            { width: `${fundingProgressPercent}%`, backgroundColor: theme.tint },
+                            {
+                              width: `${fundingPercentDisplay}%`,
+                              backgroundColor: theme.tint,
+                            },
                           ]}
                         />
                       </View>
                       <View style={styles.fundingInfoRow}>
-                        <Text style={[styles.fundingLabel, { color: theme.text }]}
+                        <Text
+                          style={[styles.fundingLabel, { color: theme.text }]}
                           accessibilityLabel={tr('wish.fundingProgress', {
-                            raised: fundingRaised.toFixed(2),
-                            goal: fundingGoalAmount.toFixed(2),
+                            raised: legacyFundingRaised.toFixed(2),
+                            goal: legacyFundingGoal.toFixed(2),
                           })}
                         >
                           {tr('wish.fundingProgress', {
-                            raised: fundingRaised.toFixed(2),
-                            goal: fundingGoalAmount.toFixed(2),
+                            raised: legacyFundingRaised.toFixed(2),
+                            goal: legacyFundingGoal.toFixed(2),
                           })}
                         </Text>
-                        <Text style={[styles.fundingPercent, { color: theme.placeholder }]}
-                          accessibilityLabel={tr('wish.fundingPercent', { percent: fundingPercentDisplay })}
+                        <Text
+                          style={[
+                            styles.fundingPercent,
+                            { color: theme.placeholder },
+                          ]}
+                          accessibilityLabel={tr('wish.fundingPercent', {
+                            percent: fundingPercentDisplay,
+                          })}
                         >
-                          {tr('wish.fundingPercent', { percent: fundingPercentDisplay })}
+                          {tr('wish.fundingPercent', {
+                            percent: fundingPercentDisplay,
+                          })}
                         </Text>
                       </View>
-                      <Text style={[styles.fundingSupporters, { color: theme.placeholder }]}
+                      <Text
+                        style={[
+                          styles.fundingSupporters,
+                          { color: theme.placeholder },
+                        ]}
                         accessibilityLabel={
-                          fundingSupporters > 0
-                            ? tr('wish.fundingSupporters', { count: fundingSupporters })
-                            : tr('wish.fundingBeFirst', 'Be the first to chip in')
+                          legacySupporters > 0
+                            ? tr('wish.fundingSupporters', {
+                                count: legacySupporters,
+                              })
+                            : tr(
+                                'wish.fundingBeFirst',
+                                'Be the first to chip in',
+                              )
                         }
                       >
-                        {fundingSupporters > 0
-                          ? tr('wish.fundingSupporters', { count: fundingSupporters })
-                          : tr('wish.fundingBeFirst', 'Be the first to chip in')}
+                        {legacySupporters > 0
+                          ? tr('wish.fundingSupporters', {
+                              count: legacySupporters,
+                            })
+                          : tr(
+                              'wish.fundingBeFirst',
+                              'Be the first to chip in',
+                            )}
                       </Text>
                     </View>
-                  )}
+                  ) : null}
+
+                  {supportRequestAmount ? (
+                    <View
+                      style={[
+                        styles.supportCard,
+                        {
+                          backgroundColor: theme.input,
+                          borderColor: theme.tint,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.supportCardTitle, { color: theme.text }]}
+                      >
+                        {tr(
+                          'wish.supportRequestTitle',
+                          'Support request: {{amount}}',
+                          {
+                            amount: formatCurrency(supportRequestAmount),
+                          },
+                        )}
+                      </Text>
+                      {supportRequestReason ? (
+                        <Text
+                          style={[
+                            styles.supportCardText,
+                            { color: theme.text },
+                          ]}
+                        >
+                          {supportRequestReason}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ) : null}
 
                   {profile?.giftingEnabled && wish.giftLink && (
                     <View
@@ -1306,44 +2110,29 @@ export default function Page() {
                       </TouchableOpacity>
                     </View>
                   )}
-                  {profile?.giftingEnabled && owner?.stripeAccountId && (
-                    <View style={styles.fundingControls}>
-                      <View style={styles.fundingPresetRow}
-                        accessibilityLabel={tr('wish.fundingQuickAmounts', 'Quick amounts')}
-                      >
-                        {fundingPresets.map((amt) => (
-                          <TouchableOpacity
-                            key={amt}
-                            onPress={() => handleSendMoney(amt)}
-                            style={[styles.fundingPresetButton, { backgroundColor: theme.input }]}
-                          >
-                            <Text style={[styles.fundingPresetLabel, { color: theme.tint }]}>${amt}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                      <View style={styles.customAmountRow}>
-                        <TextInput
-                          style={[styles.customAmountInput, { backgroundColor: theme.input, color: theme.text }]}
-                          placeholder={tr('wish.fundingCustomPlaceholder', 'Custom amount')}
-                          placeholderTextColor={theme.placeholder}
-                          keyboardType="numeric"
-                          value={customAmount}
-                          onChangeText={setCustomAmount}
-                          returnKeyType="done"
-                          onSubmitEditing={handleCustomAmountSubmit}
-                        />
-                        <TouchableOpacity
-                          onPress={handleCustomAmountSubmit}
-                          style={[styles.customAmountButton, { backgroundColor: theme.tint }]}
-                          hitSlop={HIT_SLOP}
-                        >
-                          <Text style={[styles.customAmountButtonText, { color: theme.background }]}>
-                            {tr('wish.fundingCustomCta', 'Send')}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  )}
+                  {wish?.userId && profile?.giftingEnabled ? (
+                    <GiftCTA
+                      wishId={wish.id}
+                      wishTitle={wish.text}
+                      recipientId={wish.userId}
+                      goalAmount={
+                        typeof wish.fundingGoal === 'number'
+                          ? wish.fundingGoal
+                          : null
+                      }
+                      currentGiftTotal={legacyFundingRaised}
+                      venmoRecipient={(owner && owner.venmoHandle) || null}
+                      isPrivate={
+                        wish?.visibility === 'private' ||
+                        wish?.shareScope === 'private' ||
+                        (wish as any)?.isPrivate === true
+                      }
+                      onGiftConfirmed={() => {
+                        clearWishMetaCache(wish.id);
+                        fetchWish();
+                      }}
+                    />
+                  ) : null}
 
                   {canBoost && (
                     <View
@@ -1420,6 +2209,17 @@ export default function Page() {
             </>
           )}
 
+          {wishMatcherEnabled ? (
+            <SimilarWhispsSection
+              matches={similarWhisps}
+              status={wishMatchStatus}
+              error={wishMatchError}
+              meta={wishMatchMeta}
+              onRefresh={handleSimilarRefresh}
+              onSelect={handleSimilarSelect}
+            />
+          ) : null}
+
           <FlatList
             ref={flatListRef}
             data={comments.filter((c) => isActiveWish || !c.parentId)}
@@ -1467,7 +2267,9 @@ export default function Page() {
               ]}
               pointerEvents="none"
             >
-              <Text style={[styles.successToastText, { color: theme.background }]}>
+              <Text
+                style={[styles.successToastText, { color: theme.background }]}
+              >
                 {commentSuccess}
               </Text>
             </Animated.View>
@@ -1603,6 +2405,84 @@ export default function Page() {
             }}
           />
 
+          {anonFavEnabled && (
+            <Modal
+              transparent
+              animationType="fade"
+              visible={favoriteModalVisible}
+              onRequestClose={() => setFavoriteModalVisible(false)}
+            >
+              <View style={styles.modalBackdrop}>
+                <View
+                  style={[styles.modalCard, { backgroundColor: theme.input }]}
+                >
+                  <Text style={[styles.modalText, { color: theme.text }]}>
+                    {tr('wish.favoriteAddTitle', 'Add a quick note (optional)')}
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.favoriteNoteInput,
+                      {
+                        backgroundColor: theme.background,
+                        color: theme.text,
+                      },
+                    ]}
+                    placeholder={tr(
+                      'wish.favoriteAddPlaceholder',
+                      'What do you love about this wish?',
+                    )}
+                    placeholderTextColor={theme.placeholder}
+                    value={favoriteNote}
+                    onChangeText={(value) =>
+                      setFavoriteNote(value.slice(0, 90))
+                    }
+                    multiline
+                    maxLength={90}
+                  />
+                  <View style={styles.modalActionRow}>
+                    <TouchableOpacity
+                      onPress={() => setFavoriteModalVisible(false)}
+                      style={[
+                        styles.modalActionButton,
+                        { borderColor: theme.placeholder },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.modalActionText,
+                          { color: theme.placeholder },
+                        ]}
+                      >
+                        {tr('common.cancel', 'Cancel')}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        void handleFavoriteConfirm();
+                      }}
+                      style={[
+                        styles.modalActionButton,
+                        { backgroundColor: theme.tint },
+                      ]}
+                      disabled={anonFavLoading}
+                      accessibilityState={
+                        anonFavLoading ? { busy: true } : undefined
+                      }
+                    >
+                      <Text
+                        style={[styles.modalActionText, { color: theme.text }]}
+                      >
+                        {anonFavLoading
+                          ? tr('common.saving', 'Saving…')
+                          : tr('wish.favoriteAddConfirm', 'Save favorite')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </Modal>
+          )}
+
           {editing && wish && (
             <Modal
               transparent
@@ -1614,7 +2494,9 @@ export default function Page() {
                 <View
                   style={[styles.modalCard, { backgroundColor: theme.input }]}
                 >
-                  <Text style={[styles.modalText, { color: theme.text }]}>Edit Wish</Text>
+                  <Text style={[styles.modalText, { color: theme.text }]}>
+                    Edit Wish
+                  </Text>
                   <TextInput
                     style={[
                       styles.input,
@@ -1644,185 +2526,59 @@ export default function Page() {
                     style={[styles.button, { backgroundColor: theme.tint }]}
                     hitSlop={HIT_SLOP}
                   >
-                    <Text style={[styles.buttonText, { color: theme.text }]}>Save</Text>
+                    <Text style={[styles.buttonText, { color: theme.text }]}>
+                      Save
+                    </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => setEditing(false)}
                     style={[styles.button, { backgroundColor: theme.input }]}
                     hitSlop={HIT_SLOP}
                   >
-                    <Text style={[styles.buttonText, { color: theme.text }]}>Cancel</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </Modal>
-          )}
-
-          {confirmGift && (
-            <Modal
-              transparent
-              animationType="fade"
-              visible
-              onRequestClose={() => setConfirmGift(null)}
-            >
-              <View style={styles.modalBackdrop}>
-                <View
-                  style={[styles.modalCard, { backgroundColor: theme.input }]}
-                >
-                  <Text style={[styles.modalText, { color: theme.text }]}>
-                    {confirmGift?.amount
-                      ? tr('gifts.confirmAmount', 'Send ${{amount}} to this wish?', {
-                          amount: confirmGift.amount.toFixed(2),
-                        })
-                      : tr('gifts.confirmGift', 'Confirm sending gift?')}
-                  </Text>
-                  <View style={{ flexDirection: 'row', marginTop: 10 }}>
-                    <TouchableOpacity
-                      onPress={async () => {
-                        if (Platform.OS === 'ios') {
-                          Alert.alert('Gifts unavailable', 'Gifting is not available on iOS.');
-                          setConfirmGift(null);
-                          return;
-                        }
-                        let nextThanksContext: { wishId: string } | null = null;
-                        if (confirmGift.link) {
-                          await WebBrowser.openBrowserAsync(confirmGift.link);
-                          if (confirmGift.wishId) {
-                            nextThanksContext = { wishId: confirmGift.wishId };
-                          }
-                          setShowThanks(true);
-                        } else if (
-                          confirmGift.wishId &&
-                          confirmGift.recipientId &&
-                          confirmGift.amount
-                        ) {
-                          try {
-                            const res = await createGiftCheckout(
-                              confirmGift.wishId,
-                              confirmGift.amount,
-                              confirmGift.recipientId,
-                              process.env.EXPO_PUBLIC_GIFT_SUCCESS_URL!,
-                              process.env.EXPO_PUBLIC_GIFT_CANCEL_URL!,
-                              user?.uid ?? null,
-                            );
-                            if (res.url)
-                              await WebBrowser.openBrowserAsync(res.url);
-                            setShowThanks(true);
-                            nextThanksContext = { wishId: confirmGift.wishId };
-                          } catch (err) {
-                            logger.error('Failed to checkout', err);
-                          }
-                        }
-                        setThanksContext(nextThanksContext);
-                        setConfirmGift(null);
-                      }}
-                      style={[
-                        styles.button,
-                        { backgroundColor: theme.tint, marginRight: 8 },
-                      ]}
-                      hitSlop={HIT_SLOP}
-                    >
-                      <Text style={styles.buttonText}>Send</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => setConfirmGift(null)}
-                      style={[styles.button, { backgroundColor: theme.input }]}
-                      hitSlop={HIT_SLOP}
-                    >
-                      <Text style={[styles.buttonText, { color: theme.text }]}>
-                        Cancel
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            </Modal>
-          )}
-          {showThanks && (
-            <Modal
-              transparent
-              animationType="fade"
-              visible
-              onRequestClose={() => {
-                setShowThanks(false);
-                setThanksContext(null);
-              }}
-            >
-              <View style={styles.modalBackdrop}>
-                <View
-                  style={[styles.modalCard, { backgroundColor: theme.input }]}
-                >
-                  <Text style={[styles.modalText, { color: theme.text }]}>
-                    💝 Thanks for supporting this wish!
-                  </Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        marginTop: 10,
-                        backgroundColor: theme.input,
-                        color: theme.text,
-                      },
-                    ]}
-                    placeholder="Add a message (optional)"
-                    placeholderTextColor={theme.placeholder} // theme fix
-                    value={thanksMessage}
-                    onChangeText={setThanksMessage}
-                  />
-                  {thanksContext?.wishId && (
-                    <TouchableOpacity
-                      onPress={async () => {
-                        try {
-                          await addDoc(
-                            collection(
-                              db,
-                              'wishes',
-                              thanksContext.wishId,
-                              'gifts',
-                            ),
-                            {
-                              message: thanksMessage,
-                              from: user?.displayName || 'anonymous',
-                              timestamp: serverTimestamp(),
-                            },
-                          );
-                        } catch (err) {
-                          logger.error('Failed to save message', err);
-                        }
-                        setThanksMessage('');
-                        setShowThanks(false);
-                        setThanksContext(null);
-                      }}
-                      style={[
-                        styles.button,
-                        { backgroundColor: theme.tint, marginTop: 10 },
-                      ]}
-                      hitSlop={HIT_SLOP}
-                    >
-                      <Text style={[styles.buttonText, { color: theme.text }]}>
-                        Send
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity
-                    onPress={() => {
-                      setShowThanks(false);
-                      setThanksContext(null);
-                    }}
-                    style={[
-                      styles.button,
-                      { backgroundColor: theme.tint, marginTop: 10 },
-                    ]}
-                    hitSlop={HIT_SLOP}
-                  >
                     <Text style={[styles.buttonText, { color: theme.text }]}>
-                      Close
+                      Cancel
                     </Text>
                   </TouchableOpacity>
                 </View>
               </View>
             </Modal>
           )}
+
+          {giftTogetherEnabled && wish?.id ? (
+            <GiftTogetherModal
+              visible={giftTogetherVisible}
+              onClose={() => setGiftTogetherVisible(false)}
+              wishId={wish.id}
+              wishTitle={wish.text}
+              ownerId={wish.userId ?? null}
+              currency={currencyCode}
+              targetAmountCents={targetAmountCents}
+              fundedAmountCents={fundedAmountCents}
+              remainingCents={remainingCents ?? null}
+              shareLink={giftTogetherLink}
+              onOpenChipIn={() => {
+                setGiftTogetherVisible(false);
+                setChipInVisible(true);
+              }}
+              isEnabledInvite={isOwner}
+            />
+          ) : null}
+
+          {splitPayActive && wish?.id ? (
+            <ChipInModal
+              visible={chipInVisible}
+              onClose={() => setChipInVisible(false)}
+              wishId={wish.id}
+              wishTitle={wish.text}
+              currency={currencyCode}
+              remainingCents={remainingCents ?? undefined}
+              experimentBucket={experimentBucket}
+              onCompleted={() => {
+                clearWishMetaCache(wish.id);
+                void fetchWish();
+              }}
+            />
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -1857,7 +2613,112 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 20,
   },
+  wishHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   wishCategory: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  stageContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 10,
+    marginHorizontal: -4,
+  },
+  stageChip: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    marginHorizontal: 4,
+    marginBottom: 6,
+  },
+  stageChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  stageDescription: {
+    fontSize: 13,
+    marginTop: 6,
+  },
+  stageNudge: {
+    fontSize: 13,
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
+  circleBanner: {
+    marginTop: 10,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  circleBannerTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  circleBannerSubtitle: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  favoriteSummary: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 12,
+  },
+  favoriteSummaryText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  favoriteQuote: {
+    fontSize: 13,
+    fontStyle: 'italic',
+    marginTop: 6,
+  },
+  favoriteNoteInput: {
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 12,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  modalActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+    marginTop: 16,
+  },
+  modalActionButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  modalActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  circleBannerButton: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    marginLeft: 12,
+  },
+  circleBannerButtonText: {
     fontSize: 12,
     fontWeight: '600',
   },
@@ -1896,6 +2757,63 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 12,
   },
+  splitPayCard: {
+    marginTop: 12,
+    padding: 16,
+    borderRadius: 14,
+    gap: 12,
+  },
+  splitPayStats: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  splitPayDeadline: {
+    fontSize: 12,
+  },
+  splitPayButton: {
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  splitPayButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  splitPayStatusText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  splitPayActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  splitPaySecondaryButton: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  splitPaySecondaryText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  supportCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 12,
+    gap: 8,
+  },
+  supportCardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  supportCardText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
   fundingProgressOuter: {
     height: 10,
     borderRadius: 999,
@@ -1922,43 +2840,6 @@ const styles = StyleSheet.create({
   fundingSupporters: {
     fontSize: 12,
     marginTop: 6,
-  },
-  fundingControls: {
-    marginTop: 10,
-  },
-  fundingPresetRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  fundingPresetButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  fundingPresetLabel: {
-    fontWeight: '600',
-  },
-  customAmountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  customAmountInput: {
-    flex: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
-  },
-  customAmountButton: {
-    marginLeft: 8,
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-  },
-  customAmountButtonText: {
-    fontWeight: '600',
   },
   commentBox: {
     backgroundColor: '#1a1a1a',
