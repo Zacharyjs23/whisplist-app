@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
+import type { WishScope } from './WishScope';
 
 export interface Profile {
   displayName: string | null;
@@ -15,4 +16,6 @@ export interface Profile {
   referralDisplayName?: string;
   developerMode?: boolean;
   acceptedTermsAt?: Timestamp;
+  anonModeEnabled?: boolean;
+  defaultWishScope?: WishScope;
 }

@@ -4,7 +4,6 @@ import {
   orderBy,
   limit,
   onSnapshot,
-  addDoc,
   doc,
   updateDoc,
   increment,
@@ -20,12 +19,17 @@ import {
   type QueryDocumentSnapshot,
   type QuerySnapshot,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, functions } from '../firebase';
 import * as Linking from 'expo-linking';
 import type { Wish, ReactionType } from '../types/Wish';
+import type { WishStage } from '../types/WishStage';
+import { DEFAULT_WISH_STAGE, WISH_STAGE_ORDER } from '../types/WishStage';
 import { getFollowingIds } from './followers';
 import { chunk as chunkArray } from './chunk';
 import { mergeChunksByTsDesc } from './merge';
+import { apiPost } from '../services/apiClient';
+import type { WishScope } from '../types/WishScope';
+import { normalizeWishScope } from '../types/WishScope';
 
 const isFirestoreTimestamp = (value: unknown): value is Timestamp => {
   if (!value || typeof value !== 'object') return false;
@@ -38,11 +42,13 @@ const isNativeDate = (value: unknown): value is Date =>
 
 const converter: FirestoreDataConverter<Wish> = {
   toFirestore: ({ id, ...wish }: Wish) => wish,
-  fromFirestore: (
-    snapshot: QueryDocumentSnapshot,
-  ): Wish =>
-    ({ id: snapshot.id, ...(snapshot.data() as Omit<Wish, 'id'>) } as Wish),
+  fromFirestore: (snapshot: QueryDocumentSnapshot): Wish =>
+    ({ id: snapshot.id, ...(snapshot.data() as Omit<Wish, 'id'>) }) as Wish,
 };
+
+const isWishStageValue = (value: unknown): value is WishStage =>
+  typeof value === 'string' &&
+  (WISH_STAGE_ORDER as readonly WishStage[]).includes(value as WishStage);
 
 export interface TopCreator {
   userId: string;
@@ -170,29 +176,54 @@ export async function getWhispOfTheDay(): Promise<Wish | null> {
       w.boostedUntil.toDate() > new Date();
     const reacts =
       !!w.reactions &&
-      Object.values(w.reactions).reduce<number>((sum, v) => sum + (v ?? 0), 0) > 0;
+      Object.values(w.reactions).reduce<number>((sum, v) => sum + (v ?? 0), 0) >
+        0;
     return boost || reacts;
   });
   if (filtered.length === 0) return null;
   return filtered[Math.floor(Math.random() * filtered.length)];
 }
 
+type CreateWishApiResponse = {
+  ok: boolean;
+  data?: {
+    id: string;
+  };
+  error?: string;
+};
+
 export async function addWish(
-  data: Omit<Wish, 'id' | 'likes' | 'reactions'>,
-) {
-  return addDoc(collection(db, 'wishes'), {
-    likes: 0,
-    commentCount: 0,
-    fundingRaised: 0,
-    fundingSupporters: 0,
-    reactions: {
-      heart: 0,
-      lightbulb: 0,
-      hug: 0,
-      pray: 0,
+  data: Omit<Wish, 'id' | 'likes' | 'reactions'> & { scope?: WishScope },
+): Promise<{ id: string }> {
+  const stage: WishStage = isWishStageValue(data.stage)
+    ? data.stage
+    : DEFAULT_WISH_STAGE;
+  const resolvedScope = normalizeWishScope(
+    data.scope ?? (data.isAnonymous ? 'anon' : 'all'),
+  );
+  const response = await apiPost<CreateWishApiResponse>('/wishes', {
+    wish: {
+      ...data,
+      scope: resolvedScope,
+      stage,
     },
-    timestamp: serverTimestamp(),
-    ...data,
+  });
+  if (!response.ok || !response.data?.id) {
+    throw new Error(
+      response.error || 'Failed to create wish. Please try again later.',
+    );
+  }
+  return { id: response.data.id };
+}
+
+export async function setWishStage(id: string, stage: WishStage) {
+  if (!WISH_STAGE_ORDER.includes(stage)) {
+    throw new Error(`Invalid wish stage: ${stage}`);
+  }
+  const ref = doc(db, 'wishes', id);
+  await updateDoc(ref, {
+    stage,
+    stageUpdatedAt: serverTimestamp(),
   });
 }
 
@@ -221,7 +252,9 @@ export async function updateWishReaction(
   const snap = await getDoc(reactRef);
   const prev = snap.exists() ? (snap.data().emoji as ReactionType) : null;
   type ReactionUpdateKey = `reactions.${ReactionType}`;
-  type ReactionUpdates = { [K in ReactionUpdateKey]?: ReturnType<typeof increment> };
+  type ReactionUpdates = {
+    [K in ReactionUpdateKey]?: ReturnType<typeof increment>;
+  };
   const updates: ReactionUpdates = {};
   if (prev) updates[`reactions.${prev}`] = increment(-1);
   if (prev === emoji) {
@@ -284,6 +317,62 @@ export async function createGiftCheckout(
     },
   );
   return (await resp.json()) as { url: string };
+}
+
+export async function createSplitPayPledge(
+  wishId: string,
+  amountCents: number,
+  experiment?: string | null,
+  idempotencyKey?: string | null,
+) {
+  const { httpsCallable } = await import('firebase/functions');
+  const callable = httpsCallable<
+    {
+      wishId: string;
+      amount: number;
+      experiment?: string | null;
+      idempotencyKey?: string | null;
+    },
+    {
+      pledgeId: string;
+      clientSecret?: string | null;
+      paymentIntentId: string;
+      status: string;
+    }
+  >(functions, 'createPledge');
+  const payload = {
+    wishId,
+    amount: amountCents,
+    experiment: experiment ?? null,
+  } as {
+    wishId: string;
+    amount: number;
+    experiment?: string | null;
+    idempotencyKey?: string | null;
+  };
+  if (idempotencyKey) {
+    payload.idempotencyKey = idempotencyKey;
+  }
+  const result = await callable(payload);
+  return result.data;
+}
+
+export async function createGiftTogetherInvite(
+  wishId: string,
+  username: string,
+  message?: string | null,
+) {
+  const { httpsCallable } = await import('firebase/functions');
+  const callable = httpsCallable<
+    { wishId: string; username: string; message?: string | null },
+    { inviteId: string; inviteeId: string; inviteeDisplayName: string }
+  >(functions, 'createGiftTogetherInvite');
+  const response = await callable({
+    wishId,
+    username,
+    message: message ?? null,
+  });
+  return response.data;
 }
 
 export async function setFulfillmentLink(id: string, link: string) {
@@ -382,7 +471,10 @@ export async function cleanupExpiredWishes(userId?: string | null) {
         if (isNativeDate(expiresAt)) {
           return expiresAt;
         }
-        if (expiresAt && typeof (expiresAt as { toDate?: () => Date }).toDate === 'function') {
+        if (
+          expiresAt &&
+          typeof (expiresAt as { toDate?: () => Date }).toDate === 'function'
+        ) {
           try {
             return (expiresAt as { toDate: () => Date }).toDate();
           } catch {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { PostType } from '@/types/post';
 import { DEFAULT_POST_TYPE } from '@/types/post';
 import { Alert, Platform, ToastAndroid } from 'react-native';
@@ -7,8 +7,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as logger from '@/shared/logger';
 import { recordEngagementEvent } from '@/helpers/engagement';
 import type { MilestoneId } from '@/types/Engagement';
+import { DEFAULT_WISH_STAGE, type WishStage } from '@/types/WishStage';
+import { normalizeWishScope, type WishScope } from '@/types/WishScope';
 
-export const useWishComposer = (stripeEnabled?: string | false) => {
+export type UseWishComposerOptions = {
+  defaultScope?: WishScope;
+};
+
+export const useWishComposer = (
+  stripeEnabled?: string | false,
+  options: UseWishComposerOptions = {},
+) => {
+  const defaultScope = useMemo(
+    () => normalizeWishScope(options.defaultScope),
+    [options.defaultScope],
+  );
+
   const [wish, setWish] = useState('');
   const [postType, setPostType] = useState<PostType>(DEFAULT_POST_TYPE);
   const [isPoll, setIsPoll] = useState(false);
@@ -22,17 +36,27 @@ export const useWishComposer = (stripeEnabled?: string | false) => {
   const [postConfirm, setPostConfirm] = useState(false);
   const [autoDelete, setAutoDelete] = useState(false);
   const [rephrasing, setRephrasing] = useState(false);
-  const [useProfilePost, setUseProfilePost] = useState(false);
+  const [postScope, setPostScope] = useState<WishScope>(defaultScope);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [enableExternalGift, setEnableExternalGift] = useState(!stripeEnabled);
   const [fundingEnabled, setFundingEnabled] = useState(false);
   const [fundingGoal, setFundingGoal] = useState('');
   const [fundingPresets, setFundingPresets] = useState('5,10,25');
+  const [supportAmount, setSupportAmount] = useState('');
+  const [supportReason, setSupportReason] = useState('');
+  const [stage, setStage] = useState<WishStage>(DEFAULT_WISH_STAGE);
+
+  useEffect(() => {
+    setPostScope(defaultScope);
+  }, [defaultScope]);
 
   const pickImage = async () => {
     const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!granted) {
-      Alert.alert('Permission required', 'Media access is needed to select images');
+      Alert.alert(
+        'Permission required',
+        'Media access is needed to select images',
+      );
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -44,7 +68,10 @@ export const useWishComposer = (stripeEnabled?: string | false) => {
     }
   };
 
-  const resetComposer = (nextType?: PostType) => {
+  const resetComposer = (
+    nextType?: PostType,
+    nextScope?: WishScope,
+  ) => {
     setWish('');
     setPostType(nextType ?? DEFAULT_POST_TYPE);
     setIsPoll(false);
@@ -56,13 +83,18 @@ export const useWishComposer = (stripeEnabled?: string | false) => {
     setGiftLabel('');
     setPosting(false);
     setAutoDelete(false);
-    setUseProfilePost(false);
+    setPostScope(
+      nextScope ? normalizeWishScope(nextScope) : defaultScope,
+    );
     setShowAdvanced(false);
     setEnableExternalGift(!stripeEnabled);
     setRephrasing(false);
     setFundingEnabled(false);
     setFundingGoal('');
     setFundingPresets('5,10,25');
+    setSupportAmount('');
+    setSupportReason('');
+    setStage(nextType === 'celebration' ? 'celebrating' : DEFAULT_WISH_STAGE);
   };
 
   const updateStreak = async (
@@ -70,10 +102,14 @@ export const useWishComposer = (stripeEnabled?: string | false) => {
   ): Promise<{ current: number; unlocked: MilestoneId[] }> => {
     const today = new Date().toISOString().split('T')[0];
     const lastDate = await AsyncStorage.getItem('lastPostedDate');
-    let streak = parseInt((await AsyncStorage.getItem('streakCount')) || '0', 10);
+    let streak = parseInt(
+      (await AsyncStorage.getItem('streakCount')) || '0',
+      10,
+    );
     if (lastDate !== today) {
       if (lastDate) {
-        const diff = (new Date(today).getTime() - new Date(lastDate).getTime()) / 86400000;
+        const diff =
+          (new Date(today).getTime() - new Date(lastDate).getTime()) / 86400000;
         streak = diff === 1 ? streak + 1 : 1;
       } else {
         streak = 1;
@@ -106,7 +142,8 @@ export const useWishComposer = (stripeEnabled?: string | false) => {
       const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID;
       if (!projectId) {
         logger.warn('Cannot rephrase wish: Firebase project ID is missing');
-        const msg = 'Cloud rephrase is unavailable. Configure your Firebase project ID.';
+        const msg =
+          'Cloud rephrase is unavailable. Configure your Firebase project ID.';
         if (Platform.OS === 'android') {
           ToastAndroid.show(msg, ToastAndroid.SHORT);
         } else {
@@ -170,8 +207,8 @@ export const useWishComposer = (stripeEnabled?: string | false) => {
     rephrasing,
     handleRephrase,
     updateStreak,
-    useProfilePost,
-    setUseProfilePost,
+    postScope,
+    setPostScope,
     showAdvanced,
     setShowAdvanced,
     enableExternalGift,
@@ -182,6 +219,12 @@ export const useWishComposer = (stripeEnabled?: string | false) => {
     setFundingGoal,
     fundingPresets,
     setFundingPresets,
+    supportAmount,
+    setSupportAmount,
+    supportReason,
+    setSupportReason,
+    stage,
+    setStage,
     resetComposer,
   };
 };

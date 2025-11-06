@@ -19,6 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth, db } from '../firebase';
 import { signInAnonymouslyService } from '../services/auth';
 import type { Profile } from '../types/Profile';
+import { normalizeWishScope } from '@/types/WishScope';
 import * as logger from '@/shared/logger';
 
 if (!auth || !db) {
@@ -69,6 +70,10 @@ export const AuthSessionProvider = ({
         }
         if (data.boostCredits === undefined) data.boostCredits = 0;
         if (data.developerMode === undefined) data.developerMode = false;
+        if (typeof data.anonModeEnabled !== 'boolean') {
+          data.anonModeEnabled = false;
+        }
+        data.defaultWishScope = normalizeWishScope(data.defaultWishScope);
         if (!data.acceptedTermsAt) {
           const accepted = await AsyncStorage.getItem('acceptedTerms');
           if (accepted) {
@@ -91,6 +96,8 @@ export const AuthSessionProvider = ({
           boostCredits: 0,
           createdAt: clientCreatedAt,
           developerMode: false,
+          anonModeEnabled: false,
+          defaultWishScope: 'all',
         };
         const docToWrite: Record<string, unknown> = {
           ...data,

@@ -143,8 +143,9 @@
       "privacyDescription": "Entiende cómo almacenamos, procesamos y protegemos tus datos."
     },
     "privacy": {
-      "anonymize": "Anonimizar nombre de usuario",
-      "anonymizeDescription": "Oculta tu nombre y avatar en los nuevos deseos.",
+      "anonMode": "Modo anónimo",
+      "anonModeDescription": "Publica de forma anónima de manera predeterminada en toda la app.",
+      "defaultScope": "Visibilidad predeterminada para nuevos deseos",
       "shareAnalytics": "Compartir analíticas anónimas",
       "shareAnalyticsDescription": "Ayúdanos a mejorar WhispList con estadísticas agregadas.",
       "publicProfile": "Perfil público habilitado",
@@ -383,7 +384,25 @@
     "fundingPresetsHelper": "Separa con comas las cantidades rápidas que podrán elegir.",
     "fundingGoalErrorTitle": "Define una meta",
     "fundingGoalErrorBody": "Ingresa una meta positiva para activar la financiación.",
-    "postWithProfile": "Publicar con perfil",
+    "scope": {
+      "heading": "Audiencia e identidad",
+      "all": {
+        "title": "Todos",
+        "desc": "Tu perfil visible para toda la comunidad."
+      },
+      "friends": {
+        "title": "Amigos",
+        "desc": "Solo amigos mutuos lo ven con tu perfil."
+      },
+      "close": {
+        "title": "Círculo cercano",
+        "desc": "Reservado para las personas en las que más confías."
+      },
+      "anon": {
+        "title": "Anónimo",
+        "desc": "Todos ven tu deseo sin tu identidad."
+      }
+    },
     "autoDelete24h": "Autoeliminar después de 24h",
     "recordAudio": "Grabar audio",
     "stopRecording": "Detener grabación",

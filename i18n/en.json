@@ -143,8 +143,9 @@
       "privacyDescription": "Understand how we store, process, and protect your data."
     },
     "privacy": {
-      "anonymize": "Anonymize Username",
-      "anonymizeDescription": "Hide your name and avatar on new wishes.",
+      "anonMode": "Anon Mode",
+      "anonModeDescription": "Default to anonymous posting across the app.",
+      "defaultScope": "Default visibility for new wishes",
       "shareAnalytics": "Share anonymous analytics",
       "shareAnalyticsDescription": "Help us improve WhispList with aggregated usage insights.",
       "publicProfile": "Public Profile Enabled",
@@ -383,7 +384,25 @@
     "fundingPresetsHelper": "Use commas to separate quick amounts supporters can tap.",
     "fundingGoalErrorTitle": "Set a goal",
     "fundingGoalErrorBody": "Enter a positive goal amount to enable funding.",
-    "postWithProfile": "Post with profile",
+    "scope": {
+      "heading": "Audience & identity",
+      "all": {
+        "title": "Everyone",
+        "desc": "Profile shown to the whole community."
+      },
+      "friends": {
+        "title": "Friends",
+        "desc": "Only mutual friends see it with your profile."
+      },
+      "close": {
+        "title": "Close circle",
+        "desc": "Reserved for people you trust most."
+      },
+      "anon": {
+        "title": "Anonymous",
+        "desc": "Everyone sees your wish without your identity."
+      }
+    },
     "autoDelete24h": "Auto-delete after 24h",
     "recordAudio": "Record Audio",
     "stopRecording": "Stop Recording",
