@@ -1,0 +1,7 @@
+{
+  "WishlistDetail": {
+    "before": 2,
+    "after": 1,
+    "measuredIn": "tests/web/wishlistDetail.render.test.tsx (StrictMode + React Profiler)"
+  }
+}

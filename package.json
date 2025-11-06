@@ -12,6 +12,7 @@
     "build:android:dev": "npx expo run:android",
     "lint": "eslint . --ext .ts,.tsx --max-warnings=0",
     "test": "jest",
+    "test:render": "jest --runTestsByPath tests/web/wishlistDetail.render.test.tsx",
     "test:deeplink": "jest apps/mobile/src/navigation/__tests__/DeepLinkHandler.test.ts",
     "test:rules": "jest -c jest.rules.config.js tests/rules/*.test.ts",
     "test:rules:emu": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 jest -c jest.rules.config.js tests/rules/*.test.ts",
