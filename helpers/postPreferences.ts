@@ -1,8 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import {
+  collection,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  where,
+} from 'firebase/firestore';
 import { db } from '@/firebase';
 import type { PostType } from '@/types/post';
-import { DEFAULT_POST_TYPE, POST_TYPE_ORDER, isPostType, normalizePostType } from '@/types/post';
+import {
+  DEFAULT_POST_TYPE,
+  POST_TYPE_ORDER,
+  isPostType,
+  normalizePostType,
+} from '@/types/post';
 import * as logger from '@/shared/logger';
 
 const PREFERRED_KEY_PREFIX = 'preferredPostType.v1';
@@ -10,11 +22,15 @@ const USAGE_KEY_PREFIX = 'postTypeUsage.v1';
 const PREFERRED_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
 
 const buildPreferredKey = (userId?: string | null) =>
-  userId ? `${PREFERRED_KEY_PREFIX}:${userId}` : `${PREFERRED_KEY_PREFIX}:guest`;
+  userId
+    ? `${PREFERRED_KEY_PREFIX}:${userId}`
+    : `${PREFERRED_KEY_PREFIX}:guest`;
 
 const buildUsageKey = (userId: string) => `${USAGE_KEY_PREFIX}:${userId}`;
 
-const parseStoredType = (raw: string | null): { type: PostType; sampledAt: number } | null => {
+const parseStoredType = (
+  raw: string | null,
+): { type: PostType; sampledAt: number } | null => {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
@@ -85,7 +101,9 @@ export const getPreferredPostType = async (
       return top;
     }
   } catch (err) {
-    logger.warn('Failed to compute preferred post type from Firestore', err, { userId });
+    logger.warn('Failed to compute preferred post type from Firestore', err, {
+      userId,
+    });
   }
 
   return null;
@@ -105,7 +123,10 @@ export const recordPostTypeUsage = async (
         ? parsed.counts
         : {};
     counts[type] = (counts[type] ?? 0) + 1;
-    await AsyncStorage.setItem(key, JSON.stringify({ counts, updatedAt: Date.now() }));
+    await AsyncStorage.setItem(
+      key,
+      JSON.stringify({ counts, updatedAt: Date.now() }),
+    );
 
     const favorite = POST_TYPE_ORDER.reduce<PostType>((best, current) => {
       const bestCount = counts[best] ?? 0;
@@ -130,4 +151,3 @@ export const clearPreferredPostType = async (userId?: string | null) => {
     logger.warn('Failed to clear preferred post type cache', err, { userId });
   }
 };
-

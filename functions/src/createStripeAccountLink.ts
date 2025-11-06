@@ -1,16 +1,18 @@
-import * as functions from 'firebase-functions';
+import { logger, runWith } from 'firebase-functions/v1';
+import type { Request, Response } from 'express';
 import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
 // Use Cloud Functions logger
 import { STRIPE_SECRET_KEY } from './secrets';
 
-let stripe: any;
+type StripeClient = InstanceType<typeof Stripe>;
+
+let stripe: StripeClient | null;
 
 const db = admin.firestore();
 
-export const createStripeAccountLink = functions
-  .runWith({ secrets: [STRIPE_SECRET_KEY] })
-  .https.onRequest(async (req: any, res: any) => {
+export const createStripeAccountLink = runWith({ secrets: [STRIPE_SECRET_KEY] })
+  .https.onRequest(async (req: Request, res: Response) => {
     if (req.method !== 'POST') {
       res.status(405).send('Method not allowed');
       return;
@@ -22,7 +24,7 @@ export const createStripeAccountLink = functions
       return;
     }
 
-  try {
+    try {
       if (!stripe) {
         stripe = new Stripe(STRIPE_SECRET_KEY.value(), {
           apiVersion: '2022-11-15',
@@ -37,8 +39,12 @@ export const createStripeAccountLink = functions
         accountId = account.id;
         await ref.update({ stripeAccountId: accountId });
       }
-      const refreshUrl = process.env.STRIPE_ACCOUNT_LINK_REFRESH_URL || 'https://example.com/reauth';
-      const returnUrl = process.env.STRIPE_ACCOUNT_LINK_RETURN_URL || 'https://example.com/return';
+      const refreshUrl =
+        process.env.STRIPE_ACCOUNT_LINK_REFRESH_URL ||
+        'https://example.com/reauth';
+      const returnUrl =
+        process.env.STRIPE_ACCOUNT_LINK_RETURN_URL ||
+        'https://example.com/return';
       const link = await stripe.accountLinks.create({
         account: accountId,
         refresh_url: refreshUrl,
@@ -47,7 +53,7 @@ export const createStripeAccountLink = functions
       });
       res.json({ url: link.url, accountId });
     } catch (err) {
-      functions.logger.error('Error creating account link', err);
+      logger.error('Error creating account link', err);
       res.status(500).send('Internal error');
     }
   });

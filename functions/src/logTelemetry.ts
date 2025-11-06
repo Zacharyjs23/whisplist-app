@@ -1,4 +1,4 @@
-import * as functions from 'firebase-functions';
+import * as functions from 'firebase-functions/v1';
 import * as admin from 'firebase-admin';
 import type { Request, Response } from 'express';
 import type { DecodedIdToken } from 'firebase-admin/auth';
@@ -17,9 +17,7 @@ const bearerToken = (header: string | null | undefined): string | null => {
   return match && match[1] ? match[1].trim() : null;
 };
 
-const verifyRequest = async (
-  req: Request,
-): Promise<DecodedIdToken | null> => {
+const verifyRequest = async (req: Request): Promise<DecodedIdToken | null> => {
   const token = bearerToken(req.header('authorization'));
   if (!token) {
     return null;
@@ -32,66 +30,72 @@ const verifyRequest = async (
   }
 };
 
-export const logTelemetry = functions.https.onRequest(async (req: Request, res: Response) => {
-  if (req.method !== 'POST') {
-    res.status(405).send('Method not allowed');
-    return;
-  }
-
-  try {
-    const decoded = await verifyRequest(req);
-    if (!decoded) {
-      res.status(401).send('Unauthorized');
+export const logTelemetry = functions.https.onRequest(
+  async (req: Request, res: Response) => {
+    if (req.method !== 'POST') {
+      res.status(405).send('Method not allowed');
       return;
     }
 
-    const { level, message, meta, timestamp } = (req.body ?? {}) as Record<string, unknown>;
-    const logLevel = sanitizeLevel(level);
-    const safeMessage =
-      typeof message === 'string'
-        ? message
-        : (() => {
-            try {
-              return JSON.stringify(message ?? '');
-            } catch {
-              return String(message ?? '');
-            }
-          })();
+    try {
+      const decoded = await verifyRequest(req);
+      if (!decoded) {
+        res.status(401).send('Unauthorized');
+        return;
+      }
 
-    const metaObject =
-      meta && typeof meta === 'object'
-        ? { ...(meta as Record<string, unknown>), uid: decoded.uid }
-        : { uid: decoded.uid };
+      const { level, message, meta, timestamp } = (req.body ?? {}) as Record<
+        string,
+        unknown
+      >;
+      const logLevel = sanitizeLevel(level);
+      const safeMessage =
+        typeof message === 'string'
+          ? message
+          : (() => {
+              try {
+                return JSON.stringify(message ?? '');
+              } catch {
+                return String(message ?? '');
+              }
+            })();
 
-    const isoTimestamp = (() => {
-      const numeric = typeof timestamp === 'number' ? timestamp : toNumber(timestamp);
-      if (numeric) return new Date(numeric).toISOString();
-      return new Date().toISOString();
-    })();
+      const metaObject =
+        meta && typeof meta === 'object'
+          ? { ...(meta as Record<string, unknown>), uid: decoded.uid }
+          : { uid: decoded.uid };
 
-    const payload = {
-      message: safeMessage,
-      meta: metaObject,
-      timestamp: isoTimestamp,
-    };
+      const isoTimestamp = (() => {
+        const numeric =
+          typeof timestamp === 'number' ? timestamp : toNumber(timestamp);
+        if (numeric) return new Date(numeric).toISOString();
+        return new Date().toISOString();
+      })();
 
-    switch (logLevel) {
-      case 'warn':
-        functions.logger.warn(payload);
-        break;
-      case 'error':
-        functions.logger.error(payload);
-        break;
-      default:
-        functions.logger.log(payload);
+      const payload = {
+        message: safeMessage,
+        meta: metaObject,
+        timestamp: isoTimestamp,
+      };
+
+      switch (logLevel) {
+        case 'warn':
+          functions.logger.warn(payload);
+          break;
+        case 'error':
+          functions.logger.error(payload);
+          break;
+        default:
+          functions.logger.log(payload);
+      }
+
+      res.json({ ok: true });
+    } catch (err) {
+      functions.logger.error('Failed to record telemetry', err);
+      res.status(500).json({ error: 'Failed to record telemetry' });
     }
-
-    res.json({ ok: true });
-  } catch (err) {
-    functions.logger.error('Failed to record telemetry', err);
-    res.status(500).json({ error: 'Failed to record telemetry' });
-  }
-});
+  },
+);
 
 function toNumber(value: unknown): number | null {
   if (typeof value === 'number') {

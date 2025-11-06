@@ -16,4 +16,3 @@ async function manipulateAsync(uri /*, actions, options */) {
 const mod = { SaveFormat, manipulateAsync };
 module.exports = mod;
 module.exports.default = mod;
-

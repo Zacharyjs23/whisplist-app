@@ -96,9 +96,12 @@ describe('useSupporterThanks', () => {
 
     render(<Consumer userId="user-1" />);
 
-    await waitFor(() => expect(screen.getByTestId('loading').props.children).toBe('ready'));
+    await waitFor(() =>
+      expect(screen.getByTestId('loading').props.children).toBe('ready'),
+    );
     expect(screen.getByTestId('count').props.children).toBe(1);
-    const rendered = screen.getByTestId('item-user-2-wish-7-gift-1').props.children;
+    const rendered = screen.getByTestId('item-user-2-wish-7-gift-1').props
+      .children;
     const text = Array.isArray(rendered) ? rendered.join('') : rendered;
     expect(text).toBe('Nova·A lunar telescope·42');
   });
@@ -108,7 +111,9 @@ describe('useSupporterThanks', () => {
 
     render(<Consumer userId={null} />);
 
-    await waitFor(() => expect(screen.getByTestId('loading').props.children).toBe('ready'));
+    await waitFor(() =>
+      expect(screen.getByTestId('loading').props.children).toBe('ready'),
+    );
     expect(screen.getByTestId('count').props.children).toBe(0);
   });
 });

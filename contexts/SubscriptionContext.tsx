@@ -10,10 +10,7 @@ import { Platform } from 'react-native';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useAuthSession } from './AuthSessionContext';
-import {
-  PRODUCT_TO_PLAN_KEY,
-  type PlanKey,
-} from '@/helpers/subscriptionPerks';
+import { PRODUCT_TO_PLAN_KEY, type PlanKey } from '@/helpers/subscriptionPerks';
 
 type SubscriptionDoc = {
   status?: string;
@@ -42,7 +39,9 @@ const SubscriptionContext = createContext<SubscriptionContextValue>({
   expiresAt: null,
 });
 
-export const SubscriptionProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
+export const SubscriptionProvider: React.FC<React.PropsWithChildren> = ({
+  children,
+}) => {
   const { user } = useAuthSession();
   const [sub, setSub] = useState<SubscriptionDoc | null>(null);
   const [loading, setLoading] = useState(true);
@@ -110,18 +109,21 @@ export const SubscriptionProvider: React.FC<React.PropsWithChildren> = ({ childr
 
   const extractRcState = useCallback(
     (info: any) => {
-      if (!info) return { active: false, planKey: null, expiresAt: null } as {
-        active: boolean;
-        planKey: PlanKey | null;
-        expiresAt: Date | null;
-      };
+      if (!info)
+        return { active: false, planKey: null, expiresAt: null } as {
+          active: boolean;
+          planKey: PlanKey | null;
+          expiresAt: Date | null;
+        };
       const entitlement = info?.entitlements?.active?.[entitlementKey];
       if (!entitlement) {
         return { active: false, planKey: null, expiresAt: null };
       }
-      const productId: string | undefined = entitlement.productIdentifier || entitlement.productId;
-      const planKey = productId ? productPlanMap[productId] ?? null : null;
-      const expirationSource = entitlement.expirationDate || entitlement.expiration_at;
+      const productId: string | undefined =
+        entitlement.productIdentifier || entitlement.productId;
+      const planKey = productId ? (productPlanMap[productId] ?? null) : null;
+      const expirationSource =
+        entitlement.expirationDate || entitlement.expiration_at;
       const expiresAt = coerceDate(expirationSource) ?? null;
       return { active: true, planKey, expiresAt };
     },
@@ -160,13 +162,19 @@ export const SubscriptionProvider: React.FC<React.PropsWithChildren> = ({ childr
 
         // Listen for entitlement changes
         try {
-          removeListener = Purchases.addCustomerInfoUpdateListener((updatedInfo: any) => {
-            if (cancelled) return;
-            setRcState((prev) => ({ ...prev, ...extractRcState(updatedInfo) }));
-          });
+          removeListener = Purchases.addCustomerInfoUpdateListener(
+            (updatedInfo: any) => {
+              if (cancelled) return;
+              setRcState((prev) => ({
+                ...prev,
+                ...extractRcState(updatedInfo),
+              }));
+            },
+          );
         } catch {}
       } catch {
-        if (!cancelled) setRcState({ active: null, planKey: null, expiresAt: null });
+        if (!cancelled)
+          setRcState({ active: null, planKey: null, expiresAt: null });
       }
     }
     loadRc();
@@ -193,7 +201,13 @@ export const SubscriptionProvider: React.FC<React.PropsWithChildren> = ({ childr
       return productPlanMap[docProduct] ?? null;
     }
     return null;
-  }, [rcState.planKey, sub?.planKey, sub?.priceId, sub?.productId, productPlanMap]);
+  }, [
+    rcState.planKey,
+    sub?.planKey,
+    sub?.priceId,
+    sub?.productId,
+    productPlanMap,
+  ]);
 
   const expiresAt = useMemo<Date | null>(() => {
     if (rcState.expiresAt) return rcState.expiresAt;

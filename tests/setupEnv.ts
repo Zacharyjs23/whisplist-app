@@ -13,4 +13,4 @@ process.env.EXPO_PUBLIC_FIREBASE_APP_ID =
 process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID =
   process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID || 'test-measurement-id';
 process.env.OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'test-openai-key';
-
+process.env.FEATURE_GIFT_POT = process.env.FEATURE_GIFT_POT || 'true';

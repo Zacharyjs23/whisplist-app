@@ -21,4 +21,3 @@ describe('formatTimeLeft', () => {
     expect(formatTimeLeft(past)).toBe('');
   });
 });
-

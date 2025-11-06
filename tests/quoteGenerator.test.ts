@@ -4,7 +4,8 @@ describe('quoteGenerator', () => {
   const t = (key: string, opts?: { returnObjects?: boolean }) => {
     if (!opts?.returnObjects) return '';
     if (key.endsWith('starts')) return ['Start A', 'Start B', 'Start C'];
-    if (key.endsWith('actions')) return ['do things', 'keep going', 'stay present'];
+    if (key.endsWith('actions'))
+      return ['do things', 'keep going', 'stay present'];
     if (key.endsWith('endings')) return ['and smile.', 'with heart.', 'today.'];
     return [] as any;
   };
@@ -16,9 +17,11 @@ describe('quoteGenerator', () => {
   });
 
   it('returns null when banks are missing', () => {
-    const emptyT = ((key: string, opts?: { returnObjects?: boolean }) => []) as any;
+    const emptyT = ((
+      key: string,
+      opts?: { returnObjects?: boolean },
+    ) => []) as any;
     const q = generateQuote(emptyT);
     expect(q).toBeNull();
   });
 });
-

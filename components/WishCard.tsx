@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useState,
+  useRef,
+  useMemo,
+} from 'react';
 import {
   StyleSheet,
   Text,
@@ -25,13 +31,29 @@ import { doc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { formatTimeLeft } from '../helpers/time';
 import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { ReactionBar, ReactionKey } from './ReactionBar';
+import { useAnonFavorite } from '@/hooks/useAnonFavorite';
+import { useWishStats } from '@/hooks/useWishStats';
 import * as logger from '@/shared/logger';
 import { useTranslation } from '@/contexts/I18nContext';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import * as Haptics from 'expo-haptics';
 import { useWishMeta } from '@/hooks/useWishMeta';
-import { getPostTypeColor, normalizePostType, POST_TYPE_META } from '@/types/post';
+import { SplitPayProgressBar } from '@/app/components/splitpay/ProgressBar';
+import { formatCurrency } from '@/shared/numberFormat';
+import { logSplitPayShareClick } from '@/src/lib/analytics';
+import { trackEvent } from '@/helpers/analytics';
+import {
+  getPostTypeColor,
+  normalizePostType,
+  POST_TYPE_META,
+} from '@/types/post';
+import {
+  WISH_STAGE_COPY,
+  DEFAULT_WISH_STAGE,
+  type WishStage,
+} from '@/types/WishStage';
+import { useFeatureFlags } from '@/contexts/FeatureFlagsContext';
 
 const moodColors: Record<string, string> = {
   '😢': '#f87171',
@@ -62,6 +84,7 @@ const hexToRgba = (input: string, alpha: number): string => {
   return input;
 };
 
+const MIN_PLEDGE_CENTS = 500;
 
 export const WishCard: React.FC<{
   wish: Wish;
@@ -73,34 +96,161 @@ export const WishCard: React.FC<{
   const router = useRouter();
   const { saved, toggleSave } = useSavedWishes();
   const { user } = useAuthSession();
-  const { giftCount, hasGiftMessage, isSupporter, giftTotal } = useWishMeta(wish);
-  const wishRaised = typeof wish.fundingRaised === 'number' ? wish.fundingRaised : 0;
-  const metaRaised = typeof giftTotal === 'number' ? giftTotal : 0;
-  const raisedAmount = Math.max(wishRaised, metaRaised);
-  const wishSupporters = typeof wish.fundingSupporters === 'number' ? wish.fundingSupporters : 0;
-  const supportersCount = Math.max(wishSupporters, giftCount ?? 0);
-  const progressPercentRaw =
-    wish.fundingGoal && wish.fundingGoal > 0
-      ? Math.min(100, (raisedAmount / wish.fundingGoal) * 100)
-      : 0;
-  const displayPercent = Math.round(progressPercentRaw);
+  const { giftPot: giftPotEnabled } = useFeatureFlags();
+  const { giftCount, hasGiftMessage, isSupporter, giftTotal } =
+    useWishMeta(wish);
+  const {
+    enabled: anonFavEnabled,
+    toggled: anonFavorited,
+    loading: anonFavLoading,
+    toggle: toggleAnonFavorite,
+  } = useAnonFavorite(wish.id);
+  const { stats: anonStats } = useWishStats(anonFavEnabled ? wish.id : null);
+
   const [timeLeft, setTimeLeft] = useState('');
   const [imgLoading, setImgLoading] = useState(true);
   const [userReaction, setUserReaction] = useState<ReactionKey | null>(null);
   const [reactionPending, setReactionPending] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [savePending, setSavePending] = useState(false);
+  const [optimisticSaved, setOptimisticSaved] = useState<boolean>(() =>
+    wish.id ? !!saved[wish.id] : false,
+  );
   const glowAnim = useRef(new Animated.Value(1)).current;
   const { t, i18n } = useTranslation();
   const commentCount = wish.commentCount ?? 0;
-  const [optimisticTotals, setOptimisticTotals] = useState<Record<ReactionKey, number>>(
-    () => toReactionTotals(wish.reactions),
+  const [optimisticTotals, setOptimisticTotals] = useState<
+    Record<ReactionKey, number>
+  >(() => toReactionTotals(wish.reactions));
+
+  const handleAnonFavoritePress = useCallback(async () => {
+    if (!wish.id || anonFavLoading) return;
+    const next = !anonFavorited;
+    const success = await toggleAnonFavorite(next);
+    if (success) {
+      trackEvent('favorite_toggled', {
+        wish_id: wish.id,
+        state: next ? 'on' : 'off',
+      });
+    }
+  }, [anonFavLoading, anonFavorited, toggleAnonFavorite, wish.id]);
+
+  const handleWishlistToggle = useCallback(async () => {
+    if (!wish.id || savePending) return;
+    const next = !optimisticSaved;
+    setOptimisticSaved(next);
+    setSavePending(true);
+    try {
+      await toggleSave(wish.id);
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(
+          next
+            ? t('wishlist.toastAdded', 'Added to wishlist')
+            : t('wishlist.toastRemoved', 'Removed from wishlist'),
+          ToastAndroid.SHORT,
+        );
+      }
+    } catch (err) {
+      setOptimisticSaved(!next);
+      logger.warn('Failed to toggle wishlist', err, { wishId: wish.id });
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(
+          t('wishlist.toastFailed', 'Unable to update wishlist'),
+          ToastAndroid.SHORT,
+        );
+      }
+    } finally {
+      setSavePending(false);
+    }
+  }, [
+    wish.id,
+    savePending,
+    optimisticSaved,
+    toggleSave,
+    t,
+  ]);
+  const legacyRaised = Math.max(
+    typeof wish.fundingRaised === 'number' ? wish.fundingRaised : 0,
+    typeof giftTotal === 'number' ? giftTotal : 0,
   );
+  const legacySupporters = Math.max(
+    typeof wish.fundingSupporters === 'number' ? wish.fundingSupporters : 0,
+    giftCount ?? 0,
+  );
+  const splitPayActive =
+    giftPotEnabled &&
+    wish.splitPayEnabled === true &&
+    typeof wish.targetAmount === 'number' &&
+    wish.targetAmount > 0;
+  const experimentBucket = giftPotEnabled ? 'split_pay_on' : 'split_pay_off';
+  const currencyCode =
+    typeof wish.fundingCurrency === 'string' ? wish.fundingCurrency : 'USD';
+  const targetAmountCents = splitPayActive
+    ? Math.max(0, wish.targetAmount ?? 0)
+    : Math.round(
+        (typeof wish.fundingGoal === 'number' ? wish.fundingGoal : 0) * 100,
+      );
+  const fundedAmountCents = splitPayActive
+    ? Math.max(0, typeof wish.fundedAmount === 'number' ? wish.fundedAmount : 0)
+    : Math.round(legacyRaised * 100);
+  const supportersCount = splitPayActive
+    ? Math.max(
+        0,
+        typeof wish.fundingSupporters === 'number' ? wish.fundingSupporters : 0,
+      )
+    : legacySupporters;
+  const remainingCents =
+    targetAmountCents > 0
+      ? Math.max(targetAmountCents - fundedAmountCents, 0)
+      : null;
+  const progressPercentRaw =
+    targetAmountCents > 0
+      ? Math.min(100, (fundedAmountCents / targetAmountCents) * 100)
+      : 0;
+  const displayPercent = Math.round(progressPercentRaw);
+  let splitPayStatsText = '';
+  if (splitPayActive) {
+    splitPayStatsText = `${formatCurrency(fundedAmountCents / 100, currencyCode)} of ${formatCurrency(
+      targetAmountCents / 100,
+      currencyCode,
+    )}`;
+    if (supportersCount > 0) {
+      splitPayStatsText += ` • ${supportersCount} ${supportersCount === 1 ? 'friend' : 'friends'} chipped in`;
+    }
+    if (typeof remainingCents === 'number' && remainingCents > 0) {
+      splitPayStatsText += ` • ${formatCurrency(remainingCents / 100, currencyCode)} to go`;
+    }
+  }
+  const splitPayStatus = (wish.status as string | undefined) ?? 'open';
+  const canChipIn =
+    splitPayActive &&
+    splitPayStatus !== 'fulfilled' &&
+    splitPayStatus !== 'expired';
+  const splitPayCtaLabel = !splitPayActive
+    ? ''
+    : splitPayStatus === 'fulfilled'
+      ? 'Funded!'
+      : splitPayStatus === 'expired'
+        ? 'Funding closed'
+        : typeof remainingCents === 'number' &&
+            remainingCents > 0 &&
+            remainingCents <= 1500
+          ? `Only ${formatCurrency(remainingCents / 100, currencyCode)} left`
+          : `Chip in ${formatCurrency(MIN_PLEDGE_CENTS / 100, currencyCode)}`;
+
+  useEffect(() => {
+    if (savePending) return;
+    setOptimisticSaved(wish.id ? !!saved[wish.id] : false);
+  }, [savePending, saved, wish.id]);
   const timeLabel = useMemo(() => {
     const ts = wish.timestamp as Timestamp | Date | undefined | null;
     let date: Date | null = null;
     if (!ts) {
       date = null;
-    } else if ('toDate' in (ts as any) && typeof (ts as any).toDate === 'function') {
+    } else if (
+      'toDate' in (ts as any) &&
+      typeof (ts as any).toDate === 'function'
+    ) {
       date = (ts as any).toDate();
     } else if (ts instanceof Date) {
       date = ts;
@@ -141,7 +291,8 @@ export const WishCard: React.FC<{
       glowAnim.setValue(1);
       return;
     }
-    const update = () => setTimeLeft(formatTimeLeft(wish.boostedUntil!.toDate()));
+    const update = () =>
+      setTimeLeft(formatTimeLeft(wish.boostedUntil!.toDate()));
     update();
     const id = setInterval(update, 60000);
     glowAnim.setValue(1);
@@ -170,8 +321,15 @@ export const WishCard: React.FC<{
   const normalizedType = normalizePostType(wish.type);
   const typeMeta = POST_TYPE_META[normalizedType];
   const borderColor =
-    moodColors[wish.mood || ''] || getPostTypeColor(normalizedType) || theme.tint;
+    moodColors[wish.mood || ''] ||
+    getPostTypeColor(normalizedType) ||
+    theme.tint;
   const bgTint = `${borderColor}33`;
+  const stage: WishStage =
+    wish.stage && WISH_STAGE_COPY[wish.stage as WishStage]
+      ? (wish.stage as WishStage)
+      : DEFAULT_WISH_STAGE;
+  const stageMeta = WISH_STAGE_COPY[stage];
 
   const handleReact = useCallback(
     async (key: ReactionKey) => {
@@ -185,7 +343,10 @@ export const WishCard: React.FC<{
       const prevTotals = { ...optimisticTotals } as Record<ReactionKey, number>;
       const updatedTotals = { ...prevTotals } as Record<ReactionKey, number>;
       if (prevReaction) {
-        updatedTotals[prevReaction] = Math.max(0, (updatedTotals[prevReaction] ?? 0) - 1);
+        updatedTotals[prevReaction] = Math.max(
+          0,
+          (updatedTotals[prevReaction] ?? 0) - 1,
+        );
       }
       if (nextReaction) {
         updatedTotals[nextReaction] = (updatedTotals[nextReaction] ?? 0) + 1;
@@ -210,13 +371,21 @@ export const WishCard: React.FC<{
 
   const handleShare = useCallback(async () => {
     if (!wish.id) return;
-    const wishUrl = Linking.createURL(`/wish/${wish.id}`);
+    const shareUrl = Linking.createURL(`/wish/${wish.id}`, {
+      queryParams: splitPayActive ? { splitpay: '1' } : undefined,
+    });
     try {
-      await Share.share({ message: wishUrl });
+      await Share.share({ message: shareUrl });
+      if (splitPayActive) {
+        logSplitPayShareClick({
+          wishId: wish.id,
+          experiment: experimentBucket,
+        });
+      }
     } catch (err) {
       logger.warn('Failed to share wish', err);
     }
-  }, [wish.id]);
+  }, [experimentBucket, splitPayActive, wish.id]);
 
   const performDelete = useCallback(async () => {
     if (!wish.id || deleting) return;
@@ -317,11 +486,11 @@ export const WishCard: React.FC<{
           </TouchableOpacity>
         )}
         {followed && (
-          <Text style={[styles.followTag, { color: theme.tint }]}>👥 {t('wish.followed')}</Text>
+          <Text style={[styles.followTag, { color: theme.tint }]}>
+            👥 {t('wish.followed')}
+          </Text>
         )}
-        <View style={styles.metaRow}
-          accessibilityRole="text"
-        >
+        <View style={styles.metaRow} accessibilityRole="text">
           <View
             style={[
               styles.typeTag,
@@ -335,15 +504,41 @@ export const WishCard: React.FC<{
               {t(`composer.type.${normalizedType}`, typeMeta.defaultLabel)}
             </Text>
           </View>
-          <Text style={[styles.category, { color: theme.tint }]}>#{wish.category}</Text>
+          <View
+            style={[
+              styles.stageTag,
+              {
+                backgroundColor: hexToRgba(borderColor, 0.1),
+                borderColor: borderColor,
+              },
+            ]}
+          >
+            <Text style={[styles.stageTagText, { color: borderColor }]}>
+              {stageMeta.title}
+            </Text>
+          </View>
+          <Text style={[styles.category, { color: theme.tint }]}>
+            #{wish.category}
+          </Text>
           {isBoosted && (
             <View style={[styles.boostTag, { backgroundColor: theme.tint }]}>
-              <Text style={{ color: theme.background, fontSize: 11, fontWeight: '700' }}>🚀 Boosted</Text>
+              <Text
+                style={{
+                  color: theme.background,
+                  fontSize: 11,
+                  fontWeight: '700',
+                }}
+              >
+                🚀 Boosted
+              </Text>
             </View>
           )}
           {!!timeLabel && (
-            <Text style={[styles.timeLabel, { color: theme.placeholder }]}
-              accessibilityLabel={t('wish.timeAgo', '{{time}}', { time: timeLabel })}
+            <Text
+              style={[styles.timeLabel, { color: theme.placeholder }]}
+              accessibilityLabel={t('wish.timeAgo', '{{time}}', {
+                time: timeLabel,
+              })}
             >
               • {t('wish.timeAgo', '{{time}}', { time: timeLabel })}
             </Text>
@@ -352,7 +547,7 @@ export const WishCard: React.FC<{
         <Text style={[styles.text, { color: theme.text }]}>{wish.text}</Text>
         {wish.imageUrl && (
           <View style={{ position: 'relative' }}>
-            { /* Skeleton overlay while image loads */ }
+            {/* Skeleton overlay while image loads */}
             <ExpoImage
               source={wish.imageUrl}
               style={styles.preview}
@@ -377,9 +572,56 @@ export const WishCard: React.FC<{
           </View>
         )}
       </TouchableOpacity>
-      {typeof wish.fundingGoal === 'number' && wish.fundingGoal > 0 && (
-        <View style={[styles.fundingContainer, { backgroundColor: theme.input }]}>
-          <View style={[styles.fundingProgressOuter, { backgroundColor: theme.background }]}>
+      {splitPayActive ? (
+        <View
+          style={[styles.fundingContainer, { backgroundColor: theme.input }]}
+        >
+          <SplitPayProgressBar progress={progressPercentRaw / 100} />
+          <View style={styles.fundingInfoRow}>
+            <Text style={[styles.fundingLabel, { color: theme.text }]}>
+              {splitPayStatsText}
+            </Text>
+            <Text
+              style={[styles.fundingPercent, { color: theme.placeholder }]}
+              accessibilityLabel={t('wish.fundingPercent', {
+                percent: displayPercent,
+              })}
+            >
+              {t('wish.fundingPercent', { percent: displayPercent })}
+            </Text>
+          </View>
+          <Text
+            style={[styles.fundingSupporters, { color: theme.placeholder }]}
+          >
+            {supportersCount > 0
+              ? t('wish.fundingSupporters', { count: supportersCount })
+              : t('wish.fundingBeFirst', 'Be the first to chip in')}
+          </Text>
+          <TouchableOpacity
+            onPress={() =>
+              wish.id && router.push(`/wish/${wish.id}?splitpay=1` as Href)
+            }
+            style={[styles.fundingButton, { backgroundColor: theme.tint }]}
+            accessibilityRole="button"
+            disabled={!canChipIn}
+          >
+            <Text
+              style={[styles.fundingButtonText, { color: theme.background }]}
+            >
+              {splitPayCtaLabel}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : typeof wish.fundingGoal === 'number' && wish.fundingGoal > 0 ? (
+        <View
+          style={[styles.fundingContainer, { backgroundColor: theme.input }]}
+        >
+          <View
+            style={[
+              styles.fundingProgressOuter,
+              { backgroundColor: theme.background },
+            ]}
+          >
             <View
               style={[
                 styles.fundingProgressInner,
@@ -391,24 +633,30 @@ export const WishCard: React.FC<{
             />
           </View>
           <View style={styles.fundingInfoRow}>
-            <Text style={[styles.fundingLabel, { color: theme.text }]}
+            <Text
+              style={[styles.fundingLabel, { color: theme.text }]}
               accessibilityLabel={t('wish.fundingProgress', {
-                raised: raisedAmount.toFixed(2),
+                raised: legacyRaised.toFixed(2),
                 goal: wish.fundingGoal.toFixed(2),
               })}
             >
               {t('wish.fundingProgress', {
-                raised: raisedAmount.toFixed(2),
+                raised: legacyRaised.toFixed(2),
                 goal: wish.fundingGoal.toFixed(2),
               })}
             </Text>
-            <Text style={[styles.fundingPercent, { color: theme.placeholder }]}
-              accessibilityLabel={t('wish.fundingPercent', { percent: displayPercent })}
+            <Text
+              style={[styles.fundingPercent, { color: theme.placeholder }]}
+              accessibilityLabel={t('wish.fundingPercent', {
+                percent: displayPercent,
+              })}
             >
               {t('wish.fundingPercent', { percent: displayPercent })}
             </Text>
           </View>
-          <Text style={[styles.fundingSupporters, { color: theme.placeholder }]}>
+          <Text
+            style={[styles.fundingSupporters, { color: theme.placeholder }]}
+          >
             {supportersCount > 0
               ? t('wish.fundingSupporters', { count: supportersCount })
               : t('wish.fundingBeFirst', 'Be the first to chip in')}
@@ -418,21 +666,79 @@ export const WishCard: React.FC<{
             style={[styles.fundingButton, { backgroundColor: theme.tint }]}
             accessibilityRole="button"
           >
-            <Text style={[styles.fundingButtonText, { color: theme.background }]}>
+            <Text
+              style={[styles.fundingButtonText, { color: theme.background }]}
+            >
               {t('wish.fundingCta', 'Chip in')}
             </Text>
           </TouchableOpacity>
         </View>
-      )}
+      ) : null}
       <View style={styles.actionRow}>
         <ReactionBar
           counts={optimisticTotals}
           userReaction={userReaction}
           onReact={handleReact}
-          onToggleSave={() => wish.id && toggleSave(wish.id)}
-          isSaved={!!wish.id && !!saved[wish.id]}
+          onToggleSave={handleWishlistToggle}
+          isSaved={optimisticSaved}
           disabled={reactionPending}
+          hideSaveButton
         />
+        <TouchableOpacity
+          onPress={handleWishlistToggle}
+          style={[
+            styles.inlineWishlistButton,
+            {
+              borderColor: theme.input,
+              backgroundColor: optimisticSaved ? theme.input : 'transparent',
+              opacity: savePending ? 0.6 : 1,
+            },
+          ]}
+          accessibilityRole="button"
+          accessibilityState={{
+            disabled: savePending || !wish.id,
+            selected: optimisticSaved,
+          }}
+          disabled={savePending || !wish.id}
+        >
+          <Ionicons
+            name={optimisticSaved ? 'checkmark' : 'add'}
+            size={16}
+            color={theme.tint}
+          />
+          <Text style={[styles.inlineWishlistLabel, { color: theme.tint }]}>
+            {optimisticSaved
+              ? t('wishlist.inlineAdded', 'Added')
+              : t('wishlist.inlineAdd', 'Add to wishlist')}
+          </Text>
+        </TouchableOpacity>
+        {anonFavEnabled ? (
+          <TouchableOpacity
+            onPress={handleAnonFavoritePress}
+            style={[styles.iconButton, styles.buttonSpacing]}
+            accessibilityRole="button"
+            accessibilityState={anonFavLoading ? { busy: true } : undefined}
+            disabled={anonFavLoading}
+          >
+            <View style={styles.commentButtonContent}>
+              <Ionicons
+                name={anonFavorited ? 'heart' : 'heart-outline'}
+                size={20}
+                color={anonFavorited ? '#ef4444' : theme.tint}
+              />
+              {(anonStats.favorites > 0 || anonFavorited) && (
+                <Text
+                  style={[
+                    styles.commentCountText,
+                    { color: anonFavorited ? '#ef4444' : theme.tint },
+                  ]}
+                >
+                  {anonStats.favorites}
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
+        ) : null}
         <TouchableOpacity
           onPress={() =>
             wish.id &&
@@ -546,6 +852,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
+  stageTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+    marginRight: 6,
+    marginBottom: 4,
+  },
+  stageTagText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
   timeLabel: {
     fontSize: 12,
     marginLeft: 6,
@@ -644,6 +962,7 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
   iconButton: {
     marginTop: 8,
@@ -661,6 +980,21 @@ const styles = StyleSheet.create({
   },
   commentCountText: {
     fontSize: 14,
+    fontWeight: '600',
+  },
+  inlineWishlistButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    marginLeft: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  inlineWishlistLabel: {
+    fontSize: 13,
     fontWeight: '600',
   },
 });

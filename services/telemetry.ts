@@ -11,7 +11,11 @@ type TelemetryPayload = {
   timestamp: number;
 };
 
-export async function sendTelemetry(level: LogLevel, message: string, meta?: TelemetryMeta) {
+export async function sendTelemetry(
+  level: LogLevel,
+  message: string,
+  meta?: TelemetryMeta,
+) {
   try {
     const payload: TelemetryPayload = {
       level,

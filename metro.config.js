@@ -8,8 +8,9 @@ const path = require('path');
 const config = getDefaultConfig(__dirname);
 
 // Support CJS and SVG as source files
-const assetExts = config.resolver.assetExts
-  .filter((ext) => ext !== 'cjs' && ext !== 'svg');
+const assetExts = config.resolver.assetExts.filter(
+  (ext) => ext !== 'cjs' && ext !== 'svg',
+);
 const sourceExts = [...config.resolver.sourceExts, 'cjs', 'svg'];
 
 config.resolver.assetExts = assetExts;
@@ -27,7 +28,10 @@ config.resolver.alias = {
   '@': path.resolve(__dirname),
   // Workaround: Metro (web) sometimes mis-resolves this deep dep.
   // Alias to a tiny shim to unblock web dev.
-  'set-function-length': path.resolve(__dirname, 'shims/set-function-length.js'),
+  'set-function-length': path.resolve(
+    __dirname,
+    'shims/set-function-length.js',
+  ),
 };
 
 // Conditionally alias optional native modules to local shims when not installed.

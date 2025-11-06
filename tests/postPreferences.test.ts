@@ -11,7 +11,9 @@ jest.mock('firebase/firestore', () => ({
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: {
-    getItem: jest.fn((key: string) => Promise.resolve(mockStorage[key] ?? null)),
+    getItem: jest.fn((key: string) =>
+      Promise.resolve(mockStorage[key] ?? null),
+    ),
     setItem: jest.fn((key: string, value: string) => {
       mockStorage[key] = value;
       return Promise.resolve();
@@ -25,7 +27,10 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDocs } from 'firebase/firestore';
-import { getPreferredPostType, recordPostTypeUsage } from '@/helpers/postPreferences';
+import {
+  getPreferredPostType,
+  recordPostTypeUsage,
+} from '@/helpers/postPreferences';
 
 const preferredKey = (userId: string) => `preferredPostType.v1:${userId}`;
 const usageKey = (userId: string) => `postTypeUsage.v1:${userId}`;

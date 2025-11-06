@@ -68,7 +68,9 @@ export default function NotificationsPage() {
       ListHeaderComponent={
         items.length ? (
           <TouchableOpacity onPress={handleClear} style={styles.clearBtn}>
-            <Text style={[styles.clearText, { color: theme.tint }]}>Mark all read</Text>
+            <Text style={[styles.clearText, { color: theme.tint }]}>
+              Mark all read
+            </Text>
           </TouchableOpacity>
         ) : null
       }

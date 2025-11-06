@@ -22,10 +22,18 @@ export const UserImpact: React.FC<{ impact: ImpactStats }> = ({ impact }) => {
         🔥 {t('userImpact.wishes', { count: impact.wishes })}
       </Text>
       <Text style={styles.text}>
-        🌟 {t('userImpact.boosts', { count: impact.boosts, likes: estimatedLikes })}
+        🌟{' '}
+        {t('userImpact.boosts', {
+          count: impact.boosts,
+          likes: estimatedLikes,
+        })}
       </Text>
       <Text style={styles.text}>
-        🎁 {t('userImpact.gifts', { count: impact.gifts, total: impact.giftTotal })}
+        🎁{' '}
+        {t('userImpact.gifts', {
+          count: impact.gifts,
+          total: impact.giftTotal,
+        })}
       </Text>
     </View>
   );

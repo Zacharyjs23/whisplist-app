@@ -18,7 +18,6 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    ```
 
    The app requires the following Firebase environment variables:
-
    - `EXPO_PUBLIC_FIREBASE_API_KEY`
    - `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN`
    - `EXPO_PUBLIC_FIREBASE_PROJECT_ID`
@@ -28,6 +27,12 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    - `EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID`
 
    Missing values will disable Firebase features at runtime.
+
+   Runtime validation now lives in [`env.ts`](env.ts). The module parses
+   `process.env` with Zod on startup and throws if any required variable is
+   missing or blank. Import `env` instead of `process.env` when you need these
+   values so the guard rails and the accompanying tests in
+   `tests/envValidation.test.ts` remain effective.
 
 3. Start the app
 
@@ -63,6 +68,16 @@ git pull --rebase origin main
 ```
 
 This rewrites your local commits onto the updated history, avoiding merge commits and keeping the project history linear.
+
+## Quality checks
+
+Before opening a pull request, run these commands locally:
+
+- `npm test` – executes the Jest suite, including new coverage for environment
+  validation, public users, and checkout session logic.
+- `npm run lint` – currently surfaces pre-existing issues in several Cloud
+  Functions (legacy `firebase-functions` imports). Tackle those before enforcing
+  a zero-warning CI gate.
 
 ## Poll Mode
 
@@ -151,12 +166,12 @@ npm run test:rules:emu
 
 You can run both Firestore and Storage rules suites against local emulators.
 
-1) Ensure emulators are running (default ports shown):
+1. Ensure emulators are running (default ports shown):
 
 - Firestore: `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080`
 - Storage: `FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199`
 
-2) Run the rules tests:
+2. Run the rules tests:
 
 ```
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 \

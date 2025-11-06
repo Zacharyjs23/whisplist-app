@@ -20,7 +20,9 @@ describe('trackEvent', () => {
     const { trackEvent } = require('@/helpers/analytics');
     trackEvent('test_event', { foo: 'bar' });
 
-    expect(logEvent).toHaveBeenCalledWith(analyticsInstance, 'test_event', { foo: 'bar' });
+    expect(logEvent).toHaveBeenCalledWith(analyticsInstance, 'test_event', {
+      foo: 'bar',
+    });
     expect(warn).not.toHaveBeenCalled();
   });
 
@@ -45,4 +47,3 @@ describe('trackEvent', () => {
     });
   });
 });
-

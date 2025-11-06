@@ -24,4 +24,3 @@ describe('useThemeColor', () => {
     expect(color).toBe('#000');
   });
 });
-

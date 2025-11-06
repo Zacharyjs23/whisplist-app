@@ -22,7 +22,13 @@ const makeSnapshot = (doc: DocRecord) => ({
   },
 });
 
-const createQuery = (docs: DocRecord[], field: 'type' | 'category', value: string, startAfterId: string | null, limit: number) => {
+const createQuery = (
+  docs: DocRecord[],
+  field: 'type' | 'category',
+  value: string,
+  startAfterId: string | null,
+  limit: number,
+) => {
   let filtered = docs
     .filter((doc) => doc.payload[field] === value)
     .sort((a, b) => a.id.localeCompare(b.id));
@@ -45,17 +51,27 @@ const createFakeDb = (docs: DocRecord[]) => {
         orderBy: () => ({
           limit: (limit: number) => ({
             startAfter: (last: { id: string }) => ({
-              get: () => Promise.resolve(createQuery(data, field, value, last?.id ?? null, limit)),
+              get: () =>
+                Promise.resolve(
+                  createQuery(data, field, value, last?.id ?? null, limit),
+                ),
             }),
-            get: () => Promise.resolve(createQuery(data, field, value, null, limit)),
+            get: () =>
+              Promise.resolve(createQuery(data, field, value, null, limit)),
           }),
         }),
       }),
     }),
     batch: () => {
-      const ops: { ref: { update: (patch: Record<string, unknown>) => void }; patch: Record<string, unknown> }[] = [];
+      const ops: {
+        ref: { update: (patch: Record<string, unknown>) => void };
+        patch: Record<string, unknown>;
+      }[] = [];
       return {
-        update: (ref: { update: (patch: Record<string, unknown>) => void }, patch: Record<string, unknown>) => {
+        update: (
+          ref: { update: (patch: Record<string, unknown>) => void },
+          patch: Record<string, unknown>,
+        ) => {
           ops.push({ ref, patch });
         },
         commit: () => {
@@ -79,13 +95,19 @@ describe('backfillPostTypes', () => {
     const docs = buildDocs();
     const db = createFakeDb(docs);
 
-    const result = await backfillPostTypes(db as any, { dryRun: false, log: () => {} });
+    const result = await backfillPostTypes(db as any, {
+      dryRun: false,
+      log: () => {},
+    });
 
     expect(docs[0].payload).toEqual({ type: 'goal', category: 'goal' });
     expect(docs[1].payload).toEqual({ type: 'struggle', category: 'struggle' });
     expect(docs[2].payload).toEqual({ type: 'goal', category: 'goal' });
     expect(docs[3].payload).toEqual({ type: 'goal', category: 'goal' });
-    expect(result.typeUpdates).toMatchObject({ wish: expect.any(Number), confession: expect.any(Number) });
+    expect(result.typeUpdates).toMatchObject({
+      wish: expect.any(Number),
+      confession: expect.any(Number),
+    });
   });
 
   it('respects dry-run mode', async () => {

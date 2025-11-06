@@ -60,4 +60,3 @@ export async function uploadResumableWithProgress(
   }
   throw lastErr;
 }
-

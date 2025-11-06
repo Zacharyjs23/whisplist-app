@@ -13,10 +13,21 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
 } from 'react-native';
-import type { TextInputProps, TextInput as TextInputInstance } from 'react-native';
+import type {
+  TextInputProps,
+  TextInput as TextInputInstance,
+} from 'react-native';
 import { formatDistanceToNow } from 'date-fns';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { collection, addDoc, serverTimestamp, query, orderBy, getDocs, Timestamp } from 'firebase/firestore';
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  orderBy,
+  getDocs,
+  Timestamp,
+} from 'firebase/firestore';
 import { addWish } from '../helpers/wishes';
 import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -40,9 +51,9 @@ type JournalEntry = {
 
 // Proper forwardRef wrapper for RN TextInput
 type InputRef = TextInputInstance;
-const ForwardedTextInput = React.forwardRef<InputRef, TextInputProps>((props, ref) => (
-  <RNTextInput {...props} ref={ref} />
-));
+const ForwardedTextInput = React.forwardRef<InputRef, TextInputProps>(
+  (props, ref) => <RNTextInput {...props} ref={ref} />,
+);
 ForwardedTextInput.displayName = 'ForwardedTextInput';
 
 export default function JournalPage() {
@@ -56,7 +67,9 @@ export default function JournalPage() {
   const [mood, setMood] = React.useState('😊');
   const [usePrompt, setUsePrompt] = React.useState(true);
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
-  const [moodSummary, setMoodSummary] = React.useState<Record<string, number>>({});
+  const [moodSummary, setMoodSummary] = React.useState<Record<string, number>>(
+    {},
+  );
   const [weeklyInsights, setWeeklyInsights] = React.useState<{
     entries: number;
     topMood: string | null;
@@ -71,7 +84,9 @@ export default function JournalPage() {
     if (!normalizedQuery) return entries;
     return entries.filter((item) => {
       const textMatch = item.text?.toLowerCase?.().includes(normalizedQuery);
-      const promptMatch = item.prompt?.toLowerCase?.().includes(normalizedQuery);
+      const promptMatch = item.prompt
+        ?.toLowerCase?.()
+        .includes(normalizedQuery);
       const moodMatch = item.mood?.toLowerCase?.().includes(normalizedQuery);
       return Boolean(textMatch || promptMatch || moodMatch);
     });
@@ -88,7 +103,8 @@ export default function JournalPage() {
       if (savedDate !== today || !savedPrompt) {
         let newPrompt = savedPrompt || '';
         for (let i = 0; i < 10; i++) {
-          const p = JOURNAL_PROMPTS[Math.floor(Math.random() * JOURNAL_PROMPTS.length)];
+          const p =
+            JOURNAL_PROMPTS[Math.floor(Math.random() * JOURNAL_PROMPTS.length)];
           if (p !== savedPrompt && !recent.includes(p)) {
             newPrompt = p;
             break;
@@ -101,7 +117,10 @@ export default function JournalPage() {
           0,
           3,
         );
-        await AsyncStorage.setItem('journalRecentPrompts', JSON.stringify(recent));
+        await AsyncStorage.setItem(
+          'journalRecentPrompts',
+          JSON.stringify(recent),
+        );
       }
       promptOpacity.setValue(0);
       setPrompt(savedPrompt || '');
@@ -125,9 +144,10 @@ export default function JournalPage() {
         const offlineRaw = await AsyncStorage.getItem('offlineJournalEntries');
         if (offlineRaw) {
           try {
-            const offline = JSON.parse(offlineRaw) as (
-              Omit<JournalEntry, 'id' | 'timestamp'> & { timestamp: number }
-            )[];
+            const offline = JSON.parse(offlineRaw) as (Omit<
+              JournalEntry,
+              'id' | 'timestamp'
+            > & { timestamp: number })[];
             for (const o of offline) {
               await addDoc(
                 collection(db, 'users', user.uid, 'journalEntries'),
@@ -156,9 +176,16 @@ export default function JournalPage() {
           const date = toDate(entry.timestamp);
           return date ? date.getTime() >= sevenDaysAgo : false;
         });
-        const totalChars = recent.reduce((sum, entry) => sum + (entry.text?.length || 0), 0);
-        const avgLength = recent.length ? Math.round(totalChars / recent.length) : 0;
-        const topMoodEntry = Object.entries(summary).sort((a, b) => b[1] - a[1])[0];
+        const totalChars = recent.reduce(
+          (sum, entry) => sum + (entry.text?.length || 0),
+          0,
+        );
+        const avgLength = recent.length
+          ? Math.round(totalChars / recent.length)
+          : 0;
+        const topMoodEntry = Object.entries(summary).sort(
+          (a, b) => b[1] - a[1],
+        )[0];
         setWeeklyInsights({
           entries: recent.length,
           topMood: topMoodEntry ? topMoodEntry[0] : null,
@@ -253,25 +280,26 @@ export default function JournalPage() {
   );
 
   const requestNewPrompt = async () => {
-      const recentRaw = await AsyncStorage.getItem('journalRecentPrompts');
-      let recent = recentRaw ? (JSON.parse(recentRaw) as string[]) : [];
+    const recentRaw = await AsyncStorage.getItem('journalRecentPrompts');
+    let recent = recentRaw ? (JSON.parse(recentRaw) as string[]) : [];
 
-      let newPrompt = prompt;
-      const available = JOURNAL_PROMPTS.filter(
-        (p) => p !== prompt && !recent.includes(p),
-      );
-      if (available.length > 0) {
-        newPrompt = available[Math.floor(Math.random() * available.length)];
-      } else {
-        // fallback to any prompt different from current
-        for (let i = 0; i < 10; i++) {
-          const p = JOURNAL_PROMPTS[Math.floor(Math.random() * JOURNAL_PROMPTS.length)];
-          if (p !== prompt) {
-            newPrompt = p;
-            break;
-          }
+    let newPrompt = prompt;
+    const available = JOURNAL_PROMPTS.filter(
+      (p) => p !== prompt && !recent.includes(p),
+    );
+    if (available.length > 0) {
+      newPrompt = available[Math.floor(Math.random() * available.length)];
+    } else {
+      // fallback to any prompt different from current
+      for (let i = 0; i < 10; i++) {
+        const p =
+          JOURNAL_PROMPTS[Math.floor(Math.random() * JOURNAL_PROMPTS.length)];
+        if (p !== prompt) {
+          newPrompt = p;
+          break;
         }
       }
+    }
 
     await AsyncStorage.setItem('journalPromptText', newPrompt);
     recent = [newPrompt, ...recent.filter((r) => r !== newPrompt)].slice(0, 3);
@@ -298,7 +326,8 @@ export default function JournalPage() {
     if (typeof ts === 'number') return new Date(ts);
     const anyTs = ts as any;
     if (typeof anyTs?.toDate === 'function') return anyTs.toDate();
-    if (typeof anyTs?.seconds === 'number') return new Date(anyTs.seconds * 1000);
+    if (typeof anyTs?.seconds === 'number')
+      return new Date(anyTs.seconds * 1000);
     return null;
   };
 
@@ -354,7 +383,15 @@ export default function JournalPage() {
         </View>
       );
     },
-    [expandedId, shareAsWish, theme.input, theme.placeholder, theme.text, theme.tint, t],
+    [
+      expandedId,
+      shareAsWish,
+      theme.input,
+      theme.placeholder,
+      theme.text,
+      theme.tint,
+      t,
+    ],
   );
 
   const renderHeader = () => (
@@ -372,8 +409,11 @@ export default function JournalPage() {
           {t('journal.heroSubtitle', 'Capture a thought, track your mood.')}
         </Text>
         {streak > 0 ? (
-          <View style={[styles.streakPill, { borderColor: theme.placeholder }]}
-            accessibilityLabel={t('journal.streak', '{{count}}-day streak', { count: streak })}
+          <View
+            style={[styles.streakPill, { borderColor: theme.placeholder }]}
+            accessibilityLabel={t('journal.streak', '{{count}}-day streak', {
+              count: streak,
+            })}
           >
             <Text style={[styles.streakText, { color: theme.tint }]}>
               {t('journal.streak', '{{count}}-day streak', { count: streak })}
@@ -381,9 +421,7 @@ export default function JournalPage() {
           </View>
         ) : null}
         <View style={styles.heroStatsRow}>
-          <View
-            style={[styles.heroStat, { borderColor: theme.placeholder }]}
-          >
+          <View style={[styles.heroStat, { borderColor: theme.placeholder }]}>
             <Text style={[styles.heroStatValue, { color: theme.text }]}>
               {entries.length}
             </Text>
@@ -391,9 +429,7 @@ export default function JournalPage() {
               {t('journal.stats.entries', 'Entries')}
             </Text>
           </View>
-          <View
-            style={[styles.heroStat, { borderColor: theme.placeholder }]}
-          >
+          <View style={[styles.heroStat, { borderColor: theme.placeholder }]}>
             <Text style={[styles.heroStatValue, { color: theme.text }]}>
               {streak}
             </Text>
@@ -401,9 +437,7 @@ export default function JournalPage() {
               {t('journal.stats.streak', 'Streak')}
             </Text>
           </View>
-          <View
-            style={[styles.heroStat, { borderColor: theme.placeholder }]}
-          >
+          <View style={[styles.heroStat, { borderColor: theme.placeholder }]}>
             <Text style={[styles.heroStatValue, { color: theme.text }]}>
               {weeklyInsights.entries}
             </Text>
@@ -427,10 +461,17 @@ export default function JournalPage() {
                     },
                   ]}
                 >
-                  <Text style={[styles.moodSummaryEmoji, { color: theme.text }]}>
+                  <Text
+                    style={[styles.moodSummaryEmoji, { color: theme.text }]}
+                  >
                     {emoji}
                   </Text>
-                  <Text style={[styles.moodSummaryCount, { color: theme.placeholder }]}>
+                  <Text
+                    style={[
+                      styles.moodSummaryCount,
+                      { color: theme.placeholder },
+                    ]}
+                  >
                     {count}
                   </Text>
                 </View>
@@ -458,7 +499,10 @@ export default function JournalPage() {
           placeholderTextColor={theme.placeholder}
           style={[styles.searchInput, { color: theme.text }]}
           returnKeyType="search"
-          accessibilityLabel={t('journal.searchPlaceholder', 'Search your entries')}
+          accessibilityLabel={t(
+            'journal.searchPlaceholder',
+            'Search your entries',
+          )}
           autoCorrect={false}
         />
         {searchQuery.length ? (
@@ -541,7 +585,10 @@ export default function JournalPage() {
                 accessibilityLabel={t('journal.selectMood', 'Select mood')}
               >
                 <Text
-                  style={[styles.moodChipText, { color: selected ? theme.background : theme.text }]}
+                  style={[
+                    styles.moodChipText,
+                    { color: selected ? theme.background : theme.text },
+                  ]}
                 >
                   {m}
                 </Text>
@@ -583,7 +630,10 @@ export default function JournalPage() {
           { backgroundColor: theme.input, borderColor: theme.placeholder },
         ]}
         accessible
-        accessibilityLabel={t('journal.weeklyInsightsAccessibility', 'Weekly journaling insights')}
+        accessibilityLabel={t(
+          'journal.weeklyInsightsAccessibility',
+          'Weekly journaling insights',
+        )}
       >
         <Text style={[styles.insightsTitle, { color: theme.text }]}>
           {t('journal.weeklyInsightsTitle', 'Weekly insights')}
@@ -593,7 +643,10 @@ export default function JournalPage() {
             ? t('journal.weeklyEntries', {
                 count: weeklyInsights.entries,
               })
-            : t('journal.weeklyEmpty', 'No entries yet this week — start a new reflection!')}
+            : t(
+                'journal.weeklyEmpty',
+                'No entries yet this week — start a new reflection!',
+              )}
         </Text>
         {weeklyInsights.topMood ? (
           <Text style={[styles.insightsHighlight, { color: theme.tint }]}>
@@ -626,21 +679,36 @@ export default function JournalPage() {
             filteredEntries.length === 0 ? (
               hasSearch ? (
                 <View style={styles.emptyState}>
-                  <Text style={[styles.emptyStateText, { color: theme.placeholder }]}>
+                  <Text
+                    style={[
+                      styles.emptyStateText,
+                      { color: theme.placeholder },
+                    ]}
+                  >
                     {t('journal.searchEmpty', { query: searchQuery })}
                   </Text>
                   <TouchableOpacity
                     onPress={() => setSearchQuery('')}
-                    style={[styles.emptyAction, { borderColor: theme.placeholder }]}
+                    style={[
+                      styles.emptyAction,
+                      { borderColor: theme.placeholder },
+                    ]}
                   >
-                    <Text style={[styles.emptyActionText, { color: theme.text }]}>
+                    <Text
+                      style={[styles.emptyActionText, { color: theme.text }]}
+                    >
                       {t('journal.clearSearch', 'Clear search')}
                     </Text>
                   </TouchableOpacity>
                 </View>
               ) : (
                 <View style={styles.emptyState}>
-                  <Text style={[styles.emptyStateText, { color: theme.placeholder }]}>
+                  <Text
+                    style={[
+                      styles.emptyStateText,
+                      { color: theme.placeholder },
+                    ]}
+                  >
                     {t(
                       'journal.emptyState',
                       'Your journal is waiting for its first entry.',
@@ -648,9 +716,14 @@ export default function JournalPage() {
                   </Text>
                   <TouchableOpacity
                     onPress={() => inputRef.current?.focus()}
-                    style={[styles.emptyAction, { borderColor: theme.placeholder }]}
+                    style={[
+                      styles.emptyAction,
+                      { borderColor: theme.placeholder },
+                    ]}
                   >
-                    <Text style={[styles.emptyActionText, { color: theme.text }]}>
+                    <Text
+                      style={[styles.emptyActionText, { color: theme.text }]}
+                    >
                       {t('journal.emptyStateCta', 'Write something now')}
                     </Text>
                   </TouchableOpacity>

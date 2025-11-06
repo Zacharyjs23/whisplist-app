@@ -1,10 +1,15 @@
-import * as functions from 'firebase-functions';
+import { logger, runWith } from 'firebase-functions/v1';
+import type { Request, Response } from 'express';
 import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
 // Use Cloud Functions logger
 import { STRIPE_SECRET_KEY } from './secrets';
+import { assertValidRedirectUrl, RedirectUrlError } from './redirectValidation';
+import { resolvePlanKeyFromStripePrice } from './planCatalog';
 
-let stripe: any = null;
+type StripeClient = InstanceType<typeof Stripe>;
+
+let stripe: StripeClient | null = null;
 const db = admin.firestore();
 
 async function ensureCustomer(userId: string): Promise<string> {
@@ -13,7 +18,10 @@ async function ensureCustomer(userId: string): Promise<string> {
   const existing = snap.get('stripeCustomerId');
   if (existing) return existing as string;
 
-  if (!stripe) stripe = new Stripe(STRIPE_SECRET_KEY.value(), { apiVersion: '2022-11-15' });
+  if (!stripe)
+    stripe = new Stripe(STRIPE_SECRET_KEY.value(), {
+      apiVersion: '2022-11-15',
+    });
 
   const email = snap.get('email') || undefined;
   const displayName = snap.get('displayName') || undefined;
@@ -24,15 +32,20 @@ async function ensureCustomer(userId: string): Promise<string> {
   });
 
   await Promise.all([
-    userRef.update({ stripeCustomerId: customer.id }).catch(() => userRef.set({ stripeCustomerId: customer.id }, { merge: true })),
+    userRef
+      .update({ stripeCustomerId: customer.id })
+      .catch(() =>
+        userRef.set({ stripeCustomerId: customer.id }, { merge: true }),
+      ),
     db.collection('stripeCustomers').doc(customer.id).set({ userId }),
   ]);
   return customer.id;
 }
 
-export const createSubscriptionCheckoutSession = functions
-  .runWith({ secrets: [STRIPE_SECRET_KEY] })
-  .https.onRequest(async (req: any, res: any) => {
+export const createSubscriptionCheckoutSession = runWith({
+  secrets: [STRIPE_SECRET_KEY],
+})
+  .https.onRequest(async (req: Request, res: Response) => {
     if (req.method !== 'POST') {
       res.status(405).send('Method not allowed');
       return;
@@ -43,8 +56,35 @@ export const createSubscriptionCheckoutSession = functions
       return;
     }
 
+    if (!resolvePlanKeyFromStripePrice(priceId)) {
+      res.status(400).send('Invalid price');
+      return;
+    }
+
+    let safeSuccessUrl: string;
+    let safeCancelUrl: string;
     try {
-      if (!stripe) stripe = new Stripe(STRIPE_SECRET_KEY.value(), { apiVersion: '2022-11-15' });
+      safeSuccessUrl = assertValidRedirectUrl(successUrl, 'successUrl');
+      safeCancelUrl = assertValidRedirectUrl(cancelUrl, 'cancelUrl');
+    } catch (err) {
+      if (err instanceof RedirectUrlError) {
+        logger.warn(
+          'createSubscriptionCheckoutSession received invalid redirect URL',
+          err,
+        );
+        res.status(400).send('Invalid redirect URL');
+        return;
+      }
+      logger.error('Unexpected error validating redirect URLs', err);
+      res.status(500).send('Internal error');
+      return;
+    }
+
+    try {
+      if (!stripe)
+        stripe = new Stripe(STRIPE_SECRET_KEY.value(), {
+          apiVersion: '2022-11-15',
+        });
       const customerId = await ensureCustomer(userId);
 
       const session = await stripe.checkout.sessions.create({
@@ -52,8 +92,8 @@ export const createSubscriptionCheckoutSession = functions
         customer: customerId,
         line_items: [{ price: priceId, quantity: 1 }],
         allow_promotion_codes: true,
-        success_url: successUrl,
-        cancel_url: cancelUrl,
+        success_url: safeSuccessUrl,
+        cancel_url: safeCancelUrl,
         client_reference_id: userId,
         subscription_data: {
           metadata: { userId },
@@ -74,7 +114,10 @@ export const createSubscriptionCheckoutSession = functions
 
       res.json({ url: session.url });
     } catch (err) {
-      functions.logger.error('Error creating subscription checkout session', err);
+      logger.error(
+        'Error creating subscription checkout session',
+        err,
+      );
       res.status(500).send('Internal error');
     }
   });

@@ -1,23 +1,29 @@
-import * as functions from 'firebase-functions';
+import { logger, runWith } from 'firebase-functions/v1';
+import type { Request, Response } from 'express';
 import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
 // Use Cloud Functions logger
 import { STRIPE_SECRET_KEY } from './secrets';
+import { assertValidRedirectUrl, RedirectUrlError } from './redirectValidation';
 
-let stripe: any;
+type StripeClient = InstanceType<typeof Stripe>;
+
+let stripe: StripeClient | null;
 
 const db = admin.firestore();
 const MAX_AMOUNT = 10_000; // $10k limit to prevent unreasonable charges
 
-export const createGiftCheckoutSession = functions
-  .runWith({ secrets: [STRIPE_SECRET_KEY] })
-  .https.onRequest(async (req: any, res: any) => {
+export const createGiftCheckoutSession = runWith({
+  secrets: [STRIPE_SECRET_KEY],
+})
+  .https.onRequest(async (req: Request, res: Response) => {
     if (req.method !== 'POST') {
       res.status(405).send('Method not allowed');
       return;
     }
 
-    const { wishId, amount, recipientId, successUrl, cancelUrl, supporterId } = req.body;
+    const { wishId, amount, recipientId, successUrl, cancelUrl, supporterId } =
+      req.body;
     if (
       !wishId ||
       amount === undefined ||
@@ -31,14 +37,41 @@ export const createGiftCheckoutSession = functions
     }
 
     const numAmount = Number(amount);
-    if (!Number.isFinite(numAmount) || numAmount <= 0 || numAmount > MAX_AMOUNT) {
+    if (
+      !Number.isFinite(numAmount) ||
+      numAmount <= 0 ||
+      numAmount > MAX_AMOUNT
+    ) {
       res.status(400).send('Invalid amount');
       return;
     }
 
-    const supporter = typeof supporterId === 'string' && supporterId.trim().length > 0
-      ? supporterId.trim()
-      : null;
+    let safeSuccessUrl: string;
+    let safeCancelUrl: string;
+    try {
+      safeSuccessUrl = assertValidRedirectUrl(successUrl, 'successUrl');
+      safeCancelUrl = assertValidRedirectUrl(cancelUrl, 'cancelUrl');
+    } catch (err) {
+      if (err instanceof RedirectUrlError) {
+        logger.warn(
+          'createGiftCheckoutSession received invalid redirect URL',
+          err,
+        );
+        res.status(400).send('Invalid redirect URL');
+        return;
+      }
+      logger.error(
+        'Unexpected error validating gift redirect URLs',
+        err,
+      );
+      res.status(500).send('Internal error');
+      return;
+    }
+
+    const supporter =
+      typeof supporterId === 'string' && supporterId.trim().length > 0
+        ? supporterId.trim()
+        : null;
 
     try {
       if (!stripe) {
@@ -77,8 +110,8 @@ export const createGiftCheckoutSession = functions
           transfer_data: { destination: stripeAccountId },
         },
         metadata,
-        success_url: successUrl,
-        cancel_url: cancelUrl,
+        success_url: safeSuccessUrl,
+        cancel_url: safeCancelUrl,
       });
 
       await db
@@ -97,7 +130,7 @@ export const createGiftCheckoutSession = functions
 
       res.json({ url: session.url });
     } catch (err) {
-      functions.logger.error('Error creating gift checkout session', err);
+      logger.error('Error creating gift checkout session', err);
       res.status(500).send('Internal error');
     }
   });

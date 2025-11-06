@@ -2,7 +2,12 @@ import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import { SubscriptionPlans } from '@/components/SubscriptionPlans';
 
-const palette = { text: '#000', input: '#eee', placeholder: '#999', tint: '#a78bfa' };
+const palette = {
+  text: '#000',
+  input: '#eee',
+  placeholder: '#999',
+  tint: '#a78bfa',
+};
 const t = (_k: string, d?: string) => d || _k;
 
 describe('SubscriptionPlans', () => {
@@ -36,7 +41,12 @@ describe('SubscriptionPlans', () => {
   it('enables button and calls handler when priceId present', () => {
     const onStartCheckout = jest.fn();
     const plans = [
-      { key: 'supporter_monthly', name: 'Supporter', price: '$1.99 / month', priceId: 'price_123' },
+      {
+        key: 'supporter_monthly',
+        name: 'Supporter',
+        price: '$1.99 / month',
+        priceId: 'price_123',
+      },
     ];
     const { getByTestId } = render(
       <SubscriptionPlans

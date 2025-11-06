@@ -15,7 +15,9 @@ describe('auth services', () => {
       jest.doMock('@/firebase', () => ({ auth: authInstance }));
 
       const { signUp } = require('@/services/auth');
-      await expect(signUp('test@example.com', 'password')).resolves.toBe('user');
+      await expect(signUp('test@example.com', 'password')).resolves.toBe(
+        'user',
+      );
       expect(createUserWithEmailAndPassword).toHaveBeenCalledWith(
         authInstance,
         'test@example.com',
@@ -32,7 +34,9 @@ describe('auth services', () => {
       jest.doMock('@/firebase', () => ({ auth: {} }));
 
       const { signUp } = require('@/services/auth');
-      await expect(signUp('test@example.com', 'password')).rejects.toThrow('failed');
+      await expect(signUp('test@example.com', 'password')).rejects.toThrow(
+        'failed',
+      );
     });
 
     it('rejects when auth is uninitialized', async () => {
@@ -58,7 +62,9 @@ describe('auth services', () => {
       jest.doMock('@/firebase', () => ({ auth: authInstance }));
 
       const { signIn } = require('@/services/auth');
-      await expect(signIn('test@example.com', 'password')).resolves.toBe('user');
+      await expect(signIn('test@example.com', 'password')).resolves.toBe(
+        'user',
+      );
       expect(signInWithEmailAndPassword).toHaveBeenCalledWith(
         authInstance,
         'test@example.com',
@@ -75,7 +81,9 @@ describe('auth services', () => {
       jest.doMock('@/firebase', () => ({ auth: {} }));
 
       const { signIn } = require('@/services/auth');
-      await expect(signIn('test@example.com', 'password')).rejects.toThrow('failed');
+      await expect(signIn('test@example.com', 'password')).rejects.toThrow(
+        'failed',
+      );
     });
 
     it('rejects when auth is uninitialized', async () => {
@@ -177,7 +185,9 @@ describe('auth services', () => {
       const signInWithCredential = jest
         .fn<(...args: any[]) => Promise<string>>()
         .mockResolvedValue('ok');
-      const GoogleAuthProvider = { credential: jest.fn().mockReturnValue('cred') };
+      const GoogleAuthProvider = {
+        credential: jest.fn().mockReturnValue('cred'),
+      };
       jest.doMock('firebase/auth', () => ({
         GoogleAuthProvider,
         signInWithCredential,
@@ -204,7 +214,9 @@ describe('auth services', () => {
       const signInWithCredential = jest
         .fn<(...args: any[]) => Promise<unknown>>()
         .mockRejectedValue(error);
-      const GoogleAuthProvider = { credential: jest.fn().mockReturnValue('cred') };
+      const GoogleAuthProvider = {
+        credential: jest.fn().mockReturnValue('cred'),
+      };
       jest.doMock('firebase/auth', () => ({
         GoogleAuthProvider,
         signInWithCredential,

@@ -2,7 +2,11 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useTranslation } from '@/contexts/I18nContext';
-import type { BoostPulse, FulfillmentPulse, SupporterPulse } from '@/hooks/useCommunityPulse';
+import type {
+  BoostPulse,
+  FulfillmentPulse,
+  SupporterPulse,
+} from '@/hooks/useCommunityPulse';
 
 interface Props {
   boosts: BoostPulse[];
@@ -11,36 +15,63 @@ interface Props {
   loading?: boolean;
 }
 
-const CommunityPulseCard: React.FC<Props> = ({ boosts, fulfillments, supporters, loading = false }) => {
+const CommunityPulseCard: React.FC<Props> = ({
+  boosts,
+  fulfillments,
+  supporters,
+  loading = false,
+}) => {
   const { theme } = useTheme();
   const { t } = useTranslation();
-  const hasContent = boosts.length > 0 || fulfillments.length > 0 || supporters.length > 0;
+  const hasContent =
+    boosts.length > 0 || fulfillments.length > 0 || supporters.length > 0;
 
   const sectionTitleStyle = [styles.sectionTitle, { color: theme.text }];
   const metaStyle = [styles.metaText, { color: theme.placeholder }];
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.input, borderColor: theme.placeholder }]}
-      accessibilityLabel={t('home.communityPulse.label', 'Community highlights')}
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: theme.input, borderColor: theme.placeholder },
+      ]}
+      accessibilityLabel={t(
+        'home.communityPulse.label',
+        'Community highlights',
+      )}
     >
-      <Text style={[styles.title, { color: theme.text }]}>{t('home.communityPulse.title', 'Community pulse')}</Text>
+      <Text style={[styles.title, { color: theme.text }]}>
+        {t('home.communityPulse.title', 'Community pulse')}
+      </Text>
       <Text style={[styles.subtitle, { color: theme.placeholder }]}>
         {loading
           ? t('home.communityPulse.loading', 'Gathering the latest wins…')
-          : t('home.communityPulse.subtitle', 'Here’s what friends are celebrating right now.')}
+          : t(
+              'home.communityPulse.subtitle',
+              'Here’s what friends are celebrating right now.',
+            )}
       </Text>
 
       {hasContent ? (
         <View>
           {boosts.length > 0 && (
             <View style={styles.section}>
-              <Text style={sectionTitleStyle}>{t('home.communityPulse.boosts', '🚀 Fresh boosts')}</Text>
+              <Text style={sectionTitleStyle}>
+                {t('home.communityPulse.boosts', '🚀 Fresh boosts')}
+              </Text>
               {boosts.map((boost) => (
-                <Text key={boost.id} style={[styles.itemText, { color: theme.text }]}>
+                <Text
+                  key={boost.id}
+                  style={[styles.itemText, { color: theme.text }]}
+                >
                   <Text style={styles.highlight}>{boost.boosterName}</Text>
                   {t('home.communityPulse.boostItem', ' boosted ')}
                   <Text style={styles.highlight}>{boost.wishOwnerName}</Text>
-                  {boost.wishText ? t('home.communityPulse.boostWish', "'{{wish}}'", { wish: boost.wishText }) : ''}
+                  {boost.wishText
+                    ? t('home.communityPulse.boostWish', "'{{wish}}'", {
+                        wish: boost.wishText,
+                      })
+                    : ''}
                 </Text>
               ))}
             </View>
@@ -48,12 +79,19 @@ const CommunityPulseCard: React.FC<Props> = ({ boosts, fulfillments, supporters,
 
           {fulfillments.length > 0 && (
             <View style={styles.section}>
-              <Text style={sectionTitleStyle}>{t('home.communityPulse.fulfilled', '✨ Wishes fulfilled')}</Text>
+              <Text style={sectionTitleStyle}>
+                {t('home.communityPulse.fulfilled', '✨ Wishes fulfilled')}
+              </Text>
               {fulfillments.map((item) => (
-                <Text key={item.wishId} style={[styles.itemText, { color: theme.text }]}>
+                <Text
+                  key={item.wishId}
+                  style={[styles.itemText, { color: theme.text }]}
+                >
                   <Text style={styles.highlight}>{item.wishOwnerName}</Text>
                   {t('home.communityPulse.fulfillmentItem', ' completed ')}
-                  <Text style={styles.highlight}>{item.wishText || t('home.communityPulse.aWish', 'a wish')}</Text>
+                  <Text style={styles.highlight}>
+                    {item.wishText || t('home.communityPulse.aWish', 'a wish')}
+                  </Text>
                 </Text>
               ))}
             </View>
@@ -61,7 +99,9 @@ const CommunityPulseCard: React.FC<Props> = ({ boosts, fulfillments, supporters,
 
           {supporters.length > 0 && (
             <View style={styles.section}>
-              <Text style={sectionTitleStyle}>{t('home.communityPulse.supporters', '🏅 Top supporters')}</Text>
+              <Text style={sectionTitleStyle}>
+                {t('home.communityPulse.supporters', '🏅 Top supporters')}
+              </Text>
               {supporters.map((supporter) => (
                 <View key={supporter.userId} style={styles.supporterBlock}>
                   <View style={styles.supporterRow}>
@@ -72,20 +112,30 @@ const CommunityPulseCard: React.FC<Props> = ({ boosts, fulfillments, supporters,
                       <Text style={styles.highlight}>
                         {supporter.badge} {supporter.displayName}
                       </Text>
-                      <Text style={[styles.tierInline, { color: theme.placeholder }]}>
+                      <Text
+                        style={[
+                          styles.tierInline,
+                          { color: theme.placeholder },
+                        ]}
+                      >
                         {t('home.communityPulse.supporterTier', ' · {{tier}}', {
                           tier: supporter.tierLabel,
                         })}
                       </Text>
                     </Text>
                     <Text style={metaStyle}>
-                      {t('home.communityPulse.supporterMeta', '{{gifts}} gifts · ${{amount}}', {
-                        gifts: supporter.totalGifts,
-                        amount: supporter.totalAmount.toFixed(2),
-                      })}
+                      {t(
+                        'home.communityPulse.supporterMeta',
+                        '{{gifts}} gifts · ${{amount}}',
+                        {
+                          gifts: supporter.totalGifts,
+                          amount: supporter.totalAmount.toFixed(2),
+                        },
+                      )}
                     </Text>
                   </View>
-                  <Text style={[styles.shoutOut, { color: theme.placeholder }]}
+                  <Text
+                    style={[styles.shoutOut, { color: theme.placeholder }]}
                     numberOfLines={1}
                   >
                     {t(
@@ -106,7 +156,10 @@ const CommunityPulseCard: React.FC<Props> = ({ boosts, fulfillments, supporters,
         <Text style={[styles.emptyState, { color: theme.placeholder }]}>
           {loading
             ? t('home.communityPulse.loading', 'Gathering the latest wins…')
-            : t('home.communityPulse.empty', 'Activity updates will appear here soon.')}
+            : t(
+                'home.communityPulse.empty',
+                'Activity updates will appear here soon.',
+              )}
         </Text>
       )}
     </View>

@@ -1,5 +1,5 @@
 jest.mock(
-  'firebase-functions',
+  'firebase-functions/v1',
   () => ({
     runWith: jest.fn().mockReturnValue({
       https: { onRequest: (handler: any) => handler },
@@ -58,7 +58,9 @@ describe('createGiftCheckoutSession', () => {
   });
 
   it('creates stripe gift session and returns url', async () => {
-    mockUserGet.mockResolvedValue({ get: (f: string) => (f === 'stripeAccountId' ? 'acct_1' : undefined) });
+    mockUserGet.mockResolvedValue({
+      get: (f: string) => (f === 'stripeAccountId' ? 'acct_1' : undefined),
+    });
     mockStripeCreate.mockResolvedValue({ id: 'sess_g1', url: 'https://gift' });
     const req: any = {
       method: 'POST',
@@ -66,11 +68,15 @@ describe('createGiftCheckoutSession', () => {
         wishId: 'w1',
         recipientId: 'rec1',
         amount: 20,
-        successUrl: 's',
-        cancelUrl: 'c',
+        successUrl: 'https://whisplist.app/success',
+        cancelUrl: 'https://whisplist.app/cancel',
       },
     };
-    const res = { json: jest.fn(), status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+    } as any;
     await createGiftCheckoutSession(req, res);
     expect(mockStripeCreate).toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith({ url: 'https://gift' });
@@ -84,11 +90,15 @@ describe('createGiftCheckoutSession', () => {
         wishId: 'w1',
         recipientId: 'rec1',
         amount: 20,
-        successUrl: 's',
-        cancelUrl: 'c',
+        successUrl: 'https://whisplist.app/success',
+        cancelUrl: 'https://whisplist.app/cancel',
       },
     };
-    const res = { json: jest.fn(), status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+    } as any;
     await createGiftCheckoutSession(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.send).toHaveBeenCalledWith('Recipient not enabled for Stripe');

@@ -1,5 +1,11 @@
 import React, { useEffect } from 'react';
-import { FlatList, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  FlatList,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+} from 'react-native';
 import ThemedButton from '@/components/ThemedButton';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -23,8 +29,10 @@ export default function NotificationsPage() {
     };
     return (
       <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-        <View style={[styles.item, { backgroundColor: theme.input }]}> 
-          <Text style={[styles.text, { color: theme.text }]}>{item.title || item.message}</Text>
+        <View style={[styles.item, { backgroundColor: theme.input }]}>
+          <Text style={[styles.text, { color: theme.text }]}>
+            {item.title || item.message}
+          </Text>
           <Text style={[styles.time, { color: theme.placeholder }]}>
             {item.timestamp?.seconds
               ? formatDistanceToNow(new Date(item.timestamp.seconds * 1000), {

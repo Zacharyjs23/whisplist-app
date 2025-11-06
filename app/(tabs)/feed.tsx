@@ -41,7 +41,12 @@ import { db } from '../../firebase';
 import { dedupeSortByTimestampDesc } from '../../helpers/merge';
 import type { Wish } from '../../types/Wish';
 import type { FilterType, PostType } from '@/types/post';
-import { POST_TYPE_META, POST_TYPE_ORDER, isPostType, normalizePostType } from '@/types/post';
+import {
+  POST_TYPE_META,
+  POST_TYPE_ORDER,
+  isPostType,
+  normalizePostType,
+} from '@/types/post';
 import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useTranslation } from '@/contexts/I18nContext';
@@ -92,11 +97,20 @@ export default function Page() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastVisible, setLastVisible] = useState<any | null>(null);
   const [prefModalVisible, setPrefModalVisible] = useState(false);
-  const [prefDraft, setPrefDraft] = useState<Pref>({ categories: [], type: null, manual: true });
+  const [prefDraft, setPrefDraft] = useState<Pref>({
+    categories: [],
+    type: null,
+    manual: true,
+  });
   const [prefVersion, setPrefVersion] = useState(0);
-  const prefCache = useRef<{ version: number; value: Pref; userId: string | null } | null>(null);
+  const prefCache = useRef<{
+    version: number;
+    value: Pref;
+    userId: string | null;
+  } | null>(null);
   const filterStorageKey = React.useMemo(
-    () => (user?.uid ? `feed.filterType.v1:${user.uid}` : 'feed.filterType.v1:anon'),
+    () =>
+      user?.uid ? `feed.filterType.v1:${user.uid}` : 'feed.filterType.v1:anon',
     [user?.uid],
   );
   const feedImpressionsRef = useRef<Set<string>>(new Set());
@@ -159,20 +173,25 @@ export default function Page() {
     () =>
       POST_TYPE_ORDER.map((type) => ({
         key: type,
-        label: t(`composer.type.${type}`, POST_TYPE_META[type].defaultChipLabel),
+        label: t(
+          `composer.type.${type}`,
+          POST_TYPE_META[type].defaultChipLabel,
+        ),
       })),
     [t],
   );
 
   const typeFilterChips = React.useMemo(
-    () =>
-      [
-        { key: 'all' as FilterType, label: t('feed.filters.allTypes', 'All vibes') },
-        ...POST_TYPE_ORDER.map((type) => ({
-          key: type as FilterType,
-          label: t(`feed.filters.${type}`, POST_TYPE_META[type].defaultChipLabel),
-        })),
-      ],
+    () => [
+      {
+        key: 'all' as FilterType,
+        label: t('feed.filters.allTypes', 'All vibes'),
+      },
+      ...POST_TYPE_ORDER.map((type) => ({
+        key: type as FilterType,
+        label: t(`feed.filters.${type}`, POST_TYPE_META[type].defaultChipLabel),
+      })),
+    ],
     [t],
   );
 
@@ -252,7 +271,9 @@ export default function Page() {
         typeCounts[normalized] = (typeCounts[normalized] || 0) + 1;
       }
     });
-    const favType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+    const favType = Object.entries(typeCounts).sort(
+      (a, b) => b[1] - a[1],
+    )[0]?.[0];
     const pref: Pref = {
       categories: Array.from(cats),
       type: favType ? normalizePostType(favType) : null,
@@ -554,7 +575,9 @@ export default function Page() {
             ),
           );
           const merged = snaps.flatMap((s) =>
-            s.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) } as Wish)),
+            s.docs.map(
+              (d) => ({ id: d.id, ...(d.data() as Omit<Wish, 'id'>) }) as Wish,
+            ),
           );
           normal = dedupeSortByTimestampDesc(merged);
         }
@@ -566,13 +589,7 @@ export default function Page() {
     } finally {
       setRefreshing(false);
     }
-  }, [
-    activeTab,
-    applyFilters,
-    user,
-    followingIds,
-    loadPersonalPrefs,
-  ]);
+  }, [activeTab, applyFilters, user, followingIds, loadPersonalPrefs]);
 
   const loadMore = useCallback(async () => {
     if (!lastVisible) return;
@@ -692,17 +709,32 @@ export default function Page() {
       return t('feed.empty.category', 'No posts in this category yet.');
     }
     if (filterType !== 'all') {
-      return t('feed.empty.typeFallback', 'No posts in this vibe yet. Try another.');
+      return t(
+        'feed.empty.typeFallback',
+        'No posts in this vibe yet. Try another.',
+      );
     }
     switch (activeTab) {
       case 'boosted':
-        return t('feed.empty.boosted', 'No boosted posts right now. Check back soon ✨');
+        return t(
+          'feed.empty.boosted',
+          'No boosted posts right now. Check back soon ✨',
+        );
       case 'trending':
-        return t('feed.empty.trending', 'Trending is quiet at the moment. Come back later.');
+        return t(
+          'feed.empty.trending',
+          'Trending is quiet at the moment. Come back later.',
+        );
       case 'forYou':
-        return t('feed.empty.forYou', "We couldn't find a match yet. Try adjusting preferences.");
+        return t(
+          'feed.empty.forYou',
+          "We couldn't find a match yet. Try adjusting preferences.",
+        );
       default:
-        return t('feed.empty.default', 'No posts here yet. Be the first to share ✨');
+        return t(
+          'feed.empty.default',
+          'No posts here yet. Be the first to share ✨',
+        );
     }
   }, [activeTab, filterType, normalizedSearch, selectedCategory, t]);
 
@@ -746,7 +778,10 @@ export default function Page() {
               },
             ]}
             accessibilityRole="button"
-            accessibilityLabel={t('feed.whispOfDay.open', 'Open Whisp of the Day')}
+            accessibilityLabel={t(
+              'feed.whispOfDay.open',
+              'Open Whisp of the Day',
+            )}
           >
             <Text style={[styles.highlightTitle, { color: theme.text }]}>
               🌙 {t('feed.whispOfDay.title', 'Whisp of the Day')}
@@ -828,33 +863,37 @@ export default function Page() {
             {t('feed.viewLabel', 'View')}
           </Text>
           <View style={styles.toggleBar}>
-            {(['latest', 'boosted', 'trending', 'forYou'] as const).map((tab) => {
-              const isActive = activeTab === tab;
-              return (
-                <TouchableOpacity
-                  key={tab}
-                  onPress={() => setActiveTab(tab)}
-                  style={[
-                    styles.toggleButton,
-                    {
-                      backgroundColor: isActive ? theme.tint : theme.background,
-                      borderColor: isActive ? theme.tint : theme.placeholder,
-                    },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={tabCopy[tab]?.title ?? tab}
-                >
-                  <Text
+            {(['latest', 'boosted', 'trending', 'forYou'] as const).map(
+              (tab) => {
+                const isActive = activeTab === tab;
+                return (
+                  <TouchableOpacity
+                    key={tab}
+                    onPress={() => setActiveTab(tab)}
                     style={[
-                      styles.toggleText,
-                      { color: isActive ? theme.background : theme.text },
+                      styles.toggleButton,
+                      {
+                        backgroundColor: isActive
+                          ? theme.tint
+                          : theme.background,
+                        borderColor: isActive ? theme.tint : theme.placeholder,
+                      },
                     ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={tabCopy[tab]?.title ?? tab}
                   >
-                    {tabCopy[tab]?.title ?? tab}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+                    <Text
+                      style={[
+                        styles.toggleText,
+                        { color: isActive ? theme.background : theme.text },
+                      ]}
+                    >
+                      {tabCopy[tab]?.title ?? tab}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              },
+            )}
           </View>
 
           <Text style={[styles.controlsLabel, { color: theme.placeholder }]}>
@@ -915,7 +954,9 @@ export default function Page() {
                   style={[
                     styles.categoryChip,
                     {
-                      backgroundColor: isSelected ? theme.tint : theme.background,
+                      backgroundColor: isSelected
+                        ? theme.tint
+                        : theme.background,
                       borderColor: isSelected ? theme.tint : theme.placeholder,
                     },
                   ]}
@@ -938,10 +979,16 @@ export default function Page() {
               onPress={openPrefModal}
               style={[
                 styles.prefButton,
-                { backgroundColor: theme.background, borderColor: theme.placeholder },
+                {
+                  backgroundColor: theme.background,
+                  borderColor: theme.placeholder,
+                },
               ]}
               accessibilityRole="button"
-              accessibilityLabel={t('feed.prefButton.accessibility', 'Customize For You preferences')}
+              accessibilityLabel={t(
+                'feed.prefButton.accessibility',
+                'Customize For You preferences',
+              )}
             >
               <Text style={[styles.prefButtonText, { color: theme.tint }]}>
                 ✨ {t('feed.prefButton.label', 'Customize For You')}
@@ -977,7 +1024,9 @@ export default function Page() {
                 <Text style={[styles.topWishText, { color: theme.text }]}>
                   {wish.text}
                 </Text>
-                <Text style={[styles.likes, { color: theme.tint }]}>❤️ {wish.likes}</Text>
+                <Text style={[styles.likes, { color: theme.tint }]}>
+                  ❤️ {wish.likes}
+                </Text>
               </View>
             ))}
           </View>
@@ -1028,7 +1077,10 @@ export default function Page() {
                 contentContainerStyle={styles.prefModalContent}
               >
                 <Text
-                  style={[styles.prefModalSectionTitle, { color: theme.placeholder }]}
+                  style={[
+                    styles.prefModalSectionTitle,
+                    { color: theme.placeholder },
+                  ]}
                 >
                   Categories
                 </Text>
@@ -1089,7 +1141,11 @@ export default function Page() {
                     <Text
                       style={[
                         styles.prefChipText,
-                        { color: !prefDraft.type ? theme.background : theme.text },
+                        {
+                          color: !prefDraft.type
+                            ? theme.background
+                            : theme.text,
+                        },
                       ]}
                     >
                       All types
@@ -1134,7 +1190,12 @@ export default function Page() {
                     { borderColor: theme.tint },
                   ]}
                 >
-                  <Text style={[styles.prefModalSecondaryText, { color: theme.tint }]}>
+                  <Text
+                    style={[
+                      styles.prefModalSecondaryText,
+                      { color: theme.tint },
+                    ]}
+                  >
                     Use automatic picks
                   </Text>
                 </TouchableOpacity>
@@ -1146,7 +1207,12 @@ export default function Page() {
                       { backgroundColor: theme.input },
                     ]}
                   >
-                    <Text style={[styles.prefModalButtonText, { color: theme.text }]}>
+                    <Text
+                      style={[
+                        styles.prefModalButtonText,
+                        { color: theme.text },
+                      ]}
+                    >
                       Cancel
                     </Text>
                   </TouchableOpacity>
@@ -1158,7 +1224,10 @@ export default function Page() {
                     ]}
                   >
                     <Text
-                      style={[styles.prefModalButtonText, { color: theme.background }]}
+                      style={[
+                        styles.prefModalButtonText,
+                        { color: theme.background },
+                      ]}
                     >
                       Save
                     </Text>
@@ -1172,10 +1241,11 @@ export default function Page() {
           style={[styles.safeArea, { backgroundColor: theme.background }]}
         >
           <StatusBar
-            barStyle=
-              {theme.name === 'dark' || theme.name === 'neon'
+            barStyle={
+              theme.name === 'dark' || theme.name === 'neon'
                 ? 'light-content'
-                : 'dark-content'}
+                : 'dark-content'
+            }
             backgroundColor={theme.background}
           />
           <KeyboardAvoidingView
@@ -1200,15 +1270,25 @@ export default function Page() {
                   </Text>
                 ) : (
                   <View style={styles.emptyState}>
-                    <Text style={[styles.noResults, { color: theme.placeholder }]}>
+                    <Text
+                      style={[styles.noResults, { color: theme.placeholder }]}
+                    >
                       {emptyMessage}
                     </Text>
                     {normalizedSearch ? (
                       <TouchableOpacity
                         onPress={() => setSearchTerm('')}
-                        style={[styles.emptyAction, { borderColor: theme.placeholder }]}
+                        style={[
+                          styles.emptyAction,
+                          { borderColor: theme.placeholder },
+                        ]}
                       >
-                        <Text style={[styles.emptyActionText, { color: theme.text }]}>
+                        <Text
+                          style={[
+                            styles.emptyActionText,
+                            { color: theme.text },
+                          ]}
+                        >
                           {t('feed.empty.clearSearch', 'Clear search')}
                         </Text>
                       </TouchableOpacity>
@@ -1216,10 +1296,21 @@ export default function Page() {
                     {activeTab === 'forYou' ? (
                       <TouchableOpacity
                         onPress={openPrefModal}
-                        style={[styles.emptyAction, { borderColor: theme.tint }]}
+                        style={[
+                          styles.emptyAction,
+                          { borderColor: theme.tint },
+                        ]}
                       >
-                        <Text style={[styles.emptyActionText, { color: theme.tint }]}>
-                          {t('feed.empty.adjustForYou', 'Adjust For You preferences')}
+                        <Text
+                          style={[
+                            styles.emptyActionText,
+                            { color: theme.tint },
+                          ]}
+                        >
+                          {t(
+                            'feed.empty.adjustForYou',
+                            'Adjust For You preferences',
+                          )}
                         </Text>
                       </TouchableOpacity>
                     ) : null}
@@ -1228,14 +1319,14 @@ export default function Page() {
               }
               renderItem={renderWish}
             />
-          <ReportDialog
-            visible={reportVisible}
-            onClose={() => {
-              setReportVisible(false);
-              setReportTarget(null);
-            }}
-            onSubmit={handleReport}
-          />
+            <ReportDialog
+              visible={reportVisible}
+              onClose={() => {
+                setReportVisible(false);
+                setReportTarget(null);
+              }}
+              onSubmit={handleReport}
+            />
           </KeyboardAvoidingView>
         </SafeAreaView>
       </>

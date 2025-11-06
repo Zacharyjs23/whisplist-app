@@ -21,11 +21,11 @@ export default function useDM() {
       const updatedAt = t.updatedAt?.toMillis ? t.updatedAt.toMillis() : 0;
       const rec = t.readReceipts?.[user.uid];
       const recMs = rec?.toMillis ? rec.toMillis() : 0;
-      const isUnread = lastSender && lastSender !== user.uid && updatedAt > recMs;
+      const isUnread =
+        lastSender && lastSender !== user.uid && updatedAt > recMs;
       return acc + (isUnread ? 1 : 0);
     }, 0);
   }, [threads, user?.uid]);
 
   return { threads, unread };
 }
-

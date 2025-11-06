@@ -19,7 +19,9 @@ jest.mock('@/firebase', () => ({ db: {} }));
 jest.mock('firebase/firestore', () => ({}));
 
 const interpolate = (template: string, values: Record<string, unknown>) =>
-  template.replace(/{{\s*(\w+)\s*}}/g, (_, key: string) => String(values[key] ?? ''));
+  template.replace(/{{\s*(\w+)\s*}}/g, (_, key: string) =>
+    String(values[key] ?? ''),
+  );
 
 jest.mock('@/contexts/I18nContext', () => ({
   useTranslation: () => ({
@@ -43,7 +45,10 @@ jest.mock('@/contexts/I18nContext', () => ({
         return interpolate('· {{tier}}', defaultOrOptions ?? {});
       }
       if (key === 'home.communityPulse.supporterMeta') {
-        return interpolate('{{gifts}} gifts · ${{amount}}', defaultOrOptions ?? {});
+        return interpolate(
+          '{{gifts}} gifts · ${{amount}}',
+          defaultOrOptions ?? {},
+        );
       }
       return defaultOrOptions ?? key;
     },

@@ -1,5 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Text, TouchableOpacity, View, StyleSheet, Platform } from 'react-native';
+import {
+  Animated,
+  Text,
+  TouchableOpacity,
+  View,
+  StyleSheet,
+  Platform,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -57,7 +64,10 @@ export const DailyQuoteBanner: React.FC<Props> = ({
           opacity: anim,
           transform: [
             {
-              translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-6, 0] }),
+              translateY: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [-6, 0],
+              }),
             },
           ],
         },
@@ -65,16 +75,23 @@ export const DailyQuoteBanner: React.FC<Props> = ({
       accessibilityRole="summary"
       accessibilityLabel={t('dailyQuote.title')}
     >
-      <Text style={[styles.title, { color: theme.tint }]}>{t('dailyQuote.title')}</Text>
+      <Text style={[styles.title, { color: theme.tint }]}>
+        {t('dailyQuote.title')}
+      </Text>
       <Text style={[styles.text, { color: theme.text }]}>{text}</Text>
       {!!styleName && (
-        <Text style={[styles.styleCaption, { color: theme.text }]}>• {t(`dailyQuote.styles.${styleName}`, styleName)}</Text>
+        <Text style={[styles.styleCaption, { color: theme.text }]}>
+          • {t(`dailyQuote.styles.${styleName}`, styleName)}
+        </Text>
       )}
       <View style={styles.actionsRow}>
         <TouchableOpacity
           onPress={onTurnOffToday}
           accessibilityRole="button"
-          accessibilityLabel={t('dailyQuote.turnOffToday', 'Turn off for today')}
+          accessibilityLabel={t(
+            'dailyQuote.turnOffToday',
+            'Turn off for today',
+          )}
         >
           <Text style={[styles.action, { color: theme.tint }]}>
             {t('dailyQuote.turnOffToday', 'Turn off for today')}

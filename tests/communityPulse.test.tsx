@@ -2,7 +2,9 @@ import React from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 
 const mockGetIdToken = jest.fn<Promise<string>, []>();
-const mockFunctionUrl = jest.fn((name: string) => `https://example.com/${name}`);
+const mockFunctionUrl = jest.fn(
+  (name: string) => `https://example.com/${name}`,
+);
 
 jest.mock('@/firebase', () => ({
   auth: {
@@ -17,16 +19,28 @@ jest.mock('@/services/functions', () => ({
 }));
 
 const interpolate = (template: string, values: Record<string, unknown> = {}) =>
-  template.replace(/{{\s*(\w+)\s*}}/g, (_, token: string) => String(values[token] ?? ''));
+  template.replace(/{{\s*(\w+)\s*}}/g, (_, token: string) =>
+    String(values[token] ?? ''),
+  );
 
 jest.mock('@/contexts/I18nContext', () => ({
   useTranslation: () => ({
-    t: (key: string, defaultMessageOrOptions?: unknown, maybeOptions?: Record<string, unknown>) => {
+    t: (
+      key: string,
+      defaultMessageOrOptions?: unknown,
+      maybeOptions?: Record<string, unknown>,
+    ) => {
       if (typeof defaultMessageOrOptions === 'string') {
         return interpolate(defaultMessageOrOptions, maybeOptions ?? {});
       }
-      if (defaultMessageOrOptions && typeof defaultMessageOrOptions === 'object') {
-        return interpolate(key, defaultMessageOrOptions as Record<string, unknown>);
+      if (
+        defaultMessageOrOptions &&
+        typeof defaultMessageOrOptions === 'object'
+      ) {
+        return interpolate(
+          key,
+          defaultMessageOrOptions as Record<string, unknown>,
+        );
       }
       if (typeof defaultMessageOrOptions === 'undefined') {
         return key;
@@ -54,7 +68,9 @@ describe('useCommunityPulse', () => {
     jest.clearAllMocks();
     jest.setSystemTime(new Date('2024-01-10T12:00:00Z'));
     mockGetIdToken.mockResolvedValue('token-123');
-    mockFunctionUrl.mockReturnValue('https://example.com/getCommunityPulseHttp');
+    mockFunctionUrl.mockReturnValue(
+      'https://example.com/getCommunityPulseHttp',
+    );
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,

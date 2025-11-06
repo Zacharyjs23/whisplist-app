@@ -1,4 +1,8 @@
-import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
+import {
+  initializeTestEnvironment,
+  assertFails,
+  assertSucceeds,
+} from '@firebase/rules-unit-testing';
 import fs from 'fs';
 import { ref as sRef, uploadBytes, getBytes } from 'firebase/storage';
 
@@ -55,11 +59,9 @@ describeMaybe('storage rules', () => {
     // Larger than 10MB rejected
     const big = new Uint8Array(10 * 1024 * 1024 + 1);
     await assertFails(
-      uploadBytes(
-        sRef(ownerStorage, 'users/user1/big.jpg'),
-        big,
-        { contentType: 'image/jpeg' },
-      ),
+      uploadBytes(sRef(ownerStorage, 'users/user1/big.jpg'), big, {
+        contentType: 'image/jpeg',
+      }),
     );
   });
 
@@ -111,27 +113,21 @@ describeMaybe('storage rules', () => {
     const threadId = ['alice', 'bob'].sort().join('_');
     // alice can write
     await assertSucceeds(
-      uploadBytes(
-        sRef(a, `dm/${threadId}/m.jpg`),
-        new Uint8Array([1, 2, 3]),
-        { contentType: 'image/jpeg' },
-      ),
+      uploadBytes(sRef(a, `dm/${threadId}/m.jpg`), new Uint8Array([1, 2, 3]), {
+        contentType: 'image/jpeg',
+      }),
     );
     // bob can write
     await assertSucceeds(
-      uploadBytes(
-        sRef(b, `dm/${threadId}/m2.jpg`),
-        new Uint8Array([1, 2, 3]),
-        { contentType: 'image/jpeg' },
-      ),
+      uploadBytes(sRef(b, `dm/${threadId}/m2.jpg`), new Uint8Array([1, 2, 3]), {
+        contentType: 'image/jpeg',
+      }),
     );
     // charlie cannot
     await assertFails(
-      uploadBytes(
-        sRef(c, `dm/${threadId}/m3.jpg`),
-        new Uint8Array([1, 2, 3]),
-        { contentType: 'image/jpeg' },
-      ),
+      uploadBytes(sRef(c, `dm/${threadId}/m3.jpg`), new Uint8Array([1, 2, 3]), {
+        contentType: 'image/jpeg',
+      }),
     );
     // Participants can read; non-participants cannot
     await assertSucceeds(getBytes(sRef(b, `dm/${threadId}/m.jpg`)));
@@ -143,27 +139,21 @@ describeMaybe('storage rules', () => {
     const anon = testEnv.unauthenticatedContext().storage();
     // images path
     await assertSucceeds(
-      uploadBytes(
-        sRef(authed, 'images/pic.jpg'),
-        new Uint8Array([1, 2, 3]),
-        { contentType: 'image/jpeg' },
-      ),
+      uploadBytes(sRef(authed, 'images/pic.jpg'), new Uint8Array([1, 2, 3]), {
+        contentType: 'image/jpeg',
+      }),
     );
     await assertFails(
-      uploadBytes(
-        sRef(anon, 'images/bad.txt'),
-        new Uint8Array([1, 2, 3]),
-        { contentType: 'text/plain' },
-      ),
+      uploadBytes(sRef(anon, 'images/bad.txt'), new Uint8Array([1, 2, 3]), {
+        contentType: 'text/plain',
+      }),
     );
     await assertSucceeds(getBytes(sRef(anon, 'images/pic.jpg')));
     // audio path
     await assertSucceeds(
-      uploadBytes(
-        sRef(authed, 'audio/sound.m4a'),
-        new Uint8Array([1, 2, 3]),
-        { contentType: 'audio/aac' },
-      ),
+      uploadBytes(sRef(authed, 'audio/sound.m4a'), new Uint8Array([1, 2, 3]), {
+        contentType: 'audio/aac',
+      }),
     );
     await assertSucceeds(getBytes(sRef(anon, 'audio/sound.m4a')));
   });

@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   View,
   Text,
@@ -15,7 +21,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { useTranslation } from '@/contexts/I18nContext';
-import { listenThreads, getOrCreateThread, findUserIdByDisplayName, DMThreadWithId } from '@/services/dm';
+import {
+  listenThreads,
+  getOrCreateThread,
+  findUserIdByDisplayName,
+  DMThreadWithId,
+} from '@/services/dm';
 import { useRouter } from 'expo-router';
 import { db } from '@/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -43,7 +54,9 @@ export default function MessagesIndex() {
     const others = Array.from(
       new Set(
         threads
-          .map((t: any) => (t.participants || []).find((p: string) => p !== user?.uid))
+          .map((t: any) =>
+            (t.participants || []).find((p: string) => p !== user?.uid),
+          )
           .filter(Boolean) as string[],
       ),
     );
@@ -61,16 +74,21 @@ export default function MessagesIndex() {
     });
   }, [threads, user?.uid]);
 
-  useEffect(() => () => {
-    Object.values(profileSubs.current).forEach((unsub) => unsub?.());
-    profileSubs.current = {};
-  }, []);
+  useEffect(
+    () => () => {
+      Object.values(profileSubs.current).forEach((unsub) => unsub?.());
+      profileSubs.current = {};
+    },
+    [],
+  );
 
   const filteredThreads = useMemo(() => {
     const q = queryName.trim().replace(/^@/, '').toLowerCase();
     if (!q) return threads;
     return threads.filter((thread) => {
-      const other = (thread.participants || []).find((p: string) => p !== user?.uid);
+      const other = (thread.participants || []).find(
+        (p: string) => p !== user?.uid,
+      );
       const prof = other ? profiles[other] : undefined;
       const displayName = (prof?.displayName || other || '').toLowerCase();
       return displayName.includes(q);
@@ -81,7 +99,9 @@ export default function MessagesIndex() {
     const seen = new Set<string>();
     const list: string[] = [];
     threads.forEach((thread) => {
-      const other = (thread.participants || []).find((p: string) => p !== user?.uid);
+      const other = (thread.participants || []).find(
+        (p: string) => p !== user?.uid,
+      );
       if (!other || seen.has(other)) return;
       const prof = profiles[other];
       const label = prof?.displayName || other;
@@ -100,7 +120,11 @@ export default function MessagesIndex() {
       try {
         const last = thread.updatedAt as any;
         const receipts = (thread.readReceipts || {})[user?.uid || ''] as any;
-        const lastMs = last?.toMillis ? last.toMillis() : last?.seconds ? last.seconds * 1000 : 0;
+        const lastMs = last?.toMillis
+          ? last.toMillis()
+          : last?.seconds
+            ? last.seconds * 1000
+            : 0;
         const receiptsMs = receipts?.toMillis
           ? receipts.toMillis()
           : receipts?.seconds
@@ -148,218 +172,281 @@ export default function MessagesIndex() {
     router.push('/(tabs)/messages/notifications');
   }, [router]);
 
-  const renderHeader = useCallback(() => (
-    <View style={styles.headerSpacing}>
-      <View
-        style={[
-          styles.heroCard,
-          { backgroundColor: theme.input, borderColor: theme.placeholder },
-        ]}
-      >
-        <View style={styles.heroHeaderRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.heroTitle, { color: theme.text }]}>
-              {t('messages.title', 'Direct Messages')}
-            </Text>
-            <Text style={[styles.heroSubtitle, { color: theme.placeholder }]}>
-              {t('messages.heroSubtitle', 'Stay in touch with people you follow.')}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={openNotifications}
-            style={[
-              styles.heroAction,
-              {
-                backgroundColor: theme.background,
-                borderColor: theme.placeholder,
-              },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={t('messages.openNotifications', 'Open notifications')}
-          >
-            <Ionicons name="notifications-outline" size={18} color={theme.tint} />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.heroStatsRow}>
-          <View
-            style={[
-              styles.heroStatCard,
-              { borderColor: theme.placeholder },
-            ]}
-          >
-            <Text style={[styles.heroStatValue, { color: theme.text }]}>
-              {threads.length}
-            </Text>
-            <Text style={[styles.heroStatLabel, { color: theme.placeholder }]}>
-              {t('messages.statThreads', 'Threads')}
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.heroStatCard,
-              { borderColor: theme.placeholder },
-            ]}
-          >
-            <Text style={[styles.heroStatValue, { color: theme.text }]}>
-              {unreadCount}
-            </Text>
-            <Text style={[styles.heroStatLabel, { color: theme.placeholder }]}>
-              {t('messages.statUnread', 'Unread')}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      <View
-        style={[
-          styles.searchCard,
-          { backgroundColor: theme.input, borderColor: theme.placeholder },
-        ]}
-      >
-        <Text style={[styles.searchLabel, { color: theme.placeholder }]}>
-          {t('messages.searchLabel', 'Start a conversation')}
-        </Text>
-        <View style={styles.searchRow}>
-          <TextInput
-            placeholder={t('messages.startWith', 'Start DM with @displayName')}
-            placeholderTextColor={theme.placeholder}
-            style={[
-              styles.searchInput,
-              {
-                backgroundColor: theme.background,
-                borderColor: theme.placeholder,
-                color: theme.text,
-              },
-            ]}
-            value={queryName}
-            onChangeText={setQueryName}
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="search"
-          />
-          <TouchableOpacity
-            onPress={startDm}
-            disabled={startDisabled}
-            style={[
-              styles.startButton,
-              {
-                backgroundColor: startDisabled ? theme.placeholder : theme.tint,
-              },
-              startDisabled && styles.startButtonDisabled,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={t('messages.start', 'Start')}
-          >
-            <Text
-              style={[
-                styles.startButtonText,
-                { color: startDisabled ? theme.background : theme.background },
-              ]}
-            >
-              {t('messages.start', 'Start')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-        {error ? (
-          <Text style={styles.errorText}>{error}</Text>
-        ) : (
-          <Text style={[styles.searchHint, { color: theme.placeholder }]}>
-            {t('messages.startHint', 'Type a @username to begin')}
-          </Text>
-        )}
-        {quickRecipients.length > 0 ? (
-          <View style={styles.quickSection}>
-            <Text style={[styles.quickLabel, { color: theme.placeholder }]}>
-              {t('messages.quickHeader', 'Quick start')}
-            </Text>
-            <View style={styles.quickWrap}>
-              {quickRecipients.map((label) => (
-                <TouchableOpacity
-                  key={label}
-                  style={[
-                    styles.quickChip,
-                    {
-                      borderColor: theme.placeholder,
-                      backgroundColor: theme.background,
-                    },
-                  ]}
-                  onPress={() => setQueryName(`@${label}`)}
-                >
-                  <Text style={[styles.quickChipText, { color: theme.tint }]}>@{label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        ) : null}
-      </View>
-    </View>
-  ), [
-    error,
-    openNotifications,
-    quickRecipients,
-    queryName,
-    startDisabled,
-    startDm,
-    t,
-    theme.background,
-    theme.input,
-    theme.placeholder,
-    theme.text,
-    theme.tint,
-    threads.length,
-    unreadCount,
-  ]);
-
-  const renderItem = useCallback(({ item }: { item: DMThreadWithId }) => {
-    const other = (item.participants || []).find((p: string) => p !== user?.uid);
-    const prof = other ? profiles[other] : undefined;
-    const name = prof?.displayName || other;
-    const avatar = prof?.photoURL as string | undefined;
-    const unread = isThreadUnread(item);
-    const updated: any = item.updatedAt;
-    const updatedMs = updated?.toMillis ? updated.toMillis() : updated?.seconds ? updated.seconds * 1000 : null;
-    const relativeTime = updatedMs
-      ? formatDistanceToNow(new Date(updatedMs), { addSuffix: true })
-      : t('messages.noMessages', 'No messages yet');
-
-    return (
-      <TouchableOpacity
-        onPress={() => handleOpenThread(item.id)}
-        style={[
-          styles.item,
-          {
-            backgroundColor: theme.input,
-            borderColor: unread ? theme.tint : theme.placeholder,
-          },
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel={t('messages.openChatWith', 'Open chat with {{name}}', { name })}
-      >
-        <View style={styles.profileRow}>
-          {avatar ? (
-            <Image source={{ uri: avatar }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.placeholder, { backgroundColor: theme.background }]} />
-          )}
-          <View style={{ flex: 1, gap: 2 }}>
-            <View style={styles.nameRow}>
-              <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>
-                {name}
+  const renderHeader = useCallback(
+    () => (
+      <View style={styles.headerSpacing}>
+        <View
+          style={[
+            styles.heroCard,
+            { backgroundColor: theme.input, borderColor: theme.placeholder },
+          ]}
+        >
+          <View style={styles.heroHeaderRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.heroTitle, { color: theme.text }]}>
+                {t('messages.title', 'Direct Messages')}
               </Text>
-              {unread ? <View style={[styles.unreadDot, { backgroundColor: theme.tint }]} /> : null}
+              <Text style={[styles.heroSubtitle, { color: theme.placeholder }]}>
+                {t(
+                  'messages.heroSubtitle',
+                  'Stay in touch with people you follow.',
+                )}
+              </Text>
             </View>
-            <Text style={[styles.timestamp, { color: theme.placeholder }]}>{relativeTime}</Text>
+            <TouchableOpacity
+              onPress={openNotifications}
+              style={[
+                styles.heroAction,
+                {
+                  backgroundColor: theme.background,
+                  borderColor: theme.placeholder,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t(
+                'messages.openNotifications',
+                'Open notifications',
+              )}
+            >
+              <Ionicons
+                name="notifications-outline"
+                size={18}
+                color={theme.tint}
+              />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.heroStatsRow}>
+            <View
+              style={[styles.heroStatCard, { borderColor: theme.placeholder }]}
+            >
+              <Text style={[styles.heroStatValue, { color: theme.text }]}>
+                {threads.length}
+              </Text>
+              <Text
+                style={[styles.heroStatLabel, { color: theme.placeholder }]}
+              >
+                {t('messages.statThreads', 'Threads')}
+              </Text>
+            </View>
+            <View
+              style={[styles.heroStatCard, { borderColor: theme.placeholder }]}
+            >
+              <Text style={[styles.heroStatValue, { color: theme.text }]}>
+                {unreadCount}
+              </Text>
+              <Text
+                style={[styles.heroStatLabel, { color: theme.placeholder }]}
+              >
+                {t('messages.statUnread', 'Unread')}
+              </Text>
+            </View>
           </View>
         </View>
-        <Text style={[styles.preview, { color: theme.placeholder }]} numberOfLines={1}>
-          {item.lastMessage || t('messages.noMessages', 'No messages yet')}
-        </Text>
-      </TouchableOpacity>
-    );
-  }, [handleOpenThread, isThreadUnread, profiles, theme.input, theme.background, theme.text, theme.placeholder, theme.tint, t, user?.uid]);
+
+        <View
+          style={[
+            styles.searchCard,
+            { backgroundColor: theme.input, borderColor: theme.placeholder },
+          ]}
+        >
+          <Text style={[styles.searchLabel, { color: theme.placeholder }]}>
+            {t('messages.searchLabel', 'Start a conversation')}
+          </Text>
+          <View style={styles.searchRow}>
+            <TextInput
+              placeholder={t(
+                'messages.startWith',
+                'Start DM with @displayName',
+              )}
+              placeholderTextColor={theme.placeholder}
+              style={[
+                styles.searchInput,
+                {
+                  backgroundColor: theme.background,
+                  borderColor: theme.placeholder,
+                  color: theme.text,
+                },
+              ]}
+              value={queryName}
+              onChangeText={setQueryName}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="search"
+            />
+            <TouchableOpacity
+              onPress={startDm}
+              disabled={startDisabled}
+              style={[
+                styles.startButton,
+                {
+                  backgroundColor: startDisabled
+                    ? theme.placeholder
+                    : theme.tint,
+                },
+                startDisabled && styles.startButtonDisabled,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('messages.start', 'Start')}
+            >
+              <Text
+                style={[
+                  styles.startButtonText,
+                  {
+                    color: startDisabled ? theme.background : theme.background,
+                  },
+                ]}
+              >
+                {t('messages.start', 'Start')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {error ? (
+            <Text style={styles.errorText}>{error}</Text>
+          ) : (
+            <Text style={[styles.searchHint, { color: theme.placeholder }]}>
+              {t('messages.startHint', 'Type a @username to begin')}
+            </Text>
+          )}
+          {quickRecipients.length > 0 ? (
+            <View style={styles.quickSection}>
+              <Text style={[styles.quickLabel, { color: theme.placeholder }]}>
+                {t('messages.quickHeader', 'Quick start')}
+              </Text>
+              <View style={styles.quickWrap}>
+                {quickRecipients.map((label) => (
+                  <TouchableOpacity
+                    key={label}
+                    style={[
+                      styles.quickChip,
+                      {
+                        borderColor: theme.placeholder,
+                        backgroundColor: theme.background,
+                      },
+                    ]}
+                    onPress={() => setQueryName(`@${label}`)}
+                  >
+                    <Text style={[styles.quickChipText, { color: theme.tint }]}>
+                      @{label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          ) : null}
+        </View>
+      </View>
+    ),
+    [
+      error,
+      openNotifications,
+      quickRecipients,
+      queryName,
+      startDisabled,
+      startDm,
+      t,
+      theme.background,
+      theme.input,
+      theme.placeholder,
+      theme.text,
+      theme.tint,
+      threads.length,
+      unreadCount,
+    ],
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: DMThreadWithId }) => {
+      const other = (item.participants || []).find(
+        (p: string) => p !== user?.uid,
+      );
+      const prof = other ? profiles[other] : undefined;
+      const name = prof?.displayName || other;
+      const avatar = prof?.photoURL as string | undefined;
+      const unread = isThreadUnread(item);
+      const updated: any = item.updatedAt;
+      const updatedMs = updated?.toMillis
+        ? updated.toMillis()
+        : updated?.seconds
+          ? updated.seconds * 1000
+          : null;
+      const relativeTime = updatedMs
+        ? formatDistanceToNow(new Date(updatedMs), { addSuffix: true })
+        : t('messages.noMessages', 'No messages yet');
+
+      return (
+        <TouchableOpacity
+          onPress={() => handleOpenThread(item.id)}
+          style={[
+            styles.item,
+            {
+              backgroundColor: theme.input,
+              borderColor: unread ? theme.tint : theme.placeholder,
+            },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={t(
+            'messages.openChatWith',
+            'Open chat with {{name}}',
+            { name },
+          )}
+        >
+          <View style={styles.profileRow}>
+            {avatar ? (
+              <Image source={{ uri: avatar }} style={styles.avatar} />
+            ) : (
+              <View
+                style={[
+                  styles.placeholder,
+                  { backgroundColor: theme.background },
+                ]}
+              />
+            )}
+            <View style={{ flex: 1, gap: 2 }}>
+              <View style={styles.nameRow}>
+                <Text
+                  style={[styles.title, { color: theme.text }]}
+                  numberOfLines={1}
+                >
+                  {name}
+                </Text>
+                {unread ? (
+                  <View
+                    style={[styles.unreadDot, { backgroundColor: theme.tint }]}
+                  />
+                ) : null}
+              </View>
+              <Text style={[styles.timestamp, { color: theme.placeholder }]}>
+                {relativeTime}
+              </Text>
+            </View>
+          </View>
+          <Text
+            style={[styles.preview, { color: theme.placeholder }]}
+            numberOfLines={1}
+          >
+            {item.lastMessage || t('messages.noMessages', 'No messages yet')}
+          </Text>
+        </TouchableOpacity>
+      );
+    },
+    [
+      handleOpenThread,
+      isThreadUnread,
+      profiles,
+      theme.input,
+      theme.background,
+      theme.text,
+      theme.placeholder,
+      theme.tint,
+      t,
+      user?.uid,
+    ],
+  );
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: theme.background }]}
+    >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.container}
@@ -376,7 +463,9 @@ export default function MessagesIndex() {
               <Text style={[styles.emptyTitle, { color: theme.text }]}>
                 {t('messages.emptyTitle', 'No conversations yet')}
               </Text>
-              <Text style={[styles.emptySubtitle, { color: theme.placeholder }]}>
+              <Text
+                style={[styles.emptySubtitle, { color: theme.placeholder }]}
+              >
                 {t(
                   'messages.emptySubtitle',
                   'Send your first direct message to stay in touch with your favorite wishers.',

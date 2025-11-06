@@ -1,4 +1,9 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useReducer,
+} from 'react';
 import {
   collection,
   onSnapshot,
@@ -11,6 +16,10 @@ import {
 } from 'firebase/firestore';
 import { useAuthSession } from './AuthSessionContext';
 import { db } from '../firebase';
+import {
+  initialWishlistState,
+  wishlistReducer,
+} from '@/src/reducers/wishlistReducer';
 
 interface SavedContextValue {
   saved: Record<string, boolean>;
@@ -26,7 +35,10 @@ export const SavedWishesProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const { user } = useAuthSession();
-  const [saved, setSaved] = useState<Record<string, boolean>>({});
+  const [saved, dispatch] = useReducer(
+    wishlistReducer,
+    initialWishlistState,
+  );
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -35,11 +47,11 @@ export const SavedWishesProvider: React.FC<{ children: React.ReactNode }> = ({
       orderBy('timestamp', 'desc'),
     );
     const unsub = onSnapshot(q, (snap) => {
-      const obj: Record<string, boolean> = {};
+      const ids: string[] = [];
       snap.forEach((d) => {
-        obj[d.id] = true;
+        ids.push(d.id);
       });
-      setSaved(obj);
+      dispatch({ type: 'SET_ALL', payload: ids });
     });
     return unsub;
   }, [user]);
@@ -47,10 +59,23 @@ export const SavedWishesProvider: React.FC<{ children: React.ReactNode }> = ({
   const toggleSave = async (id: string) => {
     if (!user?.uid) return;
     const ref = doc(db, 'users', user.uid, 'savedWishes', id);
-    if (saved[id]) {
-      await deleteDoc(ref);
+    const exists = !!saved[id];
+    if (exists) {
+      dispatch({ type: 'REMOVE_ITEM', payload: id });
+      try {
+        await deleteDoc(ref);
+      } catch (err) {
+        dispatch({ type: 'ADD_ITEM', payload: id });
+        throw err;
+      }
     } else {
-      await setDoc(ref, { timestamp: serverTimestamp() });
+      dispatch({ type: 'ADD_ITEM', payload: id });
+      try {
+        await setDoc(ref, { timestamp: serverTimestamp() });
+      } catch (err) {
+        dispatch({ type: 'REMOVE_ITEM', payload: id });
+        throw err;
+      }
     }
   };
 

@@ -7,7 +7,7 @@ import useNotifications from '@/hooks/useNotifications';
 import useDM from '@/hooks/useDM';
 import { useTranslation } from '@/contexts/I18nContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
- 
+
 import { useFocusEffect } from '@react-navigation/native';
 import { getQueueStatus } from '@/helpers/offlineQueue';
 
@@ -23,7 +23,9 @@ export default function Layout() {
     return total > 99 ? '99+' : String(total);
   }, [dmUnread, unread]);
   const { t } = useTranslation();
-  const [homeBadge, setHomeBadge] = React.useState<string | undefined>(undefined);
+  const [homeBadge, setHomeBadge] = React.useState<string | undefined>(
+    undefined,
+  );
 
   const refreshHomeBadge = async () => {
     try {
@@ -100,7 +102,11 @@ export default function Layout() {
           title: t('tabs.messages', 'Messages'),
           tabBarBadge: combinedMessageBadge,
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-            <Ionicons name="chatbox-ellipses-outline" color={color} size={size} />
+            <Ionicons
+              name="chatbox-ellipses-outline"
+              color={color}
+              size={size}
+            />
           ),
         }}
       />

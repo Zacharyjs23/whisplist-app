@@ -339,6 +339,12 @@ service cloud.firestore {
         allow read, write: if request.auth != null && request.auth.uid == uid;
       }
 
+      match /checkoutTokens/{tokenId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow delete: if request.auth != null && request.auth.uid == uid;
+        allow create, update: if false;
+      }
+
       match /progress/{docId} {
         allow read: if request.auth != null && request.auth.uid == uid;
         allow write: if request.auth != null
@@ -628,6 +634,15 @@ service cloud.firestore {
         && ('timestamp' in request.resource.data)
         && isShortString(request.resource.data.text, 2000);
       allow read, update, delete: if false;
+    }
+
+    match /expressCheckoutRequests/{requestId} {
+      allow read: if signedIn()
+        && (
+          (resource.data.buyerId is string && resource.data.buyerId == request.auth.uid)
+          || (resource.data.curatorId is string && resource.data.curatorId == request.auth.uid)
+        );
+      allow write: if false;
     }
 
     match /{document=**} {

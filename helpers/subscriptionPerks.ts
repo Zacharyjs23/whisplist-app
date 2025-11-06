@@ -1,5 +1,9 @@
-export const PLAN_KEYS = ['supporter_monthly', 'patron_monthly', 'patron_annual'] as const;
-export type PlanKey = typeof PLAN_KEYS[number];
+export const PLAN_KEYS = [
+  'supporter_monthly',
+  'patron_monthly',
+  'patron_annual',
+] as const;
+export type PlanKey = (typeof PLAN_KEYS)[number];
 
 type CopyEntry = {
   key: string;
@@ -10,11 +14,20 @@ const PLAN_BENEFITS: Record<PlanKey, CopyEntry[]> = {
   supporter_monthly: [
     { key: 'subscriptions.benefits.rephrase', fallback: 'Rephrase assistant' },
     { key: 'subscriptions.benefits.badge', fallback: 'Supporter badge' },
-    { key: 'subscriptions.benefits.early', fallback: 'Early access to features' },
-    { key: 'subscriptions.benefits.supporterImpact', fallback: 'Keep WhispList independent and ad-free' },
+    {
+      key: 'subscriptions.benefits.early',
+      fallback: 'Early access to features',
+    },
+    {
+      key: 'subscriptions.benefits.supporterImpact',
+      fallback: 'Keep WhispList independent and ad-free',
+    },
   ],
   patron_monthly: [
-    { key: 'subscriptions.benefits.patron.allSupporter', fallback: 'Everything in Supporter' },
+    {
+      key: 'subscriptions.benefits.patron.allSupporter',
+      fallback: 'Everything in Supporter',
+    },
     { key: 'subscriptions.benefits.image', fallback: 'Higher image quality' },
     {
       key: 'subscriptions.benefits.patron.communityImpact',
@@ -26,7 +39,10 @@ const PLAN_BENEFITS: Record<PlanKey, CopyEntry[]> = {
     },
   ],
   patron_annual: [
-    { key: 'subscriptions.benefits.annual.allPatron', fallback: 'Everything in Patron' },
+    {
+      key: 'subscriptions.benefits.annual.allPatron',
+      fallback: 'Everything in Patron',
+    },
     {
       key: 'subscriptions.benefits.annual.savings',
       fallback: 'Two months free compared to paying monthly',
@@ -43,8 +59,14 @@ const PLAN_BENEFITS: Record<PlanKey, CopyEntry[]> = {
 };
 
 const PLAN_BADGES: Partial<Record<PlanKey, CopyEntry>> = {
-  patron_monthly: { key: 'subscriptions.badges.mostPopular', fallback: 'Most popular' },
-  patron_annual: { key: 'subscriptions.badges.bestValue', fallback: 'Best value' },
+  patron_monthly: {
+    key: 'subscriptions.badges.mostPopular',
+    fallback: 'Most popular',
+  },
+  patron_annual: {
+    key: 'subscriptions.badges.bestValue',
+    fallback: 'Best value',
+  },
 };
 
 export const resolvePlanBenefits = (

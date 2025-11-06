@@ -6,20 +6,46 @@ const SkeletonCard: React.FC = () => {
   const { theme } = useTheme();
   return (
     <View style={[styles.card, { backgroundColor: theme.input + '' }]}>
-      <View style={[styles.pill, { backgroundColor: theme.placeholder + '33' }]} />
-      <View style={[styles.line, { backgroundColor: theme.placeholder + '44' }]} />
-      <View style={[styles.lineShort, { backgroundColor: theme.placeholder + '44' }]} />
-      <View style={[styles.image, { backgroundColor: theme.placeholder + '22' }]} />
+      <View
+        style={[styles.pill, { backgroundColor: theme.placeholder + '33' }]}
+      />
+      <View
+        style={[styles.line, { backgroundColor: theme.placeholder + '44' }]}
+      />
+      <View
+        style={[
+          styles.lineShort,
+          { backgroundColor: theme.placeholder + '44' },
+        ]}
+      />
+      <View
+        style={[styles.image, { backgroundColor: theme.placeholder + '22' }]}
+      />
       <View style={[styles.row]}>
-        <View style={[styles.reaction, { backgroundColor: theme.placeholder + '33' }]} />
-        <View style={[styles.reaction, { backgroundColor: theme.placeholder + '33' }]} />
-        <View style={[styles.reaction, { backgroundColor: theme.placeholder + '33' }]} />
+        <View
+          style={[
+            styles.reaction,
+            { backgroundColor: theme.placeholder + '33' },
+          ]}
+        />
+        <View
+          style={[
+            styles.reaction,
+            { backgroundColor: theme.placeholder + '33' },
+          ]}
+        />
+        <View
+          style={[
+            styles.reaction,
+            { backgroundColor: theme.placeholder + '33' },
+          ]}
+        />
       </View>
     </View>
   );
 };
 
-export const FeedSkeleton: React.FC<{ count?: number } > = ({ count = 3 }) => {
+export const FeedSkeleton: React.FC<{ count?: number }> = ({ count = 3 }) => {
   return (
     <View>
       {Array.from({ length: count }).map((_, i) => (
@@ -72,4 +98,3 @@ const styles = StyleSheet.create({
 });
 
 export default FeedSkeleton;
-

@@ -4,7 +4,9 @@ jest.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: {
-    getItem: jest.fn((key: string) => Promise.resolve(mockStorage[key] ?? null)),
+    getItem: jest.fn((key: string) =>
+      Promise.resolve(mockStorage[key] ?? null),
+    ),
     setItem: jest.fn((key: string, value: string) => {
       mockStorage[key] = value;
       return Promise.resolve();
@@ -15,10 +17,16 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
     }),
   },
 }));
-jest.mock('@/helpers/wishes', () => ({ addWish: jest.fn(() => Promise.resolve()) }));
+jest.mock('@/helpers/wishes', () => ({
+  addWish: jest.fn(() => Promise.resolve()),
+}));
 jest.mock('@/helpers/analytics', () => ({ trackEvent: jest.fn() }));
-jest.mock('@/helpers/engagement', () => ({ recordEngagementEvent: jest.fn(() => Promise.resolve()) }));
-jest.mock('@/helpers/postPreferences', () => ({ recordPostTypeUsage: jest.fn(() => Promise.resolve()) }));
+jest.mock('@/helpers/engagement', () => ({
+  recordEngagementEvent: jest.fn(() => Promise.resolve()),
+}));
+jest.mock('@/helpers/postPreferences', () => ({
+  recordPostTypeUsage: jest.fn(() => Promise.resolve()),
+}));
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { addWish } from '@/helpers/wishes';
@@ -69,7 +77,11 @@ describe('offline queue analytics metadata', () => {
   });
 
   it('reports offline state with type metadata when offline', async () => {
-    await enqueuePendingWish({ type: 'advice', text: 'Need help', userId: 'u4' });
+    await enqueuePendingWish({
+      type: 'advice',
+      text: 'Need help',
+      userId: 'u4',
+    });
     (trackEvent as jest.Mock).mockClear();
 
     fetch.mockImplementation(() => Promise.resolve({ ok: false }));
@@ -79,6 +91,27 @@ describe('offline queue analytics metadata', () => {
     expect(trackEvent).toHaveBeenCalledWith(
       'offline_queue_state',
       expect.objectContaining({ online: false, next_type: 'advice' }),
+    );
+  });
+
+  it('preserves stage and circle metadata when flushing queued wishes', async () => {
+    await enqueuePendingWish({
+      type: 'goal',
+      text: 'Offline circle',
+      stage: 'shared',
+      accountabilityCircleId: 'circle-1',
+      accountabilityCircleName: 'Morning Crew',
+    });
+
+    (addWish as jest.Mock).mockClear();
+    await flushPendingWishes();
+
+    expect(addWish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stage: 'shared',
+        accountabilityCircleId: 'circle-1',
+        accountabilityCircleName: 'Morning Crew',
+      }),
     );
   });
 });

@@ -20,20 +20,34 @@ const ActionPromptsCard: React.FC<Props> = ({ prompts }) => {
   const { t } = useTranslation();
   if (!prompts.length) return null;
   return (
-    <View style={[styles.container, { backgroundColor: theme.input, borderColor: theme.placeholder }]}>
-      <Text style={[styles.title, { color: theme.text }]}>{t('home.prompts.title', 'Keep the love going')}</Text>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: theme.input, borderColor: theme.placeholder },
+      ]}
+    >
+      <Text style={[styles.title, { color: theme.text }]}>
+        {t('home.prompts.title', 'Keep the love going')}
+      </Text>
       {prompts.map((prompt) => (
         <View key={prompt.key} style={styles.row}>
-          <Text style={[styles.icon, { color: theme.tint }]} accessibilityLabel={prompt.icon}>
+          <Text
+            style={[styles.icon, { color: theme.tint }]}
+            accessibilityLabel={prompt.icon}
+          >
             {prompt.icon}
           </Text>
-          <Text style={[styles.message, { color: theme.text }]}>{prompt.message}</Text>
+          <Text style={[styles.message, { color: theme.text }]}>
+            {prompt.message}
+          </Text>
           <TouchableOpacity
             onPress={prompt.onPress}
             style={[styles.button, { backgroundColor: theme.tint }]}
             accessibilityRole="button"
           >
-            <Text style={[styles.buttonText, { color: theme.background }]}>{prompt.cta}</Text>
+            <Text style={[styles.buttonText, { color: theme.background }]}>
+              {prompt.cta}
+            </Text>
           </TouchableOpacity>
         </View>
       ))}
@@ -77,4 +91,3 @@ const styles = StyleSheet.create({
 });
 
 export default ActionPromptsCard;
-

@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import {
   collection,
   getDocs,
@@ -10,7 +10,13 @@ import {
   limit,
   startAfter,
 } from 'firebase/firestore';
-import React, { useEffect, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -34,6 +40,13 @@ import { Colors } from '@/constants/Colors';
 import type { Wish } from '../../types/Wish';
 import * as logger from '@/shared/logger';
 import { POST_TYPE_META, normalizePostType } from '@/types/post';
+import { useFeatureFlags } from '@/contexts/FeatureFlagsContext';
+import { useMicroList } from '@/hooks/useMicroList';
+import {
+  MicroListCard,
+  type ResolvedMicroListItem,
+} from '@/components/MicroListCard';
+import { trackEvent } from '@/helpers/analytics';
 
 export default function Page() {
   const { displayName } = useLocalSearchParams<{ displayName: string }>();
@@ -49,13 +62,28 @@ export default function Page() {
   const [lastDoc, setLastDoc] = useState<any | null>(null);
   const { user } = useAuthSession();
   const router = useRouter();
+  const wishMap = useMemo(() => {
+    const map = new Map<string, Wish>();
+    wishes.forEach((wish) => map.set(wish.id, wish));
+    return map;
+  }, [wishes]);
+  const { microList: microListEnabled } = useFeatureFlags();
+  const { microList, loading: microListLoading } = useMicroList(profileId);
+  const [resolvedMicroList, setResolvedMicroList] = useState<
+    ResolvedMicroListItem[]
+  >([]);
+  const [hydratingMicroList, setHydratingMicroList] = useState(false);
+  const hasTrackedMicroList = useRef(false);
 
   useEffect(() => {
     const load = async () => {
       if (!displayName) return;
       try {
         const userSnap = await getDocs(
-          query(collection(db, 'users'), where('displayName', '==', displayName)),
+          query(
+            collection(db, 'users'),
+            where('displayName', '==', displayName),
+          ),
         );
         if (userSnap.empty) {
           setPrivateProfile(true);
@@ -104,6 +132,84 @@ export default function Page() {
     load();
   }, [displayName, user]);
 
+  useEffect(() => {
+    const items = microList?.items;
+    if (!items?.length) {
+      setResolvedMicroList([]);
+      return;
+    }
+    let cancelled = false;
+    const hydrate = async () => {
+      setHydratingMicroList(true);
+      try {
+        const data = await Promise.all<ResolvedMicroListItem | null>(
+          items.map(async (item) => {
+            const fromPosted = wishMap.get(item.wishId);
+            if (fromPosted) {
+              return {
+                wish: fromPosted,
+                note: item.note,
+                affiliateUrl: item.affiliateUrl,
+              } as ResolvedMicroListItem;
+            }
+            try {
+              const snap = await getDoc(doc(db, 'wishes', item.wishId));
+              if (snap.exists()) {
+                const wish = {
+                  id: snap.id,
+                  ...(snap.data() as Omit<Wish, 'id'>),
+                } as Wish;
+                return {
+                  wish,
+                  note: item.note,
+                  affiliateUrl: item.affiliateUrl,
+                } as ResolvedMicroListItem;
+              }
+            } catch (error) {
+              logger.warn('Failed to hydrate micro list wish', {
+                wishId: item.wishId,
+                error,
+              });
+            }
+            return null;
+          }),
+        );
+        if (!cancelled) {
+          const filtered = data.filter(
+            (entry): entry is ResolvedMicroListItem => entry !== null,
+          );
+          setResolvedMicroList(filtered);
+        }
+      } finally {
+        if (!cancelled) {
+          setHydratingMicroList(false);
+        }
+      }
+    };
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [microList?.items, wishMap]);
+
+  useEffect(() => {
+    if (!microListEnabled || !profileId || !resolvedMicroList.length) return;
+    if (hasTrackedMicroList.current) return;
+    trackEvent('microlist_open', { profile_id: profileId });
+    hasTrackedMicroList.current = true;
+  }, [microListEnabled, profileId, resolvedMicroList.length]);
+
+  const handleMicroListPress = useCallback(
+    (wish: Wish, index: number) => {
+      trackEvent('microlist_click_item', {
+        wish_id: wish.id,
+        position: index + 1,
+      });
+      router.push(`/wish/${wish.id}` as Href);
+    },
+    [router],
+  );
+
   const loadMore = async () => {
     if (!lastDoc) return;
     const snap = await getDocs(
@@ -146,8 +252,10 @@ export default function Page() {
 
   if (privateProfile || !profile) {
     return (
-      <View style={[styles.center, { backgroundColor: theme.background }]}> 
-        <Text style={[styles.notFound, { color: theme.text }]}>This user has a private profile.</Text>
+      <View style={[styles.center, { backgroundColor: theme.background }]}>
+        <Text style={[styles.notFound, { color: theme.text }]}>
+          This user has a private profile.
+        </Text>
       </View>
     );
   }
@@ -211,11 +319,32 @@ export default function Page() {
           <Text style={{ color: theme.tint }}>Share Profile</Text>
         </TouchableOpacity>
       </View>
+      {microListEnabled ? (
+        microListLoading || hydratingMicroList ? (
+          <View
+            style={[
+              styles.microListLoader,
+              { borderColor: theme.placeholder, backgroundColor: theme.input },
+            ]}
+          >
+            <ActivityIndicator color={theme.tint} />
+          </View>
+        ) : resolvedMicroList.length ? (
+          <MicroListCard
+            title={microList?.title ?? 'Wish highlights'}
+            coverUrl={microList?.coverUrl}
+            items={resolvedMicroList}
+            onPressItem={handleMicroListPress}
+          />
+        ) : null
+      ) : null}
       <FlatList
         data={wishes}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={
-          <Text style={[styles.noResults, { color: theme.text }]}>No public posts yet</Text>
+          <Text style={[styles.noResults, { color: theme.text }]}>
+            No public posts yet
+          </Text>
         }
         renderItem={({ item }) => {
           const isBoosted =
@@ -233,15 +362,18 @@ export default function Page() {
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Text style={[styles.categoryText, { color: typeMeta.color }]}>
-                {typeMeta.emoji} #{item.category}{' '}
-                {item.audioUrl ? '🔊' : ''}
+                {typeMeta.emoji} #{item.category} {item.audioUrl ? '🔊' : ''}
               </Text>
-              <Text style={[styles.wishText, { color: theme.text }]}>{item.text}</Text>
+              <Text style={[styles.wishText, { color: theme.text }]}>
+                {item.text}
+              </Text>
               {item.imageUrl && (
                 <Image source={{ uri: item.imageUrl }} style={styles.preview} />
               )}
               {isBoosted && (
-                <Text style={[styles.boostedLabel, { color: theme.tint }]}>⏳ Time left: {timeLeft}</Text>
+                <Text style={[styles.boostedLabel, { color: theme.tint }]}>
+                  ⏳ Time left: {timeLeft}
+                </Text>
               )}
               <Text style={[styles.timestamp, { color: theme.text }]}>
                 {item.timestamp?.seconds
@@ -296,4 +428,11 @@ const createStyles = (c: (typeof Colors)['light'] & { name: string }) =>
       marginBottom: 20,
     },
     shareButton: { marginTop: 10, padding: 8, borderRadius: 8 },
+    microListLoader: {
+      borderRadius: 20,
+      borderWidth: StyleSheet.hairlineWidth,
+      padding: 20,
+      marginBottom: 16,
+      alignItems: 'center',
+    },
   });

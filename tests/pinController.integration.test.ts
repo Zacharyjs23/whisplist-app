@@ -1,7 +1,7 @@
 const mockStorage: Record<string, string> = {};
 const mockListeners = new Map<
   string,
-  Set<(snapshot: { docs: Array<{ id: string; data: () => any }> }) => void>
+  Set<(snapshot: { docs: { id: string; data: () => any }[] }) => void>
 >();
 const mockStore = new Map<string, any>();
 
@@ -105,7 +105,7 @@ jest.mock('firebase/firestore', () => {
 
   const query = (
     target: { path: string },
-    ...clauses: Array<{ field: string; direction: 'asc' | 'desc' }>
+    ...clauses: { field: string; direction: 'asc' | 'desc' }[]
   ) => ({
     path: target.path,
     orderBy: clauses.find((clause) => clause.field) ?? null,
@@ -132,7 +132,7 @@ jest.mock('firebase/firestore', () => {
 
   const onSnapshot = (
     q: { path: string },
-    onNext: (snapshot: { docs: Array<{ id: string; data: () => any }> }) => void,
+    onNext: (snapshot: { docs: { id: string; data: () => any }[] }) => void,
     onError?: (err: any) => void,
   ) => {
     const set = mockListeners.get(q.path) ?? new Set();
@@ -187,7 +187,7 @@ jest.mock('firebase/firestore', () => {
       delete: (ref: { path: string; parentPath: string }) => void;
     }) => Promise<any> | any,
   ) => {
-    const mutations: Array<() => void> = [];
+    const mutations: (() => void)[] = [];
     const tx = {
       get: async (ref: { path: string }) => {
         const data = mockStore.get(ref.path);
@@ -217,7 +217,6 @@ jest.mock('firebase/firestore', () => {
     };
     const result = await updateFn(tx);
     // Apply mutations synchronously to maintain order for tests.
-    // eslint-disable-next-line no-await-in-loop
     for (const mutate of mutations) {
       await mutate();
     }

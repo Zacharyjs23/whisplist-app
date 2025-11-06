@@ -31,7 +31,12 @@ export default function DebugScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.background }]}> 
+    <ScrollView
+      contentContainerStyle={[
+        styles.container,
+        { backgroundColor: theme.background },
+      ]}
+    >
       <Text style={[styles.title, { color: theme.text }]}>
         {t('debug.title', 'Debug Information')}
       </Text>
@@ -43,7 +48,10 @@ export default function DebugScreen() {
           </Text>
         </View>
       ))}
-      <ThemedButton title={t('debug.copy', 'Copy to Clipboard')} onPress={copy} />
+      <ThemedButton
+        title={t('debug.copy', 'Copy to Clipboard')}
+        onPress={copy}
+      />
     </ScrollView>
   );
 }
@@ -71,4 +79,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-

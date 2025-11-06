@@ -12,9 +12,10 @@ import {
   Dimensions,
   Animated,
   TouchableOpacity,
-  ViewToken,
   FlatList,
   ActivityIndicator,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
@@ -40,19 +41,24 @@ export default function Page() {
   const router = useRouter();
   const { theme } = useTheme();
   const { t } = useTranslation();
-  const {
-    signInWithGoogle,
-    signInAnonymously,
-    authError,
-    setAuthError,
-  } = useAuthFlows();
+  const { signInWithGoogle, signInAnonymously, authError, setAuthError } =
+    useAuthFlows();
   const [index, setIndex] = useState(0);
+  const indexRef = useRef(0);
   const [accepted, setAccepted] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const scrollX = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<FlatList<Slide> | null>(null);
-  const viewConfigRef = useRef({ viewAreaCoveragePercentThreshold: 50 });
+
+  const getItemLayout = useCallback(
+    (_: ArrayLike<Slide> | null | undefined, itemIndex: number) => ({
+      length: width,
+      offset: width * itemIndex,
+      index: itemIndex,
+    }),
+    [],
+  );
 
   const slides = useMemo<Slide[]>(
     () => [
@@ -140,30 +146,48 @@ export default function Page() {
     [completing, router],
   );
 
-  const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      if (viewableItems.length > 0) {
-        const idx = viewableItems[0].index ?? 0;
-        setIndex(idx);
-        trackEvent('view_onboarding_slide', { index: idx });
-      }
-    },
-  ).current;
-
   useEffect(() => {
     trackEvent('view_onboarding');
   }, []);
 
+  useEffect(() => {
+    trackEvent('view_onboarding_slide', { index: 0 });
+  }, []);
+
+  const handleMomentumEnd = useCallback(
+    ({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const nextIndex = Math.round(nativeEvent.contentOffset.x / width);
+      if (nextIndex !== indexRef.current) {
+        indexRef.current = nextIndex;
+        setIndex(nextIndex);
+        trackEvent('view_onboarding_slide', { index: nextIndex });
+      }
+    },
+    [],
+  );
+
   const handleSkip = useCallback(() => {
-    if (index === slides.length - 1) return;
+    const lastIndex = slides.length - 1;
+    if (index === lastIndex) return;
     trackEvent('skip_onboarding');
-    flatListRef.current?.scrollToIndex({ index: slides.length - 1, animated: true });
+    setIndex(lastIndex);
+    const targetOffset = lastIndex * width;
+    flatListRef.current?.scrollToOffset({
+      offset: targetOffset,
+      animated: true,
+    });
   }, [index, slides.length]);
 
   const handleNext = useCallback(() => {
     if (index >= slides.length - 1) return;
     trackEvent('onboarding_next', { from: index });
-    flatListRef.current?.scrollToIndex({ index: index + 1, animated: true });
+    const nextIndex = Math.min(slides.length - 1, index + 1);
+    setIndex(nextIndex);
+    const targetOffset = nextIndex * width;
+    flatListRef.current?.scrollToOffset({
+      offset: targetOffset,
+      animated: true,
+    });
   }, [index, slides.length]);
 
   const handleStart = useCallback(async () => {
@@ -189,7 +213,13 @@ export default function Page() {
     if (!success) {
       setCompleting(false);
     }
-  }, [accepted, completing, resetAuthError, signInAnonymously, completeOnboarding]);
+  }, [
+    accepted,
+    completing,
+    resetAuthError,
+    signInAnonymously,
+    completeOnboarding,
+  ]);
 
   const handleGoogle = useCallback(async () => {
     if (!accepted || completing || googleLoading) return;
@@ -208,7 +238,14 @@ export default function Page() {
       setGoogleLoading(false);
       setCompleting(false);
     }
-  }, [accepted, completing, googleLoading, resetAuthError, signInWithGoogle, completeOnboarding]);
+  }, [
+    accepted,
+    completing,
+    googleLoading,
+    resetAuthError,
+    signInWithGoogle,
+    completeOnboarding,
+  ]);
 
   const handleSignIn = useCallback(async () => {
     if (!accepted || completing) return;
@@ -284,13 +321,14 @@ export default function Page() {
           }}
           style={styles.carousel}
           contentContainerStyle={styles.carouselContent}
-          onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={viewConfigRef.current}
+          getItemLayout={getItemLayout}
           keyExtractor={(item) => item.key}
           onScroll={Animated.event(
             [{ nativeEvent: { contentOffset: { x: scrollX } } }],
             { useNativeDriver: false },
           )}
+          onMomentumScrollEnd={handleMomentumEnd}
+          scrollEventThrottle={16}
           renderItem={({ item, index: slideIndex }) => {
             const inputRange = [
               (slideIndex - 1) * width,
@@ -317,7 +355,7 @@ export default function Page() {
             const pointBackground = withAlpha(theme.tint, 0.18);
 
             return (
-              <View style={[styles.slide, { width }]}> 
+              <View style={[styles.slide, { width }]}>
                 <Animated.View
                   style={[
                     styles.slideCard,
@@ -368,7 +406,8 @@ export default function Page() {
                           color={theme.tint}
                           style={styles.pointIcon}
                         />
-                        <Text style={[styles.pointText, { color: theme.text }]}
+                        <Text
+                          style={[styles.pointText, { color: theme.text }]}
                           accessibilityRole="text"
                         >
                           {point}
@@ -464,13 +503,15 @@ export default function Page() {
               styles.altButton,
               {
                 backgroundColor: theme.input,
-                opacity:
-                  !accepted || completing || googleLoading ? 0.6 : 1,
+                opacity: !accepted || completing || googleLoading ? 0.6 : 1,
               },
             ]}
             disabled={!accepted || completing || googleLoading}
             accessibilityRole="button"
-            accessibilityLabel={t('onboarding.googleCta', 'Continue with Google')}
+            accessibilityLabel={t(
+              'onboarding.googleCta',
+              'Continue with Google',
+            )}
           >
             <View style={styles.altButtonContent}>
               <Ionicons
@@ -515,7 +556,10 @@ export default function Page() {
             style={styles.linkButton}
             disabled={!accepted || completing}
             accessibilityRole="button"
-            accessibilityLabel={t('onboarding.signinCta', 'I already have an account')}
+            accessibilityLabel={t(
+              'onboarding.signinCta',
+              'I already have an account',
+            )}
           >
             <View style={styles.linkButtonRow}>
               <Ionicons
@@ -524,14 +568,14 @@ export default function Page() {
                 color={theme.placeholder}
                 style={styles.linkIcon}
               />
-              <Text style={[styles.linkButtonText, { color: theme.placeholder }]}>
+              <Text
+                style={[styles.linkButtonText, { color: theme.placeholder }]}
+              >
                 {t('onboarding.signinCta', 'I already have an account')}
               </Text>
             </View>
           </TouchableOpacity>
-          {authError ? (
-            <Text style={styles.errorText}>{authError}</Text>
-          ) : null}
+          {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
         </>
       )}
     </View>

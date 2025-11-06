@@ -20,10 +20,8 @@ import { chunk as chunkArray } from './chunk';
 
 const converter: FirestoreDataConverter<Wish> = {
   toFirestore: ({ id, ...wish }: Wish) => wish,
-  fromFirestore: (
-    snapshot: QueryDocumentSnapshot,
-  ): Wish =>
-    ({ id: snapshot.id, ...(snapshot.data() as Omit<Wish, 'id'>) } as Wish),
+  fromFirestore: (snapshot: QueryDocumentSnapshot): Wish =>
+    ({ id: snapshot.id, ...(snapshot.data() as Omit<Wish, 'id'>) }) as Wish,
 };
 
 // Note: Firestore 'in' supports up to 10 values; we batch using chunkArray

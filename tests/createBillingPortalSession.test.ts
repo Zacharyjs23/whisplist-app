@@ -1,9 +1,10 @@
 jest.mock(
-  'firebase-functions',
+  'firebase-functions/v1',
   () => ({
     runWith: jest.fn().mockReturnValue({
       https: { onRequest: (handler: any) => handler },
     }),
+    logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn() },
   }),
   { virtual: true },
 );
@@ -72,10 +73,14 @@ describe('createBillingPortalSession', () => {
       method: 'POST',
       body: {
         userId: 'u1',
-        returnUrl: 'https://app/link',
+        returnUrl: 'https://whisplist.app/link',
       },
     };
-    const res = { json: jest.fn(), status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+    } as any;
     await createBillingPortalSession(req, res);
     expect(mockStripeCustomersCreate).toHaveBeenCalled();
     expect(mockStripePortalCreate).toHaveBeenCalled();
@@ -84,9 +89,12 @@ describe('createBillingPortalSession', () => {
 
   it('returns 400 on missing parameters', async () => {
     const req: any = { method: 'POST', body: { userId: 'u1' } };
-    const res = { json: jest.fn(), status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+    } as any;
     await createBillingPortalSession(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
   });
 });
-

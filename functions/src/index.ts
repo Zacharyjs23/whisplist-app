@@ -843,4 +843,6 @@ export { createPledge } from './splitpay/createPledge';
 export { settleWish, settleSplitPayWishes } from './splitpay/settleWish';
 export { favoritesOnWrite, rateLimiter } from './anonFavorites';
 export { generateWishMatches } from './wishMatcher';
+export { expressCheckout } from './expressCheckout';
 export { createGiftTogetherInvite } from './splitpay/createInvite';
+export { api } from './httpApi';

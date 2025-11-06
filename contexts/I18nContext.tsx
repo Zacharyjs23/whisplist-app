@@ -1,7 +1,10 @@
 /* eslint-disable import/no-named-as-default-member */
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import i18n from 'i18next';
-import { initReactI18next, useTranslation as useI18NextTranslation } from 'react-i18next';
+import {
+  initReactI18next,
+  useTranslation as useI18NextTranslation,
+} from 'react-i18next';
 import * as Localization from 'expo-localization';
 import en from '../i18n/en.json';
 import es from '../i18n/es.json';
@@ -28,7 +31,9 @@ const I18nContext = createContext<I18nContextType>({
   setLanguage: () => {},
 });
 
-export const I18nProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
+export const I18nProvider: React.FC<React.PropsWithChildren> = ({
+  children,
+}) => {
   const [language, setLanguageState] = useState(i18n.language);
 
   useEffect(() => {

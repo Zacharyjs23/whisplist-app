@@ -2,10 +2,7 @@ import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useTranslation } from '@/contexts/I18nContext';
-import {
-  getMilestonesFor,
-  getNextMilestone,
-} from '@/helpers/engagement';
+import { getMilestonesFor, getNextMilestone } from '@/helpers/engagement';
 import type { EngagementKind, EngagementStats } from '@/types/Engagement';
 
 const ROWS: { kind: EngagementKind; emoji: string }[] = [
@@ -40,35 +37,37 @@ const EngagementCard: React.FC<Props> = ({ stats, loading = false }) => {
       : 'rgba(17,24,28,0.08)';
   }, [theme.name]);
 
-  const rows = useMemo(() =>
-    ROWS.map(({ kind, emoji }) => {
-      const entry = stats[kind];
-      const next = getNextMilestone(kind, entry);
-      const milestones = getMilestonesFor(kind);
-      const unlocked = Object.keys(entry.milestones ?? {}).length;
-      const total = milestones.length;
-      const progress = next ? Math.min(1, entry.current / next.target) : 1;
-      const titleKey = `home.engagement.${kind}` as const;
-      const subtitle = next
-        ? t(NEXT_KEYS[kind], {
-            target: next.target,
-          })
-        : t('home.engagement.complete', 'All badges unlocked');
-      const unitLabel = t(UNIT_KEYS[kind], { count: entry.current });
-      return {
-        kind,
-        emoji,
-        label: t(titleKey, `${kind} streak`),
-        current: entry.current,
-        longest: entry.longest,
-        subtitle,
-        progress,
-        unlocked,
-        total,
-        unitLabel,
-      };
-    }),
-  [stats, t]);
+  const rows = useMemo(
+    () =>
+      ROWS.map(({ kind, emoji }) => {
+        const entry = stats[kind];
+        const next = getNextMilestone(kind, entry);
+        const milestones = getMilestonesFor(kind);
+        const unlocked = Object.keys(entry.milestones ?? {}).length;
+        const total = milestones.length;
+        const progress = next ? Math.min(1, entry.current / next.target) : 1;
+        const titleKey = `home.engagement.${kind}` as const;
+        const subtitle = next
+          ? t(NEXT_KEYS[kind], {
+              target: next.target,
+            })
+          : t('home.engagement.complete', 'All badges unlocked');
+        const unitLabel = t(UNIT_KEYS[kind], { count: entry.current });
+        return {
+          kind,
+          emoji,
+          label: t(titleKey, `${kind} streak`),
+          current: entry.current,
+          longest: entry.longest,
+          subtitle,
+          progress,
+          unlocked,
+          total,
+          unitLabel,
+        };
+      }),
+    [stats, t],
+  );
 
   return (
     <View
@@ -76,29 +75,44 @@ const EngagementCard: React.FC<Props> = ({ stats, loading = false }) => {
       accessibilityRole="summary"
       accessibilityLabel={t('home.engagement.label', 'Your engagement streaks')}
     >
-      <Text style={[styles.title, { color: theme.text }]}>{t('home.engagement.title', 'Keep your streak alive')}</Text>
-      <Text style={[styles.caption, { color: theme.placeholder }]}> 
+      <Text style={[styles.title, { color: theme.text }]}>
+        {t('home.engagement.title', 'Keep your streak alive')}
+      </Text>
+      <Text style={[styles.caption, { color: theme.placeholder }]}>
         {loading
           ? t('home.engagement.loading', 'Checking your momentum…')
-          : t('home.engagement.caption', 'Badges unlock as you show up for the community.')} 
+          : t(
+              'home.engagement.caption',
+              'Badges unlock as you show up for the community.',
+            )}
       </Text>
       {rows.map((row) => (
         <View
           key={row.kind}
           style={[styles.row, { borderColor }]}
-          accessibilityLabel={t('home.engagement.rowLabel', '{{label}} — {{unit}}', {
-            label: row.label,
-            unit: row.unitLabel,
-          })}
+          accessibilityLabel={t(
+            'home.engagement.rowLabel',
+            '{{label}} — {{unit}}',
+            {
+              label: row.label,
+              unit: row.unitLabel,
+            },
+          )}
         >
           <View style={styles.rowHeader}>
             <Text style={styles.emoji}>{row.emoji}</Text>
             <View style={styles.rowText}>
-              <Text style={[styles.rowTitle, { color: theme.text }]}>{row.label}</Text>
-              <Text style={[styles.rowSubtitle, { color: theme.placeholder }]}>{row.subtitle}</Text>
+              <Text style={[styles.rowTitle, { color: theme.text }]}>
+                {row.label}
+              </Text>
+              <Text style={[styles.rowSubtitle, { color: theme.placeholder }]}>
+                {row.subtitle}
+              </Text>
             </View>
-           <View style={styles.counter}>
-             <Text style={[styles.counterValue, { color: theme.text }]}>{row.current}</Text>
+            <View style={styles.counter}>
+              <Text style={[styles.counterValue, { color: theme.text }]}>
+                {row.current}
+              </Text>
               <Text style={[styles.counterLabel, { color: theme.placeholder }]}>
                 {row.unitLabel}
               </Text>
@@ -108,7 +122,9 @@ const EngagementCard: React.FC<Props> = ({ stats, loading = false }) => {
             style={[
               styles.progressTrack,
               {
-                backgroundColor: ['dark', 'neon', 'cyberpunk'].includes(theme.name)
+                backgroundColor: ['dark', 'neon', 'cyberpunk'].includes(
+                  theme.name,
+                )
                   ? 'rgba(255,255,255,0.15)'
                   : 'rgba(17,24,28,0.08)',
               },
