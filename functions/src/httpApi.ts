@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { Request, Response } from 'express';
 import {
   logger,
@@ -7,8 +8,10 @@ import type { DecodedIdToken } from 'firebase-admin/auth';
 import * as admin from 'firebase-admin';
 import { canViewerSeeWish, normalizeWishScope, type WishScope } from './feedVisibility';
 import type {
+  DocumentReference,
   DocumentSnapshot,
   QueryDocumentSnapshot,
+  Transaction,
 } from 'firebase-admin/firestore';
 
 if (!admin.apps.length) {
@@ -36,6 +39,13 @@ const TIMESTAMP_FIELDS = new Set([
   'expiresAt',
   'fulfilledAt',
 ]);
+
+const WISHLIST_TITLE_MAX = 120;
+const WISHLIST_DESCRIPTION_MAX = 400;
+const WISHLIST_ITEM_NAME_MAX = 140;
+const WISHLIST_ITEM_NOTES_MAX = 240;
+const WISHLIST_MAX_ITEMS = 50;
+const IDEMPOTENCY_TTL_MS = 30_000;
 
 const FEED_FIELD_ALLOWLIST = [
   'text',
@@ -98,6 +108,19 @@ type SerializedWish = Record<string, unknown> & {
     canSeeIdentity: boolean;
     scope: WishScope;
   };
+};
+
+type SanitizedWishlistItem = {
+  name: string;
+  url?: string;
+  priceCents?: number;
+  notes?: string;
+};
+
+type SanitizedWishlistPayload = {
+  title: string;
+  description?: string;
+  items: SanitizedWishlistItem[];
 };
 
 function applyCors(res: Response) {
@@ -198,6 +221,71 @@ function timestampToMillis(value: unknown): number | null {
   }
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   return null;
+}
+
+function sanitizeWishlistItem(value: unknown): SanitizedWishlistItem | null {
+  if (!value || typeof value !== 'object') return null;
+  const name = sanitizeString(
+    (value as { name?: unknown }).name,
+    WISHLIST_ITEM_NAME_MAX,
+  );
+  if (!name) return null;
+  const sanitized: SanitizedWishlistItem = { name };
+  const url = sanitizeUrl((value as { url?: unknown }).url);
+  if (url) sanitized.url = url;
+  const price = sanitizePositiveNumber(
+    (value as { priceCents?: unknown }).priceCents,
+  );
+  if (price !== undefined) {
+    sanitized.priceCents = Math.round(price);
+  }
+  const notes = sanitizeOptionalString(
+    (value as { notes?: unknown }).notes,
+    WISHLIST_ITEM_NOTES_MAX,
+  );
+  if (notes) sanitized.notes = notes;
+  return sanitized;
+}
+
+function sanitizeWishlistPayload(
+  input: Record<string, unknown>,
+): SanitizedWishlistPayload {
+  const title = sanitizeString(input.title, WISHLIST_TITLE_MAX);
+  if (!title) {
+    throw new Error('wishlist_title_required');
+  }
+  const description = sanitizeOptionalString(
+    input.description,
+    WISHLIST_DESCRIPTION_MAX,
+  );
+  const itemsInput = Array.isArray(input.items) ? input.items : [];
+  const items: SanitizedWishlistItem[] = [];
+  for (let i = 0; i < itemsInput.length && items.length < WISHLIST_MAX_ITEMS; i += 1) {
+    const sanitized = sanitizeWishlistItem(itemsInput[i]);
+    if (sanitized) items.push(sanitized);
+  }
+  return {
+    title,
+    description: description ?? undefined,
+    items,
+  };
+}
+
+function hashWishlistPayload(payload: SanitizedWishlistPayload): string {
+  const normalized = {
+    title: payload.title,
+    description: payload.description ?? null,
+    items: payload.items.map((item) => ({
+      name: item.name,
+      url: item.url ?? null,
+      priceCents:
+        typeof item.priceCents === 'number' ? Number(item.priceCents) : null,
+      notes: item.notes ?? null,
+    })),
+  };
+  return createHash('sha256')
+    .update(JSON.stringify(normalized))
+    .digest('hex');
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -390,6 +478,175 @@ function compareByTimestampDesc(a: SerializedWish, b: SerializedWish): number {
   const right = b.timestamp ?? 0;
   if (right !== left) return right - left;
   return a.id.localeCompare(b.id);
+}
+
+async function handleCreateWishlist(req: Request, res: Response) {
+  if (req.method !== 'POST') {
+    res
+      .status(405)
+      .json({ ok: false, error: 'method_not_allowed' });
+    return;
+  }
+
+  const decoded = await authenticate(req);
+  if (!decoded) {
+    res
+      .status(401)
+      .json({ ok: false, error: 'authentication_required' });
+    return;
+  }
+
+  const payload =
+    typeof req.body === 'object' && req.body
+      ? (req.body as Record<string, unknown>)
+      : null;
+  if (!payload) {
+    res.status(400).json({ ok: false, error: 'invalid_payload' });
+    return;
+  }
+
+  const idempotencyKey = sanitizeString(
+    payload.idempotencyKey,
+    120,
+    { allowEmpty: false },
+  );
+  if (!idempotencyKey) {
+    res.status(400).json({ ok: false, error: 'idempotency_key_required' });
+    return;
+  }
+
+  const userId = sanitizeString(payload.userId, 120, { allowEmpty: false });
+  if (!userId || userId !== decoded.uid) {
+    res.status(403).json({ ok: false, error: 'user_mismatch' });
+    return;
+  }
+
+  const wishlistInput =
+    payload.wishlist && typeof payload.wishlist === 'object'
+      ? (payload.wishlist as Record<string, unknown>)
+      : null;
+  if (!wishlistInput) {
+    res.status(400).json({ ok: false, error: 'wishlist_required' });
+    return;
+  }
+
+  let sanitized: SanitizedWishlistPayload;
+  try {
+    sanitized = sanitizeWishlistPayload(wishlistInput);
+  } catch (err) {
+    const message =
+      err instanceof Error && err.message === 'wishlist_title_required'
+        ? 'title_required'
+        : 'invalid_wishlist';
+    res.status(400).json({ ok: false, error: message });
+    return;
+  }
+
+  const payloadHash = hashWishlistPayload(sanitized);
+  const nowTs = admin.firestore.Timestamp.now();
+  const expiresAt = admin.firestore.Timestamp.fromMillis(
+    nowTs.toMillis() + IDEMPOTENCY_TTL_MS,
+  );
+  const keyRef: DocumentReference = db
+    .collection('idempotencyKeys')
+    .doc(`${decoded.uid}_${idempotencyKey}`);
+  const wishlistCollection = db.collection('wishlists');
+  const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
+
+  try {
+    const outcome = await db.runTransaction(async (tx: Transaction) => {
+      const keySnap = await tx.get(keyRef);
+      if (keySnap.exists) {
+        const data = keySnap.data() ?? {};
+        const existingExpiry =
+          data.expiresAt instanceof admin.firestore.Timestamp
+            ? (data.expiresAt as FirebaseFirestore.Timestamp)
+            : null;
+        const expired =
+          existingExpiry && existingExpiry.toMillis() < nowTs.toMillis();
+        const existingWishlistId =
+          typeof data.wishlistId === 'string' ? data.wishlistId : null;
+        const existingHash =
+          typeof data.payloadHash === 'string' ? data.payloadHash : null;
+        if (!expired) {
+          if (existingWishlistId && existingHash === payloadHash) {
+            return {
+              status: 'replay' as const,
+              wishlistId: existingWishlistId,
+            };
+          }
+          return {
+            status: 'conflict' as const,
+            wishlistId: existingWishlistId,
+          };
+        }
+      }
+
+      const wishlistRef = wishlistCollection.doc();
+      const doc: Record<string, unknown> = {
+        title: sanitized.title,
+        items: sanitized.items,
+        itemCount: sanitized.items.length,
+        ownerId: decoded.uid,
+        userId: decoded.uid,
+        createdAt: serverTimestamp,
+        updatedAt: serverTimestamp,
+      };
+      if (sanitized.description) {
+        doc.description = sanitized.description;
+      }
+
+      tx.set(wishlistRef, doc);
+      tx.set(keyRef, {
+        userId: decoded.uid,
+        key: idempotencyKey,
+        wishlistId: wishlistRef.id,
+        payloadHash,
+        createdAt: serverTimestamp,
+        expiresAt,
+      });
+
+      return {
+        status: 'created' as const,
+        wishlistId: wishlistRef.id,
+      };
+    });
+
+    if (outcome.status === 'created') {
+      res.status(201).json({
+        ok: true,
+        data: { id: outcome.wishlistId },
+      });
+      return;
+    }
+
+    if (outcome.status === 'replay' && outcome.wishlistId) {
+      res.status(200).json({
+        ok: true,
+        data: { id: outcome.wishlistId },
+      });
+      return;
+    }
+
+    logger.warn('Wishlist idempotency conflict detected', {
+      userId: decoded.uid,
+      key: idempotencyKey,
+    });
+    res.status(409).json({
+      ok: false,
+      error: 'IDEMPOTENCY_CONFLICT',
+    });
+  } catch (err) {
+    logger.error(
+      'Failed to create wishlist',
+      err instanceof Error ? err : { err },
+      {
+        severity: 'medium',
+        userId: decoded.uid,
+      },
+    );
+    res.status(500).json({ ok: false, error: 'internal_error' });
+  }
 }
 
 async function handleCreateWish(req: Request, res: Response) {
@@ -688,6 +945,10 @@ export const api = region('us-central1').https.onRequest(
       res.status(200).json({ ok: true });
       return;
     }
+    if (path === '/wishlists' && req.method === 'POST') {
+      await handleCreateWishlist(req, res);
+      return;
+    }
     if (path === '/wishes' && req.method === 'POST') {
       await handleCreateWish(req, res);
       return;
@@ -696,6 +957,10 @@ export const api = region('us-central1').https.onRequest(
       await handleFeed(req, res);
       return;
     }
-    res.status(404).json({ ok: false, error: 'not_found' });
+      res.status(404).json({ ok: false, error: 'not_found' });
   },
 );
+
+export const __httpApiTest = {
+  handleCreateWishlist,
+};
