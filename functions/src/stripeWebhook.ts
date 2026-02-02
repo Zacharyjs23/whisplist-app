@@ -27,8 +27,14 @@ type StripeClient = InstanceType<typeof Stripe>;
 type StripePaymentIntent = Awaited<
   ReturnType<StripeClient['paymentIntents']['retrieve']>
 >;
+type StripeCharge = {
+  amount_captured?: number | null;
+  [key: string]: unknown;
+};
 type PaymentIntentWithCharges = StripePaymentIntent & {
-  charges?: StripePaymentIntent['charges'];
+  charges?: {
+    data?: StripeCharge[];
+  } | null;
 };
 
 let stripe: StripeClient | null = null;

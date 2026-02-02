@@ -10,12 +10,15 @@ describe('TokenService', () => {
 
   beforeEach(() => {
     now = 0;
+    const logger = {
+      info: jest.fn(),
+    };
     service = new TokenService({
       ttlMs: 2000,
       skewMs: 50,
       cleanupIntervalMs: 0,
       now: () => now,
-      logger: console,
+      logger,
     });
   });
 

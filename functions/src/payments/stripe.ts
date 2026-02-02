@@ -18,6 +18,7 @@ type PaymentIntent = {
   amount?: number | null;
   amount_capturable?: number | null;
   amount_received?: number | null;
+  client_secret?: string | null;
   currency?: string | null;
   metadata?: Record<string, string>;
   charges?: {
@@ -29,7 +30,6 @@ type PaymentIntent = {
   last_payment_error?: {
     message?: string | null;
   } | null;
-  [key: string]: unknown;
 };
 
 type PaymentIntentCreateParams = {
