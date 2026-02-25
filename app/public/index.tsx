@@ -38,6 +38,7 @@ export default function Page() {
           snapshot.docs.map(
             async (docSnap): Promise<PublicUser | null> => {
               const data = docSnap.data();
+              const userId = docSnap.id;
               const displayName =
                 typeof data.displayName === 'string'
                   ? data.displayName
@@ -52,14 +53,27 @@ export default function Page() {
               }
 
               try {
-                const wishSnapshot = await getDocs(
+                // Prefer stable ownership (`userId`) and only fall back to
+                // displayName for legacy wishes missing userId.
+                let wishSnapshot = await getDocs(
                   query(
                     collection(db, 'wishes'),
-                    where('displayName', '==', displayName),
+                    where('userId', '==', userId),
                     where('isAnonymous', '==', false),
                     orderBy('timestamp', 'desc'),
                   ),
                 );
+
+                if (wishSnapshot.empty) {
+                  wishSnapshot = await getDocs(
+                    query(
+                      collection(db, 'wishes'),
+                      where('displayName', '==', displayName),
+                      where('isAnonymous', '==', false),
+                      orderBy('timestamp', 'desc'),
+                    ),
+                  );
+                }
 
                 if (wishSnapshot.empty) {
                   return null;

@@ -27,6 +27,7 @@ export type Wish<
   boosted?: string;
   audioUrl?: string;
   imageUrl?: string;
+  videoUrl?: string;
   giftLink?: string;
   /**
    * Type of external gift link (e.g. 'kofi', 'paypal')

@@ -361,7 +361,7 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid
         && hasOnlyAllowedKeys(request.resource.data, [
           'text','category','type','likes','userId','displayName','photoURL','isAnonymous','boostedUntil','boosted',
-          'audioUrl','imageUrl','giftLink','giftType','giftLabel','fulfillmentLink','fulfilledAt','fundingGoal','fundingCurrency','fundingPresets','fundingRaised','fundingSupporters','splitPayEnabled','targetAmount','fundedAmount','deadline','status','isPoll','optionA','optionB',
+          'audioUrl','imageUrl','videoUrl','giftLink','giftType','giftLabel','fulfillmentLink','fulfilledAt','fundingGoal','fundingCurrency','fundingPresets','fundingRaised','fundingSupporters','splitPayEnabled','targetAmount','fundedAmount','deadline','status','isPoll','optionA','optionB',
           'votesA','votesB','mood','reactions','commentCount','expiresAt','timestamp','active','detectedMood','voiceTranscription','aiRefinedText'
         ])
         && (!('likes' in request.resource.data) || request.resource.data.likes == 0)
@@ -392,6 +392,7 @@ service cloud.firestore {
         && (!('photoURL' in request.resource.data) || isShortString(request.resource.data.photoURL, 2000))
         && (!('audioUrl' in request.resource.data) || isShortString(request.resource.data.audioUrl, 2000))
         && (!('imageUrl' in request.resource.data) || isShortString(request.resource.data.imageUrl, 2000))
+        && (!('videoUrl' in request.resource.data) || isShortString(request.resource.data.videoUrl, 2000))
         && (!('giftLink' in request.resource.data) || isShortString(request.resource.data.giftLink, 2000))
         && (!('giftType' in request.resource.data) || isShortString(request.resource.data.giftType, 20))
         && (!('giftLabel' in request.resource.data) || isShortString(request.resource.data.giftLabel, 50))
@@ -408,7 +409,7 @@ service cloud.firestore {
           && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
           && hasOnlyAllowedKeys(request.resource.data, [
             'text','category','type','likes','userId','displayName','photoURL','isAnonymous','boostedUntil','boosted',
-            'audioUrl','imageUrl','giftLink','giftType','giftLabel','fulfillmentLink','fulfilledAt','fundingGoal','fundingCurrency','fundingPresets','fundingRaised','fundingSupporters','splitPayEnabled','targetAmount','fundedAmount','deadline','status','isPoll','optionA','optionB',
+            'audioUrl','imageUrl','videoUrl','giftLink','giftType','giftLabel','fulfillmentLink','fulfilledAt','fundingGoal','fundingCurrency','fundingPresets','fundingRaised','fundingSupporters','splitPayEnabled','targetAmount','fundedAmount','deadline','status','isPoll','optionA','optionB',
             'votesA','votesB','mood','reactions','commentCount','expiresAt','timestamp','active','detectedMood','voiceTranscription','aiRefinedText'
           ])
           && (!('likes' in request.resource.data) || request.resource.data.likes == resource.data.likes)
@@ -449,6 +450,7 @@ service cloud.firestore {
           && (!('photoURL' in request.resource.data) || isShortString(request.resource.data.photoURL, 2000))
           && (!('audioUrl' in request.resource.data) || isShortString(request.resource.data.audioUrl, 2000))
           && (!('imageUrl' in request.resource.data) || isShortString(request.resource.data.imageUrl, 2000))
+          && (!('videoUrl' in request.resource.data) || isShortString(request.resource.data.videoUrl, 2000))
           && (!('giftLink' in request.resource.data) || isShortString(request.resource.data.giftLink, 2000))
           && (!('giftType' in request.resource.data) || isShortString(request.resource.data.giftType, 20))
           && (!('giftLabel' in request.resource.data) || isShortString(request.resource.data.giftLabel, 50))

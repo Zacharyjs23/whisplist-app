@@ -150,6 +150,35 @@ describe('Public users screen', () => {
     expect(mockPush).toHaveBeenCalledWith('/profile/whisperer');
   });
 
+  it('falls back to legacy displayName wishes when userId wishes are missing', async () => {
+    const userDoc = {
+      id: 'u-legacy',
+      data: () => ({
+        displayName: 'legacyUser',
+        bio: 'Legacy bio',
+        photoURL: null,
+      }),
+    };
+
+    const wishDoc = {
+      data: () => ({ text: 'Legacy wish text' }),
+    };
+
+    mockGetDocs
+      .mockResolvedValueOnce({ docs: [userDoc] })
+      .mockResolvedValueOnce({ docs: [], empty: true, size: 0 })
+      .mockResolvedValueOnce({ docs: [wishDoc], empty: false, size: 2 });
+
+    render(<Page />);
+    await act(async () => {
+      await flushPromises();
+    });
+
+    await screen.findByText('@legacyUser');
+    await screen.findByText('Last wish: Legacy wish text');
+    await screen.findByText('2 wishes');
+  });
+
   it('renders an error message when loading fails', async () => {
     mockGetDocs.mockRejectedValueOnce(new Error('firestore down'));
     render(<Page />);

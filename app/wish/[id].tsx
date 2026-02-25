@@ -52,16 +52,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  Image,
   Switch,
   View,
-  Dimensions,
   Alert,
-  RefreshControl,
   ScrollView,
   Modal,
   Linking as RNLinking,
@@ -73,7 +69,6 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useTranslation } from '@/contexts/I18nContext';
-import { BarChart } from 'react-native-chart-kit';
 import ReportDialog from '../../components/ReportDialog';
 import FulfillmentLinkDialog from '../../components/FulfillmentLinkDialog';
 import { db } from '../../firebase';
@@ -88,9 +83,7 @@ import { POST_TYPE_META, normalizePostType } from '@/types/post';
 import { useWishStages } from '@/hooks/useWishStages';
 import type { WishStage } from '@/types/WishStage';
 import { useAccountabilityCircles } from '@/hooks/useAccountabilityCircles';
-import { GiftCTA } from '@/src/features/gifting/GiftCTA';
 import { ChipInModal } from '@/app/components/splitpay/ChipInModal';
-import { SplitPayProgressBar } from '@/app/components/splitpay/ProgressBar';
 import { GiftTogetherModal } from '@/app/components/splitpay/GiftTogetherModal';
 import { formatCurrency } from '@/shared/numberFormat';
 import { logSplitPayShareClick, logSplitPayView } from '@/src/lib/analytics';
@@ -106,42 +99,14 @@ import {
   type WishMatchMeta,
 } from '@/services/WishMatcher';
 import { recordRecentWishlistView } from '@/src/features/wishlist/recentService';
-
-const formatTimeLeft = (d: Date) => {
-  const ms = d.getTime() - Date.now();
-  if (ms <= 0) return '0h';
-  const h = Math.floor(ms / 3_600_000);
-  const m = Math.floor((ms % 3_600_000) / 60_000);
-  return `${h}h ${m}m`;
-};
-
-const emojiOptions = ['❤️', '😂', '😢', '👍'];
-// Approximate height of a single comment item including margins
-const COMMENT_ITEM_HEIGHT = 80;
-const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
-const MIN_PLEDGE_CENTS = 500;
-
-const CAN_USE_NATIVE_DRIVER = Platform.OS !== 'web';
-
-const withAlpha = (input: string, alpha: number): string => {
-  if (!input) return `rgba(255,255,255,${alpha})`;
-  if (input.startsWith('#')) {
-    const hex = input.replace('#', '');
-    const bigint = Number.parseInt(hex.length === 3 ? hex.repeat(2) : hex, 16);
-    const r = (bigint >> 16) & 255;
-    const g = (bigint >> 8) & 255;
-    const b = bigint & 255;
-    return `rgba(${r},${g},${b},${alpha})`;
-  }
-  if (input.startsWith('rgb')) {
-    return input.replace(/rgba?\(([^)]+)\)/, (_match, values) => {
-      const parts = values.split(',').map((v: string) => v.trim());
-      const [r, g, b] = parts;
-      return `rgba(${r},${g},${b},${alpha})`;
-    });
-  }
-  return input;
-};
+import {
+  formatTimeLeft,
+  HIT_SLOP,
+  MIN_PLEDGE_CENTS,
+} from '@/features/wishDetail/constants';
+import { styles } from '@/features/wishDetail/styles';
+import { CommentThread } from '@/features/wishDetail/components/CommentThread';
+import { WishDetailCard } from '@/features/wishDetail/components/WishDetailCard';
 
 export default function Page() {
   const params = useLocalSearchParams<{
@@ -295,6 +260,7 @@ export default function Page() {
     expiredLogged: false,
   });
   const autoScrollRef = useRef(false);
+  const commentsHydratedRef = useRef(false);
   const [shouldFocusComposer, setShouldFocusComposer] = useState(false);
   const [commentSuccess, setCommentSuccess] = useState<string | null>(null);
   const successOpacity = useRef(new Animated.Value(0)).current;
@@ -597,10 +563,6 @@ export default function Page() {
 
   const flatListRef = useRef<FlatList<Comment>>(null);
 
-  const animationRefs = useRef<{ [key: string]: Animated.Value }>({});
-  const animatedCommentIds = useRef<Set<string>>(new Set());
-  const hasHydratedComments = useRef(false);
-
   const fetchWish = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -639,6 +601,10 @@ export default function Page() {
   }, [user?.uid, wish?.id, wish?.imageUrl, wish?.text]);
 
   useEffect(() => {
+    commentsHydratedRef.current = false;
+  }, [id]);
+
+  useEffect(() => {
     const checkVote = async () => {
       if (!user?.uid) return;
       try {
@@ -658,37 +624,6 @@ export default function Page() {
     const unsubscribe = listenWishComments(
       id as string,
       (list) => {
-        const ids = new Set<string>();
-        const isInitialBatch = !hasHydratedComments.current && list.length > 0;
-        list.forEach((d) => {
-          const commentId = d.id;
-          ids.add(commentId);
-          if (!animationRefs.current[commentId]) {
-            const initialValue = isInitialBatch ? 1 : 0;
-            animationRefs.current[commentId] = new Animated.Value(initialValue);
-            if (isInitialBatch) {
-              animatedCommentIds.current.add(commentId);
-            } else {
-              animatedCommentIds.current.delete(commentId);
-            }
-          } else if (isInitialBatch) {
-            animatedCommentIds.current.add(commentId);
-          }
-        });
-        Object.keys(animationRefs.current).forEach((key) => {
-          if (!ids.has(key)) {
-            delete animationRefs.current[key];
-          }
-        });
-        animatedCommentIds.current.forEach((key) => {
-          if (!ids.has(key)) {
-            animatedCommentIds.current.delete(key);
-          }
-        });
-        if (isInitialBatch) {
-          hasHydratedComments.current = true;
-        }
-
         const sorted = [...list].sort((a, b) => {
           const aCount = Object.values(a.reactions || {}).reduce(
             (s, v) => s + v,
@@ -705,13 +640,13 @@ export default function Page() {
         setWish((prev) =>
           prev ? { ...prev, commentCount: sorted.length } : prev,
         );
-        const shouldScroll =
-          autoScrollRef.current || !hasHydratedComments.current;
+        const shouldScroll = autoScrollRef.current || !commentsHydratedRef.current;
         if (shouldScroll) {
           setTimeout(() => {
             flatListRef.current?.scrollToEnd({ animated: true });
           }, 250);
           autoScrollRef.current = false;
+          commentsHydratedRef.current = true;
         }
         setLoading(false);
       },
@@ -1255,226 +1190,33 @@ export default function Page() {
     ]);
   }, [id, router]);
 
+  const handleGiftConfirmed = useCallback(() => {
+    if (!wish?.id) return;
+    clearWishMetaCache(wish.id);
+    void fetchWish();
+  }, [fetchWish, wish?.id]);
+
+  const handleStartEditWish = useCallback(() => {
+    if (!wish) return;
+    setEditText(wish.text);
+    setEditCategory(wish.category);
+    setEditing(true);
+  }, [wish]);
+
+  const handleReportWish = useCallback(() => {
+    if (!wish) return;
+    setReportTarget({ type: 'wish', id: wish.id });
+    setReportVisible(true);
+  }, [wish]);
+
+  const ownerVenmoHandle =
+    typeof owner?.venmoHandle === 'string' ? owner.venmoHandle : null;
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchWish();
     setRefreshing(false);
   }, [fetchWish]);
-
-  const renderCommentItem = useCallback(
-    (item: Comment, level = 0) => {
-      let animValue = animationRefs.current[item.id];
-      if (!animValue) {
-        animValue = new Animated.Value(1);
-        animationRefs.current[item.id] = animValue;
-        animatedCommentIds.current.add(item.id);
-      }
-      if (!animatedCommentIds.current.has(item.id)) {
-        animatedCommentIds.current.add(item.id);
-        animValue.setValue(0);
-        Animated.timing(animValue, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: CAN_USE_NATIVE_DRIVER,
-        }).start(({ finished }) => {
-          if (!finished) {
-            animatedCommentIds.current.delete(item.id);
-          }
-        });
-      }
-
-      const currentUser = user?.uid || 'anon';
-      const userReaction = item.userReactions?.[currentUser];
-      const replies = isActiveWish
-        ? comments.filter((c) => c.parentId === item.id)
-        : [];
-      const isEditing = editingCommentId === item.id;
-
-      return (
-        <View key={item.id}>
-          <Animated.View
-            style={{
-              ...styles.commentBox,
-              marginLeft: level * 16,
-              opacity: animValue,
-              transform: [
-                {
-                  translateY: animValue.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [10, 0],
-                  }),
-                },
-              ],
-            }}
-          >
-            {!item.isAnonymous && publicStatus[item.userId || ''] ? (
-              <TouchableOpacity
-                onPress={() => router.push(`/profile/${item.displayName}`)}
-                hitSlop={HIT_SLOP}
-              >
-                <Text style={[styles.nickname, { color: theme.placeholder }]}>
-                  {' '}
-                  {/* theme fix */}
-                  {item.displayName}
-                  {verifiedStatus[item.userId || ''] ? ' \u2705 Verified' : ''}
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <Text style={[styles.nickname, { color: theme.placeholder }]}>
-                {item.nickname || 'Anonymous'}
-              </Text>
-            )}
-            {item.userId === wish?.userId && (
-              <Text style={[styles.nickname, { color: theme.tint }]}>
-                {' '}
-                (author)
-              </Text>
-            )}
-            {isEditing ? (
-              <>
-                <TextInput
-                  value={editingCommentText}
-                  onChangeText={setEditingCommentText}
-                  style={[
-                    styles.comment,
-                    {
-                      color: theme.text,
-                      borderWidth: 1,
-                      borderColor: theme.text + '33',
-                      borderRadius: 6,
-                      padding: 4,
-                    },
-                  ]}
-                  multiline
-                />
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    marginTop: 6,
-                  }}
-                >
-                  <TouchableOpacity onPress={handleSaveComment}>
-                    <Text style={{ color: theme.tint }}>Save</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setEditingCommentId(null);
-                      setEditingCommentText('');
-                    }}
-                    style={{ marginLeft: 8 }}
-                  >
-                    <Text style={{ color: '#f87171' }}>Cancel</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={[styles.comment, { color: theme.text }]}>
-                  {item.text}
-                </Text>
-                <Text style={[styles.timestamp, { color: theme.placeholder }]}>
-                  {' '}
-                  {/* theme fix */}
-                  {item.timestamp?.seconds
-                    ? formatDistanceToNow(
-                        new Date(item.timestamp.seconds * 1000),
-                        { addSuffix: true },
-                      )
-                    : 'Just now'}
-                </Text>
-
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    marginTop: 6,
-                  }}
-                >
-                  {emojiOptions.map((emoji) => (
-                    <TouchableOpacity
-                      key={emoji}
-                      onPress={() => handleReact(item.id, emoji)}
-                      style={{
-                        marginRight: 8,
-                        padding: 6,
-                        borderRadius: 6,
-                        opacity: userReaction === emoji ? 1 : 0.4,
-                      }}
-                    >
-                      <Text style={{ fontSize: 20 }}>
-                        {emoji} {item.reactions?.[emoji] || 0}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                  {isActiveWish && (
-                    <TouchableOpacity
-                      onPress={() => setReplyTo(item.id)}
-                      style={{ marginLeft: 8 }}
-                    >
-                      <Text style={{ color: '#a78bfa' }}>Reply</Text>
-                    </TouchableOpacity>
-                  )}
-                  {item.userId === user?.uid && (
-                    <>
-                      <TouchableOpacity
-                        onPress={() => {
-                          setEditingCommentId(item.id);
-                          setEditingCommentText(item.text);
-                        }}
-                        style={{ marginLeft: 8 }}
-                      >
-                        <Text style={{ color: theme.tint }}>Edit</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => handleDeleteComment(item.id)}
-                        style={{ marginLeft: 8 }}
-                      >
-                        <Text style={{ color: '#f87171' }}>Delete</Text>
-                      </TouchableOpacity>
-                    </>
-                  )}
-                  <TouchableOpacity
-                    onLongPress={() => {
-                      setReportTarget({ type: 'comment', id: item.id });
-                      setReportVisible(true);
-                    }}
-                    style={{ marginLeft: 8 }}
-                    hitSlop={HIT_SLOP}
-                  >
-                    <Text style={{ color: '#f87171' }}>🚩</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-          </Animated.View>
-          {replies.map((r) => renderCommentItem(r, level + 1))}
-        </View>
-      );
-    },
-    [
-      comments,
-      handleReact,
-      user,
-      isActiveWish,
-      publicStatus,
-      router,
-      theme.text,
-      theme.tint,
-      theme.placeholder,
-      verifiedStatus,
-      wish?.userId,
-      editingCommentId,
-      editingCommentText,
-      handleSaveComment,
-      handleDeleteComment,
-    ],
-  );
-
-  const renderComment = useCallback(
-    ({ item }: { item: Comment }) => renderCommentItem(item),
-    [renderCommentItem],
-  );
 
   return (
     <SafeAreaView
@@ -1515,697 +1257,61 @@ export default function Page() {
             <Text style={styles.errorText}>{error}</Text>
           ) : (
             <>
-              {wish && (
-                <Animated.View
-                  style={[
-                    styles.wishBox,
-                    {
-                      backgroundColor: theme.input,
-                      borderColor: isBoosted ? '#facc15' : typeMeta.color,
-                      borderWidth: isBoosted ? 2 : 1,
-                      transform: [
-                        {
-                          scale: isBoosted ? glowAnim : 1,
-                        },
-                      ],
-                    },
-                  ]}
-                >
-                  <View style={styles.wishHeaderRow}>
-                    <Text
-                      style={[styles.wishCategory, { color: typeMeta.color }]}
-                    >
-                      {typeMeta.emoji} #{wish.category}
-                    </Text>
-                    <View style={styles.headerActions}>
-                      {anonFavEnabled ? (
-                        <TouchableOpacity
-                          onPress={() => {
-                            void handleFavoritePress();
-                          }}
-                          hitSlop={HIT_SLOP}
-                          accessibilityRole="button"
-                          accessibilityState={
-                            anonFavLoading ? { busy: true } : undefined
-                          }
-                          disabled={anonFavLoading}
-                        >
-                          <Ionicons
-                            name={anonFavorited ? 'heart' : 'heart-outline'}
-                            size={20}
-                            color={anonFavorited ? '#ef4444' : theme.tint}
-                          />
-                        </TouchableOpacity>
-                      ) : null}
-                      <TouchableOpacity
-                        onPress={handleShare}
-                        hitSlop={HIT_SLOP}
-                      >
-                        <Ionicons
-                          name="share-outline"
-                          size={20}
-                          color={theme.tint}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                  <View style={styles.stageContainer}>
-                    {stageOptions.map((option) => {
-                      const isActive = option.value === stage;
-                      return (
-                        <TouchableOpacity
-                          key={option.value}
-                          style={[
-                            styles.stageChip,
-                            {
-                              backgroundColor: isActive
-                                ? withAlpha(typeMeta.color, 0.22)
-                                : withAlpha(theme.text, 0.06),
-                              borderColor: isActive
-                                ? typeMeta.color
-                                : withAlpha(theme.text, 0.15),
-                              opacity:
-                                pendingStage && pendingStage === option.value
-                                  ? 0.6
-                                  : 1,
-                            },
-                          ]}
-                          onPress={() => handleStageChange(option.value)}
-                          disabled={pendingStage !== null}
-                        >
-                          <Text
-                            style={[
-                              styles.stageChipText,
-                              { color: isActive ? typeMeta.color : theme.text },
-                            ]}
-                          >
-                            {option.title}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                  <Text
-                    style={[
-                      styles.stageDescription,
-                      { color: theme.placeholder },
-                    ]}
-                  >
-                    {stageMeta.description}
-                  </Text>
-                  <Text style={[styles.stageNudge, { color: theme.tint }]}>
-                    {stageMeta.nudge}
-                  </Text>
-                  {anonFavEnabled ? (
-                    <View
-                      style={[
-                        styles.favoriteSummary,
-                        {
-                          borderColor: theme.placeholder,
-                          backgroundColor: theme.background,
-                        },
-                      ]}
-                    >
-                      <TouchableOpacity
-                        onPress={() => {
-                          void handleFavoritePress();
-                        }}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 8,
-                        }}
-                        accessibilityRole="button"
-                        accessibilityState={
-                          anonFavLoading ? { busy: true } : undefined
-                        }
-                        disabled={anonFavLoading}
-                      >
-                        <Ionicons
-                          name={anonFavorited ? 'heart' : 'heart-outline'}
-                          size={18}
-                          color={anonFavorited ? '#ef4444' : theme.tint}
-                        />
-                        <Text
-                          style={[
-                            styles.favoriteSummaryText,
-                            { color: theme.text },
-                          ]}
-                        >
-                          {anonStats.favorites > 0
-                            ? tr('wish.favoritesTitle', '{{count}} favorites', {
-                                count: anonStats.favorites,
-                              })
-                            : tr(
-                                'wish.favoritesBeFirst',
-                                'Be the first to favorite',
-                              )}
-                        </Text>
-                      </TouchableOpacity>
-                      {favoriteSampleNote ? (
-                        <Text
-                          style={[
-                            styles.favoriteQuote,
-                            { color: theme.placeholder },
-                          ]}
-                        >
-                          “{favoriteSampleNote}”
-                        </Text>
-                      ) : null}
-                    </View>
-                  ) : null}
-                  {wish.accountabilityCircleName ? (
-                    <View
-                      style={[
-                        styles.circleBanner,
-                        {
-                          borderColor: withAlpha(theme.tint, 0.4),
-                          backgroundColor: withAlpha(theme.tint, 0.08),
-                        },
-                      ]}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          style={[
-                            styles.circleBannerTitle,
-                            { color: theme.tint },
-                          ]}
-                        >
-                          👥 {wish.accountabilityCircleName}
-                        </Text>
-                        {circleMeta?.lastCheckInAt ? (
-                          <Text
-                            style={[
-                              styles.circleBannerSubtitle,
-                              { color: theme.placeholder },
-                            ]}
-                          >
-                            {tr(
-                              'wish.circleLastCheckIn',
-                              'Last check-in {{time}} ago',
-                              {
-                                time: formatDistanceToNow(
-                                  new Date(circleMeta.lastCheckInAt),
-                                ),
-                              },
-                            )}
-                          </Text>
-                        ) : (
-                          <Text
-                            style={[
-                              styles.circleBannerSubtitle,
-                              { color: theme.placeholder },
-                            ]}
-                          >
-                            {tr(
-                              'wish.circlePrompt',
-                              'Keep the circle in the loop with short updates.',
-                            )}
-                          </Text>
-                        )}
-                      </View>
-                      {wish.accountabilityCircleId ? (
-                        <TouchableOpacity
-                          onPress={handleCircleCheckIn}
-                          style={[
-                            styles.circleBannerButton,
-                            { borderColor: theme.tint },
-                          ]}
-                          hitSlop={HIT_SLOP}
-                        >
-                          <Text
-                            style={[
-                              styles.circleBannerButtonText,
-                              { color: theme.tint },
-                            ]}
-                          >
-                            {tr('wish.circleLogCheckIn', 'Log check-in')}
-                          </Text>
-                        </TouchableOpacity>
-                      ) : null}
-                    </View>
-                  ) : null}
-                  <Text style={[styles.wishText, { color: theme.text }]}>
-                    {wish.text}
-                  </Text>
-                  {wish.fulfillmentLink && (
-                    <Text style={{ color: theme.tint, marginTop: 4 }}>
-                      💝 Fulfilled
-                    </Text>
-                  )}
-                  {wish.imageUrl && (
-                    <Image
-                      source={{ uri: wish.imageUrl }}
-                      style={styles.preview}
-                    />
-                  )}
-
-                  {wish.isPoll ? (
-                    <View style={{ marginTop: 8 }}>
-                      {(() => {
-                        const totalVotes =
-                          (wish.votesA || 0) + (wish.votesB || 0);
-                        const percentA = totalVotes
-                          ? Math.round(((wish.votesA || 0) / totalVotes) * 100)
-                          : 0;
-                        const percentB = totalVotes
-                          ? Math.round(((wish.votesB || 0) / totalVotes) * 100)
-                          : 0;
-                        return (
-                          <>
-                            <TouchableOpacity
-                              style={styles.pollOption}
-                              disabled={hasVoted}
-                              onPress={() => handleVote('A')}
-                            >
-                              <Text
-                                style={[
-                                  styles.pollOptionText,
-                                  { color: theme.text },
-                                ]}
-                              >
-                                {wish.optionA} - {wish.votesA || 0} ({percentA}
-                                %)
-                              </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={styles.pollOption}
-                              disabled={hasVoted}
-                              onPress={() => handleVote('B')}
-                            >
-                              <Text
-                                style={[
-                                  styles.pollOptionText,
-                                  { color: theme.text },
-                                ]}
-                              >
-                                {wish.optionB} - {wish.votesB || 0} ({percentB}
-                                %)
-                              </Text>
-                            </TouchableOpacity>
-                            <Text style={{ color: theme.text, marginTop: 4 }}>
-                              Total votes: {totalVotes}
-                            </Text>
-                          </>
-                        );
-                      })()}
-                      <BarChart
-                        data={{
-                          labels: [wish.optionA || 'A', wish.optionB || 'B'],
-                          datasets: [
-                            { data: [wish.votesA || 0, wish.votesB || 0] },
-                          ],
-                        }}
-                        width={Dimensions.get('window').width - 80}
-                        height={220}
-                        yAxisLabel=""
-                        yAxisSuffix=""
-                        fromZero
-                        chartConfig={{
-                          backgroundColor: theme.input,
-                          backgroundGradientFrom: theme.input,
-                          backgroundGradientTo: theme.input,
-                          color: () => theme.tint,
-                          labelColor: () => theme.placeholder,
-                        }}
-                        style={{ marginTop: 10 }}
-                      />
-                    </View>
-                  ) : (
-                    <Text style={[styles.likes, { color: theme.tint }]}>
-                      ❤️ {wish.likes}
-                    </Text>
-                  )}
-                  {isBoosted && (
-                    <Text style={styles.boostedLabel}>
-                      ⏳ Time left: {timeLeft}
-                    </Text>
-                  )}
-
-                  {wish.audioUrl && (
-                    <TouchableOpacity
-                      onPress={toggleAudio}
-                      style={{ marginTop: 10 }}
-                    >
-                      <Text style={{ color: '#a78bfa' }}>
-                        {isPlaying ? '⏸ Pause Audio' : '▶ Play Audio'}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-
-                  {splitPayActive ? (
-                    <View
-                      style={[
-                        styles.splitPayCard,
-                        { backgroundColor: theme.input },
-                      ]}
-                    >
-                      <SplitPayProgressBar progress={progressPercent / 100} />
-                      {splitPayStatsText ? (
-                        <Text
-                          style={[styles.splitPayStats, { color: theme.text }]}
-                        >
-                          {splitPayStatsText}
-                        </Text>
-                      ) : null}
-                      {deadlineLabel ? (
-                        <Text
-                          style={[
-                            styles.splitPayDeadline,
-                            { color: theme.placeholder },
-                          ]}
-                        >
-                          {deadlineLabel}
-                        </Text>
-                      ) : null}
-                      {splitPayCtaLabel ? (
-                        canChipIn ? (
-                          <TouchableOpacity
-                            onPress={() => setChipInVisible(true)}
-                            style={[
-                              styles.splitPayButton,
-                              { backgroundColor: theme.tint },
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.splitPayButtonText,
-                                { color: theme.background },
-                              ]}
-                            >
-                              {splitPayCtaLabel}
-                            </Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <Text
-                            style={[
-                              styles.splitPayStatusText,
-                              { color: theme.placeholder },
-                            ]}
-                          >
-                            {splitPayCtaLabel}
-                          </Text>
-                        )
-                      ) : null}
-                      <View style={styles.splitPayActions}>
-                        {giftTogetherEnabled ? (
-                          <TouchableOpacity
-                            onPress={() => setGiftTogetherVisible(true)}
-                            style={[
-                              styles.splitPaySecondaryButton,
-                              { borderColor: theme.placeholder },
-                            ]}
-                            hitSlop={HIT_SLOP}
-                            accessibilityRole="button"
-                          >
-                            <Text
-                              style={[
-                                styles.splitPaySecondaryText,
-                                { color: theme.text },
-                              ]}
-                            >
-                              🎁 Gift Together
-                            </Text>
-                          </TouchableOpacity>
-                        ) : null}
-                        <TouchableOpacity
-                          onPress={handleShare}
-                          style={[
-                            styles.splitPaySecondaryButton,
-                            { borderColor: theme.placeholder },
-                          ]}
-                          hitSlop={HIT_SLOP}
-                          accessibilityRole="button"
-                        >
-                          <Text
-                            style={[
-                              styles.splitPaySecondaryText,
-                              { color: theme.text },
-                            ]}
-                          >
-                            Share link
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  ) : hasFundingGoal ? (
-                    <View
-                      style={[
-                        styles.fundingCard,
-                        { backgroundColor: theme.input },
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.fundingProgressOuter,
-                          { backgroundColor: theme.background },
-                        ]}
-                      >
-                        <View
-                          style={[
-                            styles.fundingProgressInner,
-                            {
-                              width: `${fundingPercentDisplay}%`,
-                              backgroundColor: theme.tint,
-                            },
-                          ]}
-                        />
-                      </View>
-                      <View style={styles.fundingInfoRow}>
-                        <Text
-                          style={[styles.fundingLabel, { color: theme.text }]}
-                          accessibilityLabel={tr('wish.fundingProgress', {
-                            raised: legacyFundingRaised.toFixed(2),
-                            goal: legacyFundingGoal.toFixed(2),
-                          })}
-                        >
-                          {tr('wish.fundingProgress', {
-                            raised: legacyFundingRaised.toFixed(2),
-                            goal: legacyFundingGoal.toFixed(2),
-                          })}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.fundingPercent,
-                            { color: theme.placeholder },
-                          ]}
-                          accessibilityLabel={tr('wish.fundingPercent', {
-                            percent: fundingPercentDisplay,
-                          })}
-                        >
-                          {tr('wish.fundingPercent', {
-                            percent: fundingPercentDisplay,
-                          })}
-                        </Text>
-                      </View>
-                      <Text
-                        style={[
-                          styles.fundingSupporters,
-                          { color: theme.placeholder },
-                        ]}
-                        accessibilityLabel={
-                          legacySupporters > 0
-                            ? tr('wish.fundingSupporters', {
-                                count: legacySupporters,
-                              })
-                            : tr(
-                                'wish.fundingBeFirst',
-                                'Be the first to chip in',
-                              )
-                        }
-                      >
-                        {legacySupporters > 0
-                          ? tr('wish.fundingSupporters', {
-                              count: legacySupporters,
-                            })
-                          : tr(
-                              'wish.fundingBeFirst',
-                              'Be the first to chip in',
-                            )}
-                      </Text>
-                    </View>
-                  ) : null}
-
-                  {supportRequestAmount ? (
-                    <View
-                      style={[
-                        styles.supportCard,
-                        {
-                          backgroundColor: theme.input,
-                          borderColor: theme.tint,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[styles.supportCardTitle, { color: theme.text }]}
-                      >
-                        {tr(
-                          'wish.supportRequestTitle',
-                          'Support request: {{amount}}',
-                          {
-                            amount: formatCurrency(supportRequestAmount),
-                          },
-                        )}
-                      </Text>
-                      {supportRequestReason ? (
-                        <Text
-                          style={[
-                            styles.supportCardText,
-                            { color: theme.text },
-                          ]}
-                        >
-                          {supportRequestReason}
-                        </Text>
-                      ) : null}
-                    </View>
-                  ) : null}
-
-                  {profile?.giftingEnabled && wish.giftLink && (
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        marginTop: 8,
-                      }}
-                    >
-                      <TouchableOpacity
-                        onPress={() => openGiftLink(wish.giftLink!)}
-                        style={{
-                          backgroundColor: theme.input,
-                          padding: 8,
-                          borderRadius: 8,
-                        }}
-                      >
-                        <Text style={{ color: theme.tint }}>
-                          {(() => {
-                            try {
-                              const url = new URL(wish.giftLink!);
-                              const trusted = [
-                                'venmo.com',
-                                'paypal.me',
-                                'amazon.com',
-                              ].some((d) => url.hostname.includes(d));
-                              return `${trusted ? '✅' : '⚠️'} 🎁 ${wish.giftLabel || 'Send Gift'}`;
-                            } catch {
-                              return `⚠️ 🎁 ${wish.giftLabel || 'Send Gift'}`;
-                            }
-                          })()}
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() =>
-                          Alert.alert(
-                            'Gift Info',
-                            'Gifting is anonymous and optional. You can attach a support link like Venmo or Stripe.',
-                          )
-                        }
-                        style={{ marginLeft: 6 }}
-                        hitSlop={HIT_SLOP}
-                      >
-                        <Ionicons
-                          name="information-circle-outline"
-                          size={16}
-                          color={theme.text}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                  {wish?.userId && profile?.giftingEnabled ? (
-                    <GiftCTA
-                      wishId={wish.id}
-                      wishTitle={wish.text}
-                      recipientId={wish.userId}
-                      goalAmount={
-                        typeof wish.fundingGoal === 'number'
-                          ? wish.fundingGoal
-                          : null
-                      }
-                      currentGiftTotal={legacyFundingRaised}
-                      venmoRecipient={(owner && owner.venmoHandle) || null}
-                      isPrivate={
-                        wish?.visibility === 'private' ||
-                        wish?.shareScope === 'private' ||
-                        (wish as any)?.isPrivate === true
-                      }
-                      onGiftConfirmed={() => {
-                        clearWishMetaCache(wish.id);
-                        fetchWish();
-                      }}
-                    />
-                  ) : null}
-
-                  {canBoost && (
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        marginTop: 8,
-                      }}
-                    >
-                      <TouchableOpacity
-                        onPress={handleBoostWish}
-                        hitSlop={HIT_SLOP}
-                      >
-                        <Text style={{ color: '#facc15' }}>Boost Wish</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() =>
-                          Alert.alert(
-                            'Boost Info',
-                            'Boosting highlights a wish for 24 hours.',
-                          )
-                        }
-                        style={{ marginLeft: 6 }}
-                        hitSlop={HIT_SLOP}
-                      >
-                        <Ionicons
-                          name="information-circle-outline"
-                          size={16}
-                          color={theme.text}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {user?.uid === wish.userId && (
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        marginTop: 8,
-                      }}
-                    >
-                      <TouchableOpacity
-                        onPress={() => {
-                          setEditText(wish.text);
-                          setEditCategory(wish.category);
-                          setEditing(true);
-                        }}
-                        hitSlop={HIT_SLOP}
-                      >
-                        <Text style={{ color: theme.tint }}>Edit</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={handleDeleteWish}
-                        style={{ marginLeft: 10 }}
-                        hitSlop={HIT_SLOP}
-                      >
-                        <Text style={{ color: '#f87171' }}>Delete</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  <TouchableOpacity
-                    onPress={() => {
-                      setReportTarget({ type: 'wish', id: wish.id });
-                      setReportVisible(true);
-                    }}
-                    style={{ marginTop: 8 }}
-                    hitSlop={HIT_SLOP}
-                  >
-                    <Text style={{ color: '#f87171' }}>Report</Text>
-                  </TouchableOpacity>
-                </Animated.View>
-              )}
+              {wish ? (
+                <WishDetailCard
+                  wish={wish}
+                  theme={theme}
+                  t={tr}
+                  typeMeta={typeMeta}
+                  isBoosted={Boolean(isBoosted)}
+                  glowAnim={glowAnim}
+                  stage={stage}
+                  stageMeta={stageMeta}
+                  stageOptions={stageOptions}
+                  pendingStage={pendingStage}
+                  onChangeStage={handleStageChange}
+                  anonFavEnabled={anonFavEnabled}
+                  anonFavorited={anonFavorited}
+                  anonFavLoading={anonFavLoading}
+                  favoriteCount={anonStats.favorites}
+                  favoriteSampleNote={favoriteSampleNote}
+                  onFavoritePress={handleFavoritePress}
+                  circleLastCheckInAt={circleMeta?.lastCheckInAt}
+                  onCircleCheckIn={handleCircleCheckIn}
+                  hasVoted={hasVoted}
+                  onVote={handleVote}
+                  isPlaying={isPlaying}
+                  onToggleAudio={toggleAudio}
+                  splitPayActive={splitPayActive}
+                  progressPercent={progressPercent}
+                  splitPayStatsText={splitPayStatsText}
+                  deadlineLabel={deadlineLabel}
+                  splitPayCtaLabel={splitPayCtaLabel}
+                  canChipIn={canChipIn}
+                  giftTogetherEnabled={giftTogetherEnabled}
+                  onOpenChipIn={() => setChipInVisible(true)}
+                  onOpenGiftTogether={() => setGiftTogetherVisible(true)}
+                  onShare={handleShare}
+                  hasFundingGoal={hasFundingGoal}
+                  fundingPercentDisplay={fundingPercentDisplay}
+                  legacyFundingRaised={legacyFundingRaised}
+                  legacyFundingGoal={legacyFundingGoal}
+                  legacySupporters={legacySupporters}
+                  supportRequestAmount={supportRequestAmount}
+                  supportRequestReason={supportRequestReason}
+                  giftingEnabled={profile?.giftingEnabled === true}
+                  onOpenGiftLink={openGiftLink}
+                  ownerVenmoHandle={ownerVenmoHandle}
+                  onGiftConfirmed={handleGiftConfirmed}
+                  canBoost={Boolean(canBoost)}
+                  onBoostWish={handleBoostWish}
+                  isOwner={isOwner}
+                  onStartEdit={handleStartEditWish}
+                  onDeleteWish={handleDeleteWish}
+                  onReportWish={handleReportWish}
+                  timeLeft={timeLeft}
+                />
+              ) : null}
             </>
           )}
 
@@ -2220,22 +1326,30 @@ export default function Page() {
             />
           ) : null}
 
-          <FlatList
-            ref={flatListRef}
-            data={comments.filter((c) => isActiveWish || !c.parentId)}
-            keyExtractor={(item) => item.id}
-            renderItem={renderComment}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            contentContainerStyle={{ paddingBottom: 80, flexGrow: 1 }}
-            scrollEnabled={false}
-            initialNumToRender={10}
-            getItemLayout={(_, index) => ({
-              length: COMMENT_ITEM_HEIGHT,
-              offset: COMMENT_ITEM_HEIGHT * index,
-              index,
-            })}
+          <CommentThread
+            comments={comments}
+            isActiveWish={isActiveWish}
+            userId={user?.uid}
+            wishUserId={wish?.userId}
+            publicStatus={publicStatus}
+            verifiedStatus={verifiedStatus}
+            editingCommentId={editingCommentId}
+            editingCommentText={editingCommentText}
+            setEditingCommentId={setEditingCommentId}
+            setEditingCommentText={setEditingCommentText}
+            onSaveComment={handleSaveComment}
+            onDeleteComment={handleDeleteComment}
+            onReact={handleReact}
+            onReply={setReplyTo}
+            onReportComment={(commentId) => {
+              setReportTarget({ type: 'comment', id: commentId });
+              setReportVisible(true);
+            }}
+            onOpenProfile={(displayName) => router.push(`/profile/${displayName}`)}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            flatListRef={flatListRef}
+            theme={theme}
           />
 
           {replyTo && (
@@ -2584,346 +1698,3 @@ export default function Page() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 20,
-    paddingBottom: 100,
-    flexGrow: 1,
-  },
-  backButton: {
-    marginBottom: 10,
-  },
-  backButtonText: {
-    fontSize: 16,
-  },
-  banner: {
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  wishBox: {
-    padding: 14,
-    borderRadius: 10,
-    marginBottom: 20,
-  },
-  wishHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  wishCategory: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  stageContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 10,
-    marginHorizontal: -4,
-  },
-  stageChip: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    borderWidth: 1,
-    marginHorizontal: 4,
-    marginBottom: 6,
-  },
-  stageChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  stageDescription: {
-    fontSize: 13,
-    marginTop: 6,
-  },
-  stageNudge: {
-    fontSize: 13,
-    marginTop: 2,
-    fontStyle: 'italic',
-  },
-  circleBanner: {
-    marginTop: 10,
-    marginBottom: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  circleBannerTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  circleBannerSubtitle: {
-    fontSize: 12,
-    marginTop: 4,
-  },
-  favoriteSummary: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 10,
-    padding: 12,
-    marginTop: 12,
-  },
-  favoriteSummaryText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  favoriteQuote: {
-    fontSize: 13,
-    fontStyle: 'italic',
-    marginTop: 6,
-  },
-  favoriteNoteInput: {
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginTop: 12,
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  modalActionRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-    marginTop: 16,
-  },
-  modalActionButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  modalActionText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  circleBannerButton: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    marginLeft: 12,
-  },
-  circleBannerButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  wishText: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginTop: 4,
-  },
-  preview: {
-    width: '100%',
-    height: 200,
-    borderRadius: 10,
-    marginTop: 8,
-  },
-  likes: {
-    fontSize: 14,
-    marginTop: 8,
-    fontWeight: '500',
-  },
-  boostedLabel: {
-    color: '#facc15',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  pollOption: {
-    backgroundColor: '#2e2e2e',
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 6,
-  },
-  pollOptionText: {
-    textAlign: 'center',
-  },
-  fundingCard: {
-    marginTop: 12,
-    padding: 14,
-    borderRadius: 12,
-  },
-  splitPayCard: {
-    marginTop: 12,
-    padding: 16,
-    borderRadius: 14,
-    gap: 12,
-  },
-  splitPayStats: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  splitPayDeadline: {
-    fontSize: 12,
-  },
-  splitPayButton: {
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  splitPayButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  splitPayStatusText: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginTop: 4,
-  },
-  splitPayActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  splitPaySecondaryButton: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  splitPaySecondaryText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  supportCard: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
-    marginTop: 12,
-    gap: 8,
-  },
-  supportCardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  supportCardText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  fundingProgressOuter: {
-    height: 10,
-    borderRadius: 999,
-    overflow: 'hidden',
-  },
-  fundingProgressInner: {
-    height: 10,
-    borderRadius: 999,
-  },
-  fundingInfoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  fundingLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  fundingPercent: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  fundingSupporters: {
-    fontSize: 12,
-    marginTop: 6,
-  },
-  commentBox: {
-    backgroundColor: '#1a1a1a',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  replyInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  successToast: {
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    alignSelf: 'flex-start',
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
-  },
-  successToastText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  signInNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    alignSelf: 'flex-start',
-    marginBottom: 12,
-  },
-  nickname: {
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  comment: {
-    fontSize: 14,
-  },
-  timestamp: {
-    fontSize: 10,
-    marginTop: 4,
-  },
-  label: {
-    marginBottom: 4,
-  },
-  input: {
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-  errorText: {
-    color: '#f87171',
-    textAlign: 'center',
-    marginTop: 20,
-  },
-  button: {
-    padding: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  buttonText: {
-    fontWeight: '600',
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalCard: {
-    padding: 20,
-    borderRadius: 10,
-    width: '80%',
-  },
-  modalText: {
-    fontSize: 16,
-    textAlign: 'center',
-  },
-});

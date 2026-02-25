@@ -55,6 +55,7 @@ const FEED_FIELD_ALLOWLIST = [
   'photoURL',
   'audioUrl',
   'imageUrl',
+  'videoUrl',
   'giftLink',
   'giftType',
   'giftLabel',
@@ -730,6 +731,7 @@ async function handleCreateWish(req: Request, res: Response) {
   const optionalStringFields: Record<string, number> = {
     audioUrl: 2000,
     imageUrl: 2000,
+    videoUrl: 2000,
     giftLink: 2000,
     giftType: 20,
     giftLabel: 50,
