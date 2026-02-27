@@ -19,7 +19,6 @@ import {
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -41,7 +40,14 @@ import * as Haptics from 'expo-haptics';
 import { useWishMeta } from '@/hooks/useWishMeta';
 import { SplitPayProgressBar } from '@/app/components/splitpay/ProgressBar';
 import { formatCurrency } from '@/shared/numberFormat';
-import { logSplitPayShareClick } from '@/src/lib/analytics';
+import {
+  logCampaignShareComplete,
+  logCampaignShareDismissed,
+  logCampaignShareStart,
+  logSplitPayShareClick,
+} from '@/src/lib/analytics';
+import { buildCampaignShareMessage } from '@/src/lib/campaignShare';
+import { buildPublicWishUrl } from '@/src/lib/publicLinks';
 import { trackEvent } from '@/helpers/analytics';
 import {
   getPostTypeColor,
@@ -371,11 +377,36 @@ export const WishCard: React.FC<{
 
   const handleShare = useCallback(async () => {
     if (!wish.id) return;
-    const shareUrl = Linking.createURL(`/wish/${wish.id}`, {
-      queryParams: splitPayActive ? { splitpay: '1' } : undefined,
-    });
+    const shareUrl = buildPublicWishUrl(
+      wish.id,
+      splitPayActive ? { splitpay: 1 } : undefined,
+    );
     try {
-      await Share.share({ message: shareUrl });
+      logCampaignShareStart({
+        wishId: wish.id,
+        surface: 'wish_card',
+        withSplitPay: splitPayActive,
+      });
+      const result = await Share.share({
+        message: buildCampaignShareMessage({
+          creatorName: wish.displayName,
+          wishTitle: wish.text,
+          url: shareUrl,
+        }),
+      });
+      if (result.action === Share.sharedAction) {
+        logCampaignShareComplete({
+          wishId: wish.id,
+          surface: 'wish_card',
+          withSplitPay: splitPayActive,
+        });
+      } else if (result.action === Share.dismissedAction) {
+        logCampaignShareDismissed({
+          wishId: wish.id,
+          surface: 'wish_card',
+          withSplitPay: splitPayActive,
+        });
+      }
       if (splitPayActive) {
         logSplitPayShareClick({
           wishId: wish.id,
@@ -385,7 +416,7 @@ export const WishCard: React.FC<{
     } catch (err) {
       logger.warn('Failed to share wish', err);
     }
-  }, [experimentBucket, splitPayActive, wish.id]);
+  }, [experimentBucket, splitPayActive, wish.displayName, wish.id, wish.text]);
 
   const performDelete = useCallback(async () => {
     if (!wish.id || deleting) return;

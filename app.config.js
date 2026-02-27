@@ -7,6 +7,7 @@ export default () => {
   const plugins = [
     'expo-router',
     'expo-audio',
+    'expo-video',
     [
       'expo-splash-screen',
       {

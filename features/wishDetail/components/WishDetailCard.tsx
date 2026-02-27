@@ -69,7 +69,7 @@ type WishDetailCardProps = {
   supportRequestReason: string;
   giftingEnabled: boolean;
   onOpenGiftLink: (link: string) => void;
-  ownerVenmoHandle: string | null;
+  ownerPayoutHandle: string | null;
   onGiftConfirmed: () => void;
   canBoost: boolean;
   onBoostWish: () => void;
@@ -123,7 +123,7 @@ export const WishDetailCard: React.FC<WishDetailCardProps> = ({
   supportRequestReason,
   giftingEnabled,
   onOpenGiftLink,
-  ownerVenmoHandle,
+  ownerPayoutHandle,
   onGiftConfirmed,
   canBoost,
   onBoostWish,
@@ -143,7 +143,7 @@ export const WishDetailCard: React.FC<WishDetailCardProps> = ({
     if (!wish.giftLink) return null;
     try {
       const url = new URL(wish.giftLink);
-      const trusted = ['venmo.com', 'paypal.me', 'amazon.com'].some((domain) =>
+      const trusted = ['paypal.me', 'amazon.com', 'cash.app', 'whisplist.app'].some((domain) =>
         url.hostname.includes(domain),
       );
       return `${trusted ? '✅' : '⚠️'} 🎁 ${wish.giftLabel || 'Send Gift'}`;
@@ -571,7 +571,7 @@ export const WishDetailCard: React.FC<WishDetailCardProps> = ({
             onPress={() =>
               Alert.alert(
                 'Gift Info',
-                'Gifting is anonymous and optional. You can attach a support link like Venmo or Stripe.',
+                'Gifting is optional. Contributions finalize after payment verification.',
               )
             }
             style={{ marginLeft: 6 }}
@@ -593,7 +593,7 @@ export const WishDetailCard: React.FC<WishDetailCardProps> = ({
           recipientId={wish.userId}
           goalAmount={typeof wish.fundingGoal === 'number' ? wish.fundingGoal : null}
           currentGiftTotal={legacyFundingRaised}
-          venmoRecipient={ownerVenmoHandle}
+          quickPayRecipient={ownerPayoutHandle}
           isPrivate={
             legacyVisibilityWish.visibility === 'private' ||
             legacyVisibilityWish.shareScope === 'private' ||

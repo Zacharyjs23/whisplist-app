@@ -585,6 +585,60 @@ export default function Page() {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (!user?.uid) {
+      Alert.alert('Error', 'No signed-in account found.');
+      return;
+    }
+
+    const confirmed = await new Promise<boolean>((resolve) => {
+      Alert.alert(
+        t('settings.system.deleteAccountTitle', 'Delete account?'),
+        t(
+          'settings.system.deleteAccountBody',
+          'This permanently deletes your account and associated content. This action cannot be undone.',
+        ),
+        [
+          { text: t('common.cancel', 'Cancel'), onPress: () => resolve(false) },
+          {
+            text: t('common.delete', 'Delete'),
+            style: 'destructive',
+            onPress: () => resolve(true),
+          },
+        ],
+      );
+    });
+    if (!confirmed) return;
+
+    try {
+      const callable = httpsCallable(functions, 'deleteMyAccount');
+      await callable({});
+      await AsyncStorage.clear();
+      try {
+        await auth.signOut();
+      } catch {
+        // account may already be deleted server-side
+      }
+      Alert.alert(
+        t('settings.system.deleteAccountDoneTitle', 'Account deleted'),
+        t(
+          'settings.system.deleteAccountDoneBody',
+          'Your account has been permanently deleted.',
+        ),
+      );
+      router.replace('/auth' as Href);
+    } catch (err) {
+      logger.error('Failed to delete account', err);
+      Alert.alert(
+        'Error',
+        t(
+          'settings.system.deleteAccountFailed',
+          'We could not delete your account right now. Please try again.',
+        ),
+      );
+    }
+  };
+
   const openOSSettings = async () => {
     try {
       if (Linking.openSettings) {
@@ -663,6 +717,45 @@ export default function Page() {
 
   const handleShareInvite = async () => {
     setRefDialogVisible(true);
+  };
+
+  const handleRateApp = async () => {
+    const fallbackUrl = 'https://whisplist.app';
+    try {
+      if (Platform.OS === 'ios') {
+        const configuredUrl = process.env.EXPO_PUBLIC_IOS_APP_STORE_URL;
+        const appStoreId = process.env.EXPO_PUBLIC_IOS_APP_STORE_ID;
+        const reviewUrl = appStoreId
+          ? `itms-apps://itunes.apple.com/app/id${appStoreId}?action=write-review`
+          : null;
+        await Linking.openURL(configuredUrl || reviewUrl || fallbackUrl);
+        return;
+      }
+
+      if (Platform.OS === 'android') {
+        const packageId =
+          Constants.expoConfig?.android?.package || 'com.zachary.whisplist';
+        const configuredUrl = process.env.EXPO_PUBLIC_ANDROID_PLAY_STORE_URL;
+        const marketUrl = `market://details?id=${packageId}`;
+        const webUrl =
+          configuredUrl ||
+          `https://play.google.com/store/apps/details?id=${packageId}`;
+        const canUseMarketUrl = await Linking.canOpenURL(marketUrl);
+        await Linking.openURL(canUseMarketUrl ? marketUrl : webUrl);
+        return;
+      }
+
+      await Linking.openURL(fallbackUrl);
+    } catch (err) {
+      logger.warn('Failed to open rate-app URL', err);
+      Alert.alert(
+        t('settings.system.rateAppErrorTitle', 'Unable to open store'),
+        t(
+          'settings.system.rateAppErrorBody',
+          'Please try again in a moment.',
+        ),
+      );
+    }
   };
 
   const permissionsInfo = async () => {
@@ -1506,9 +1599,7 @@ export default function Page() {
                   'settings.system.rateAppDescription',
                   'Tell others what you love about WhispList.',
                 )}
-                onPress={() => {
-                  Linking.openURL('https://example.com');
-                }}
+                onPress={handleRateApp}
                 trailing={
                   <Ionicons name="star-outline" size={18} color={theme.tint} />
                 }
@@ -1669,6 +1760,21 @@ export default function Page() {
                 trailing={
                   <Ionicons
                     name="trash-outline"
+                    size={18}
+                    color="rgb(220, 38, 38)"
+                  />
+                }
+              />
+              <SettingRow
+                title={t('settings.system.deleteAccount', 'Delete Account')}
+                description={t(
+                  'settings.system.deleteAccountDescription',
+                  'Permanently remove your account and associated data.',
+                )}
+                onPress={handleDeleteAccount}
+                trailing={
+                  <Ionicons
+                    name="alert-circle-outline"
                     size={18}
                     color="rgb(220, 38, 38)"
                   />

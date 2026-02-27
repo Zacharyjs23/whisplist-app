@@ -2,6 +2,7 @@ import * as Linking from 'expo-linking';
 import type { Href } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
+import { Platform } from 'react-native';
 import { useAuthSession } from '@/contexts/AuthSessionContext';
 import * as logger from '@/shared/logger';
 
@@ -214,6 +215,12 @@ export const useWishlistDeepLinkHandler = () => {
   }, [loading, user?.uid]);
 
   useEffect(() => {
+    if (Platform.OS === 'web') {
+      // On web, opening non-matching "initial URLs" via Linking.openURL can
+      // bounce back to the same page and cause an infinite reload loop.
+      return;
+    }
+
     let cancelled = false;
     const subscription = Linking.addEventListener('url', ({ url }) => {
       controllerRef.current?.handleIncomingUrl(url);

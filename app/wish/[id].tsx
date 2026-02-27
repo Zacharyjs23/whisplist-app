@@ -66,7 +66,6 @@ import {
   LayoutAnimation,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useTranslation } from '@/contexts/I18nContext';
 import ReportDialog from '../../components/ReportDialog';
@@ -86,8 +85,16 @@ import { useAccountabilityCircles } from '@/hooks/useAccountabilityCircles';
 import { ChipInModal } from '@/app/components/splitpay/ChipInModal';
 import { GiftTogetherModal } from '@/app/components/splitpay/GiftTogetherModal';
 import { formatCurrency } from '@/shared/numberFormat';
-import { logSplitPayShareClick, logSplitPayView } from '@/src/lib/analytics';
+import {
+  logCampaignShareComplete,
+  logCampaignShareDismissed,
+  logCampaignShareStart,
+  logSplitPayShareClick,
+  logSplitPayView,
+} from '@/src/lib/analytics';
 import { ANALYTICS_EVENTS } from '@/src/lib/analytics/events';
+import { buildPublicWishUrl } from '@/src/lib/publicLinks';
+import { buildCampaignShareMessage } from '@/src/lib/campaignShare';
 import { useAnonFavorite } from '@/hooks/useAnonFavorite';
 import { useWishStats } from '@/hooks/useWishStats';
 import { appConfig } from '@/appConfig';
@@ -1097,15 +1104,41 @@ export default function Page() {
   const giftTogetherEnabled = splitPayActive && appConfig.features.giftTogether;
   const giftTogetherLink = useMemo(() => {
     if (!wish?.id) return '';
-    const params =
-      giftPotEnabled && wish?.splitPayEnabled ? { splitpay: '1' } : undefined;
-    return Linking.createURL(`/wish/${wish.id}`, { queryParams: params });
+    return buildPublicWishUrl(
+      wish.id,
+      giftPotEnabled && wish?.splitPayEnabled ? { splitpay: 1 } : undefined,
+    );
   }, [giftPotEnabled, wish?.id, wish?.splitPayEnabled]);
 
   const handleShare = useCallback(async () => {
     if (!wish?.id || !giftTogetherLink) return;
     try {
-      await Share.share({ message: giftTogetherLink });
+      const withSplitPay = Boolean(giftPotEnabled && wish.splitPayEnabled);
+      logCampaignShareStart({
+        wishId: wish.id,
+        surface: 'wish_detail',
+        withSplitPay,
+      });
+      const result = await Share.share({
+        message: buildCampaignShareMessage({
+          creatorName: wish.displayName,
+          wishTitle: wish.text,
+          url: giftTogetherLink,
+        }),
+      });
+      if (result.action === Share.sharedAction) {
+        logCampaignShareComplete({
+          wishId: wish.id,
+          surface: 'wish_detail',
+          withSplitPay,
+        });
+      } else if (result.action === Share.dismissedAction) {
+        logCampaignShareDismissed({
+          wishId: wish.id,
+          surface: 'wish_detail',
+          withSplitPay,
+        });
+      }
       if (giftPotEnabled && wish.splitPayEnabled) {
         logSplitPayShareClick({
           wishId: wish.id,
@@ -1120,7 +1153,9 @@ export default function Page() {
     giftPotEnabled,
     giftTogetherLink,
     wish?.id,
+    wish?.displayName,
     wish?.splitPayEnabled,
+    wish?.text,
   ]);
 
   useEffect(() => {
@@ -1209,8 +1244,8 @@ export default function Page() {
     setReportVisible(true);
   }, [wish]);
 
-  const ownerVenmoHandle =
-    typeof owner?.venmoHandle === 'string' ? owner.venmoHandle : null;
+  const ownerPayoutHandle =
+    typeof owner?.payoutHandle === 'string' ? owner.payoutHandle : null;
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -1301,7 +1336,7 @@ export default function Page() {
                   supportRequestReason={supportRequestReason}
                   giftingEnabled={profile?.giftingEnabled === true}
                   onOpenGiftLink={openGiftLink}
-                  ownerVenmoHandle={ownerVenmoHandle}
+                  ownerPayoutHandle={ownerPayoutHandle}
                   onGiftConfirmed={handleGiftConfirmed}
                   canBoost={Boolean(canBoost)}
                   onBoostWish={handleBoostWish}

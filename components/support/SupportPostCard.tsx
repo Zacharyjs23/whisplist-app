@@ -2,6 +2,11 @@ import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
 import {
+  VideoView,
+  useVideoPlayer,
+  type TimeUpdateEventPayload,
+} from 'expo-video';
+import {
   Image,
   Pressable,
   StyleSheet,
@@ -19,8 +24,33 @@ type SupportPostCardProps = {
   post: SupportPost;
   compact?: boolean;
   onOpenPost: (post: SupportPost) => void;
+  onChipIn?: (post: SupportPost) => void;
+  allowChipIn?: boolean;
+  onSharePost?: (post: SupportPost) => void;
   onOpenGift?: (post: SupportPost) => void;
   onOpenVideo?: (post: SupportPost) => void;
+  autoPlayVideo?: boolean;
+  onVideoEvent?: (event: SupportPostVideoEvent) => void;
+};
+
+export type SupportPostVideoEventType =
+  | 'impression'
+  | 'play'
+  | 'pause'
+  | 'progress_3s'
+  | 'progress_10s'
+  | 'progress_25'
+  | 'progress_50'
+  | 'progress_75'
+  | 'complete'
+  | 'error';
+
+export type SupportPostVideoEvent = {
+  postId: string;
+  videoUrl: string;
+  event: SupportPostVideoEventType;
+  positionSeconds?: number;
+  durationSeconds?: number;
 };
 
 function requestLabel(type: SupportRequestType): string {
@@ -45,14 +75,186 @@ export function SupportPostCard({
   post,
   compact = false,
   onOpenPost,
+  onChipIn,
+  allowChipIn = false,
+  onSharePost,
   onOpenGift,
   onOpenVideo,
+  autoPlayVideo = false,
+  onVideoEvent,
 }: SupportPostCardProps) {
   const progress = getProgress(post);
   const createdAtLabel = post.createdAtMs
     ? formatDistanceToNow(post.createdAtMs, { addSuffix: true })
     : 'just now';
   const initial = post.creatorName.trim().charAt(0).toUpperCase() || 'A';
+  const [isMuted, setIsMuted] = React.useState(true);
+  const canChipIn = !compact && allowChipIn && typeof onChipIn === 'function';
+
+  const shouldRenderVideo = !compact && !!post.videoUrl;
+  const player = useVideoPlayer(post.videoUrl ?? null, (videoPlayer) => {
+    videoPlayer.loop = true;
+    videoPlayer.muted = true;
+    videoPlayer.timeUpdateEventInterval = 0.5;
+  });
+
+  const emitVideoEvent = React.useCallback(
+    (
+      event: SupportPostVideoEventType,
+      extras: Pick<SupportPostVideoEvent, 'positionSeconds' | 'durationSeconds'> = {},
+    ) => {
+      if (!post.videoUrl) return;
+      onVideoEvent?.({
+        postId: post.id,
+        videoUrl: post.videoUrl,
+        event,
+        ...extras,
+      });
+    },
+    [onVideoEvent, post.id, post.videoUrl],
+  );
+
+  const toFiniteSeconds = (value: unknown): number | undefined => {
+    if (typeof value !== 'number') return undefined;
+    if (!Number.isFinite(value) || value <= 0) return undefined;
+    return value;
+  };
+
+  const progressMilestonesRef = React.useRef({
+    progress3: false,
+    progress10: false,
+    progress25: false,
+    progress50: false,
+    progress75: false,
+  });
+  const playbackStateRef = React.useRef(false);
+  const loggedImpressionRef = React.useRef(false);
+
+  React.useEffect(() => {
+    progressMilestonesRef.current = {
+      progress3: false,
+      progress10: false,
+      progress25: false,
+      progress50: false,
+      progress75: false,
+    };
+    playbackStateRef.current = false;
+    loggedImpressionRef.current = false;
+  }, [post.id, post.videoUrl]);
+
+  React.useEffect(() => {
+    if (!shouldRenderVideo) return;
+    if (autoPlayVideo) {
+      if (!loggedImpressionRef.current) {
+        loggedImpressionRef.current = true;
+        emitVideoEvent('impression', {
+          positionSeconds: toFiniteSeconds(player.currentTime),
+          durationSeconds: toFiniteSeconds(player.duration),
+        });
+      }
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [autoPlayVideo, emitVideoEvent, player, shouldRenderVideo]);
+
+  React.useEffect(() => {
+    if (!shouldRenderVideo) return;
+
+    const handleMilestones = (payload: TimeUpdateEventPayload) => {
+      const current = toFiniteSeconds(payload.currentTime);
+      const duration = toFiniteSeconds(player.duration);
+      if (current === undefined) return;
+
+      if (!progressMilestonesRef.current.progress3 && current >= 3) {
+        progressMilestonesRef.current.progress3 = true;
+        emitVideoEvent('progress_3s', {
+          positionSeconds: current,
+          durationSeconds: duration,
+        });
+      }
+
+      if (!progressMilestonesRef.current.progress10 && current >= 10) {
+        progressMilestonesRef.current.progress10 = true;
+        emitVideoEvent('progress_10s', {
+          positionSeconds: current,
+          durationSeconds: duration,
+        });
+      }
+
+      if (!duration) return;
+      const progressRatio = current / duration;
+
+      if (!progressMilestonesRef.current.progress25 && progressRatio >= 0.25) {
+        progressMilestonesRef.current.progress25 = true;
+        emitVideoEvent('progress_25', {
+          positionSeconds: current,
+          durationSeconds: duration,
+        });
+      }
+      if (!progressMilestonesRef.current.progress50 && progressRatio >= 0.5) {
+        progressMilestonesRef.current.progress50 = true;
+        emitVideoEvent('progress_50', {
+          positionSeconds: current,
+          durationSeconds: duration,
+        });
+      }
+      if (!progressMilestonesRef.current.progress75 && progressRatio >= 0.75) {
+        progressMilestonesRef.current.progress75 = true;
+        emitVideoEvent('progress_75', {
+          positionSeconds: current,
+          durationSeconds: duration,
+        });
+      }
+    };
+
+    const playingSub = player.addListener('playingChange', ({ isPlaying }) => {
+      if (isPlaying === playbackStateRef.current) return;
+      playbackStateRef.current = isPlaying;
+      emitVideoEvent(isPlaying ? 'play' : 'pause', {
+        positionSeconds: toFiniteSeconds(player.currentTime),
+        durationSeconds: toFiniteSeconds(player.duration),
+      });
+    });
+
+    const timeSub = player.addListener('timeUpdate', handleMilestones);
+    const endSub = player.addListener('playToEnd', () => {
+      emitVideoEvent('complete', {
+        positionSeconds: toFiniteSeconds(player.currentTime),
+        durationSeconds: toFiniteSeconds(player.duration),
+      });
+    });
+    const statusSub = player.addListener('statusChange', ({ status }) => {
+      if (status === 'error') {
+        emitVideoEvent('error', {
+          positionSeconds: toFiniteSeconds(player.currentTime),
+          durationSeconds: toFiniteSeconds(player.duration),
+        });
+      }
+    });
+
+    return () => {
+      playingSub.remove();
+      timeSub.remove();
+      endSub.remove();
+      statusSub.remove();
+    };
+  }, [emitVideoEvent, player, shouldRenderVideo]);
+
+  const togglePlayback = React.useCallback(() => {
+    if (!post.videoUrl) return;
+    if (player.playing) {
+      player.pause();
+    } else {
+      player.play();
+    }
+  }, [player, post.videoUrl]);
+
+  const toggleMute = React.useCallback(() => {
+    const next = !isMuted;
+    setIsMuted(next);
+    player.muted = next;
+  }, [isMuted, player]);
 
   return (
     <View style={[styles.card, compact ? styles.cardCompact : null]}>
@@ -79,16 +281,43 @@ export function SupportPostCard({
         <Image source={{ uri: post.imageUrl }} style={styles.mediaImage} />
       ) : null}
 
-      {!compact && post.videoUrl ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => onOpenVideo?.(post)}
-          style={styles.videoPlaceholder}
-        >
-          <Ionicons name="play-circle" size={26} color="#ffffff" />
-          <Text style={styles.videoLabel}>Video attached</Text>
-          <Text style={styles.videoSubLabel}>Tap to open video</Text>
-        </Pressable>
+      {shouldRenderVideo ? (
+        <View style={styles.videoWrap}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={togglePlayback}
+            onLongPress={() => onOpenVideo?.(post)}
+            style={styles.videoPressable}
+          >
+            <VideoView
+              player={player}
+              style={styles.videoView}
+              contentFit="cover"
+              nativeControls={false}
+              allowsFullscreen
+            />
+            {!player.playing ? (
+              <View style={styles.videoOverlayCenter}>
+                <Ionicons name="play-circle" size={52} color="#ffffff" />
+              </View>
+            ) : null}
+            <View style={styles.videoOverlayBottom}>
+              <Text style={styles.videoLabel}>Video request</Text>
+              <Text style={styles.videoSubLabel}>Tap to pause/play</Text>
+            </View>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={toggleMute}
+            style={styles.videoMuteButton}
+          >
+            <Ionicons
+              name={isMuted ? 'volume-mute' : 'volume-high'}
+              size={18}
+              color="#ffffff"
+            />
+          </Pressable>
+        </View>
       ) : null}
 
       <Text style={styles.needLabel}>What they need</Text>
@@ -121,12 +350,28 @@ export function SupportPostCard({
       <View style={styles.actionsRow}>
         <Pressable
           accessibilityRole="button"
-          onPress={() => onOpenPost(post)}
+          onPress={() => {
+            if (canChipIn) {
+              onChipIn?.(post);
+              return;
+            }
+            onOpenPost(post);
+          }}
           style={styles.primaryButton}
         >
-          <Text style={styles.primaryButtonText}>{primaryAction(post.requestType)}</Text>
+          <Text style={styles.primaryButtonText}>
+            {canChipIn ? 'Chip in now' : primaryAction(post.requestType)}
+          </Text>
         </Pressable>
-        {post.giftLink ? (
+        {canChipIn ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => onOpenPost(post)}
+            style={styles.secondaryButton}
+          >
+            <Text style={styles.secondaryButtonText}>View story</Text>
+          </Pressable>
+        ) : post.giftLink ? (
           <Pressable
             accessibilityRole="button"
             onPress={() => onOpenGift?.(post)}
@@ -136,6 +381,26 @@ export function SupportPostCard({
           </Pressable>
         ) : null}
       </View>
+      {canChipIn && post.giftLink ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onOpenGift?.(post)}
+          style={styles.tertiaryLinkButton}
+        >
+          <Text style={styles.tertiaryLinkText}>Open gift wishlist</Text>
+        </Pressable>
+      ) : null}
+      {onSharePost ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onSharePost(post)}
+          style={styles.tertiaryLinkButton}
+        >
+          <Text style={styles.tertiaryLinkText}>
+            {canChipIn ? 'Share fundraiser' : 'Share post'}
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -242,6 +507,50 @@ const styles = StyleSheet.create({
     color: '#cbd5e1',
     fontSize: 12,
   },
+  videoWrap: {
+    borderRadius: 14,
+    marginBottom: 12,
+    overflow: 'hidden',
+    backgroundColor: '#0f172a',
+  },
+  videoPressable: {
+    position: 'relative',
+  },
+  videoView: {
+    width: '100%',
+    aspectRatio: 9 / 16,
+    backgroundColor: '#0f172a',
+  },
+  videoOverlayCenter: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(2, 6, 23, 0.2)',
+  },
+  videoOverlayBottom: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(2, 6, 23, 0.45)',
+  },
+  videoMuteButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(2, 6, 23, 0.45)',
+  },
   needLabel: {
     fontSize: 12,
     color: '#475569',
@@ -329,6 +638,18 @@ const styles = StyleSheet.create({
     color: '#334155',
     fontWeight: '600',
     fontSize: 13,
+  },
+  tertiaryLinkButton: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  tertiaryLinkText: {
+    color: '#0f172a',
+    fontWeight: '700',
+    fontSize: 13,
+    textDecorationLine: 'underline',
   },
 });
 

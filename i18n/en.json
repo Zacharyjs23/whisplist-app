@@ -370,7 +370,7 @@
     "optionB": "Option B",
     "includeAudio": "Include Audio",
     "addExternalGiftOption": "Add External Gift Option",
-    "addGiftLinkLabel": "Add a gift link (e.g., Venmo, wishlist)",
+    "addGiftLinkLabel": "Add a gift link (e.g., payout app, wishlist)",
     "giftLinkPlaceholder": "Gift link (optional)",
     "giftType": "Gift Type",
     "giftTypePlaceholder": "kofi, paypal, etc",

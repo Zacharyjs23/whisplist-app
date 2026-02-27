@@ -9,8 +9,11 @@ import {
   Pressable,
   RefreshControl,
   SafeAreaView,
+  Share,
   StyleSheet,
   Text,
+  useWindowDimensions,
+  type ViewToken,
   View,
 } from 'react-native';
 import {
@@ -26,13 +29,29 @@ import {
 import { db } from '@/firebase';
 import type { Wish } from '@/types/Wish';
 import { useAuthSession } from '@/contexts/AuthSessionContext';
+import { useFeatureFlags } from '@/contexts/FeatureFlagsContext';
 import { SupportPostCard } from '@/components/support/SupportPostCard';
+import type { SupportPostVideoEvent } from '@/components/support/SupportPostCard';
+import { ChipInModal } from '@/app/components/splitpay/ChipInModal';
 import {
+  getRemainingCents,
+  getSupportUrgencyScore,
+  isChipInAvailable,
   isSupportPost,
+  sortSupportPosts,
   toSupportPost,
   type SupportPost,
 } from '@/features/mvp/supportPosts';
 import * as logger from '@/shared/logger';
+import {
+  logCampaignShareComplete,
+  logCampaignShareDismissed,
+  logCampaignShareStart,
+  logFeedVideoEvent,
+  logSplitPayShareClick,
+} from '@/src/lib/analytics';
+import { buildCampaignShareMessage } from '@/src/lib/campaignShare';
+import { buildPublicWishUrl } from '@/src/lib/publicLinks';
 
 const FEED_LIMIT = 80;
 
@@ -50,10 +69,18 @@ function buildQuery() {
 export default function FeedPage() {
   const router = useRouter();
   const { user } = useAuthSession();
+  const { giftPot: giftPotEnabled } = useFeatureFlags();
+  const { height: windowHeight } = useWindowDimensions();
   const [posts, setPosts] = React.useState<SupportPost[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [activeVideoPostId, setActiveVideoPostId] = React.useState<string | null>(null);
+  const [chipInPost, setChipInPost] = React.useState<SupportPost | null>(null);
+  const [viewMode, setViewMode] = React.useState<'cards' | 'reels'>('reels');
+
+  const isReelsMode = viewMode === 'reels';
+  const reelItemHeight = Math.max(520, windowHeight - 230);
 
   React.useEffect(() => {
     const feedQuery = buildQuery();
@@ -64,7 +91,7 @@ export default function FeedPage() {
           .map(toWish)
           .filter(isSupportPost)
           .map(toSupportPost);
-        setPosts(mapped);
+        setPosts(sortSupportPosts(mapped));
         setError(null);
         setLoading(false);
       },
@@ -85,7 +112,7 @@ export default function FeedPage() {
     try {
       const snap = await getDocs(buildQuery());
       const mapped = snap.docs.map(toWish).filter(isSupportPost).map(toSupportPost);
-      setPosts(mapped);
+      setPosts(sortSupportPosts(mapped));
       setError(null);
     } catch (err) {
       logger.warn('Support feed refresh failed', err);
@@ -131,9 +158,106 @@ export default function FeedPage() {
     [openExternalUrl],
   );
 
+  const canChipInFromFeed = React.useCallback(
+    (post: SupportPost) => {
+      if (!giftPotEnabled) return false;
+      if (!user?.uid) return false;
+      if (!isChipInAvailable(post)) return false;
+      if (post.creatorId && post.creatorId === user.uid) return false;
+      return true;
+    },
+    [giftPotEnabled, user?.uid],
+  );
+
+  const handleChipIn = React.useCallback((post: SupportPost) => {
+    setChipInPost(post);
+  }, []);
+
+  const handleSharePost = React.useCallback(
+    async (post: SupportPost) => {
+      try {
+        const includeSplitPay = canChipInFromFeed(post);
+        const shareUrl = buildPublicWishUrl(
+          post.id,
+          includeSplitPay ? { splitpay: 1 } : undefined,
+        );
+        logCampaignShareStart({
+          wishId: post.id,
+          surface: 'feed',
+          withSplitPay: includeSplitPay,
+        });
+        const result = await Share.share({
+          message: buildCampaignShareMessage({
+            creatorName: post.creatorName,
+            wishTitle: post.needReason,
+            url: shareUrl,
+          }),
+        });
+        if (result.action === Share.sharedAction) {
+          logCampaignShareComplete({
+            wishId: post.id,
+            surface: 'feed',
+            withSplitPay: includeSplitPay,
+          });
+        } else if (result.action === Share.dismissedAction) {
+          logCampaignShareDismissed({
+            wishId: post.id,
+            surface: 'feed',
+            withSplitPay: includeSplitPay,
+          });
+        }
+        if (includeSplitPay) {
+          logSplitPayShareClick({
+            wishId: post.id,
+            amount: post.raisedAmount,
+            experiment: giftPotEnabled ? 'split_pay_feed_on' : 'split_pay_feed_off',
+          });
+        }
+      } catch (err) {
+        logger.warn('Failed to share feed support post', err);
+        Alert.alert('Unable to share', 'Please try again.');
+      }
+    },
+    [canChipInFromFeed, giftPotEnabled],
+  );
+
+  const handleVideoEvent = React.useCallback((event: SupportPostVideoEvent) => {
+    logFeedVideoEvent({
+      event: event.event,
+      wishId: event.postId,
+      source: 'support_feed',
+      positionSeconds: event.positionSeconds,
+      durationSeconds: event.durationSeconds,
+    });
+  }, []);
+
+  const viewabilityConfig = React.useRef({
+    minimumViewTime: 200,
+    itemVisiblePercentThreshold: 75,
+  }).current;
+
+  const onViewableItemsChanged = React.useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      const next = viewableItems.find((item) => {
+        const post = item.item as SupportPost | undefined;
+        return item.isViewable && !!post?.videoUrl;
+      });
+      const nextId = (next?.item as SupportPost | undefined)?.id ?? null;
+      setActiveVideoPostId(nextId);
+    },
+  ).current;
+
   const firstName =
     user?.displayName?.trim().split(/\s+/)[0] ||
     (user?.isAnonymous ? 'there' : 'friend');
+
+  const topUrgencyPost = React.useMemo(() => {
+    if (!posts.length) return null;
+    return sortSupportPosts(posts)[0] ?? null;
+  }, [posts]);
+  const topUrgencyScore = topUrgencyPost
+    ? getSupportUrgencyScore(topUrgencyPost)
+    : null;
 
   return (
     <SafeAreaView style={styles.root}>
@@ -153,6 +277,47 @@ export default function FeedPage() {
       </View>
 
       <Text style={styles.greeting}>Hi {firstName}, discover who needs help today.</Text>
+      <View style={styles.modeToggleRow}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setViewMode('reels')}
+          style={[
+            styles.modeToggleButton,
+            viewMode === 'reels' ? styles.modeToggleButtonActive : null,
+          ]}
+        >
+          <Text
+            style={[
+              styles.modeToggleText,
+              viewMode === 'reels' ? styles.modeToggleTextActive : null,
+            ]}
+          >
+            Reels
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setViewMode('cards')}
+          style={[
+            styles.modeToggleButton,
+            viewMode === 'cards' ? styles.modeToggleButtonActive : null,
+          ]}
+        >
+          <Text
+            style={[
+              styles.modeToggleText,
+              viewMode === 'cards' ? styles.modeToggleTextActive : null,
+            ]}
+          >
+            Cards
+          </Text>
+        </Pressable>
+      </View>
+      {topUrgencyPost && topUrgencyScore !== null ? (
+        <Text style={styles.urgencyHint}>
+          Ranked by urgency. Top need: {topUrgencyPost.creatorName} ({topUrgencyScore})
+        </Text>
+      ) : null}
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
@@ -166,18 +331,48 @@ export default function FeedPage() {
           data={posts}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <SupportPostCard
-              post={item}
-              onOpenPost={handleOpenPost}
-              onOpenGift={handleOpenGift}
-              onOpenVideo={handleOpenVideo}
-            />
+            <View
+              style={
+                isReelsMode
+                  ? [
+                      styles.reelItemWrap,
+                      {
+                        height: reelItemHeight,
+                      },
+                    ]
+                  : undefined
+              }
+            >
+              <SupportPostCard
+                post={item}
+                onOpenPost={handleOpenPost}
+                onChipIn={handleChipIn}
+                allowChipIn={canChipInFromFeed(item)}
+                onSharePost={handleSharePost}
+                onOpenGift={handleOpenGift}
+                onOpenVideo={handleOpenVideo}
+                autoPlayVideo={activeVideoPostId === item.id}
+                onVideoEvent={handleVideoEvent}
+              />
+            </View>
           )}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          removeClippedSubviews
+          pagingEnabled={isReelsMode}
+          snapToInterval={isReelsMode ? reelItemHeight : undefined}
+          decelerationRate={isReelsMode ? 'fast' : 'normal'}
+          disableIntervalMomentum={isReelsMode}
+          showsVerticalScrollIndicator={!isReelsMode}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
           contentContainerStyle={
-            posts.length ? styles.listContent : styles.emptyListContent
+            posts.length
+              ? isReelsMode
+                ? styles.reelsContent
+                : styles.listContent
+              : styles.emptyListContent
           }
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
@@ -198,6 +393,16 @@ export default function FeedPage() {
           }
         />
       )}
+      <ChipInModal
+        visible={!!chipInPost}
+        onClose={() => setChipInPost(null)}
+        wishId={chipInPost?.id || ''}
+        wishTitle={chipInPost?.needReason || chipInPost?.story || undefined}
+        currency={chipInPost?.fundingCurrency || 'USD'}
+        remainingCents={chipInPost ? getRemainingCents(chipInPost) : null}
+        experimentBucket={giftPotEnabled ? 'split_pay_feed_on' : 'split_pay_feed_off'}
+        onCompleted={() => setChipInPost(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -243,7 +448,43 @@ const styles = StyleSheet.create({
   greeting: {
     paddingHorizontal: 16,
     color: '#334155',
+    marginBottom: 8,
+  },
+  modeToggleRow: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 999,
+    padding: 4,
+    flexDirection: 'row',
+    gap: 6,
+    alignSelf: 'flex-start',
+  },
+  modeToggleButton: {
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
+  modeToggleButtonActive: {
+    backgroundColor: '#0f172a',
+  },
+  modeToggleText: {
+    color: '#334155',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  modeToggleTextActive: {
+    color: '#ffffff',
+  },
+  urgencyHint: {
+    marginHorizontal: 16,
     marginBottom: 10,
+    color: '#0f172a',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  reelItemWrap: {
+    justifyContent: 'center',
   },
   errorText: {
     marginHorizontal: 16,
@@ -266,6 +507,9 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 24,
+  },
+  reelsContent: {
+    paddingBottom: 40,
   },
   emptyListContent: {
     flexGrow: 1,

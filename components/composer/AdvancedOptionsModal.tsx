@@ -582,7 +582,7 @@ export const AdvancedOptionsModal: React.FC<AdvancedOptionsModalProps> = ({
                   <Text style={[styles.helper, { color: theme.placeholder }]}>
                     {t(
                       'composer.supportLinkHint',
-                      'Paste Venmo, PayPal, wishlist, or any URL supporters can use.',
+                      'Paste a payout app, PayPal, wishlist, or any URL supporters can use.',
                     )}
                   </Text>
                   {!!composer.giftLink &&
