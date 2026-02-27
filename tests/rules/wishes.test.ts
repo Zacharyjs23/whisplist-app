@@ -33,7 +33,7 @@ describeMaybe('firestore rules - wishes', () => {
     const [host, portStr] = (EMU || '').split(':');
     const port = Number(portStr) || 8080;
     testEnv = await initializeTestEnvironment({
-      projectId: 'whisplist-test',
+      projectId: 'whisplist-test-wishes',
       firestore: {
         host,
         port,

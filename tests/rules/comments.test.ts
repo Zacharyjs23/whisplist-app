@@ -15,7 +15,7 @@ describeMaybe('firestore rules - comments', () => {
     const [host, portStr] = (EMU || '').split(':');
     const port = Number(portStr) || 8080;
     testEnv = await initializeTestEnvironment({
-      projectId: 'whisplist-test',
+      projectId: 'whisplist-test-comments',
       firestore: {
         host,
         port,

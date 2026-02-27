@@ -15,7 +15,7 @@ describeMaybe('firestore rules - users and reactions', () => {
     const [host, portStr] = (EMU || '').split(':');
     const port = Number(portStr) || 8080;
     testEnv = await initializeTestEnvironment({
-      projectId: 'whisplist-test',
+      projectId: 'whisplist-test-users',
       firestore: {
         host,
         port,
@@ -27,7 +27,6 @@ describeMaybe('firestore rules - users and reactions', () => {
       const adminDb = context.firestore();
       await adminDb.doc('users/user1').set({ displayName: 'U1' });
       await adminDb.doc('users/user2').set({ displayName: 'U2' });
-      await adminDb.doc('wishes/w1').set({ userId: 'user1', text: 'hello' });
       await adminDb.doc('users/user1/notifications/n1').set({
         type: 'generic',
         message: 'hello',

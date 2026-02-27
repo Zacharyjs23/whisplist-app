@@ -16,7 +16,7 @@ describeMaybe('storage rules', () => {
     const [host, portStr] = (STORAGE_EMU || '').split(':');
     const port = Number(portStr) || 9199;
     testEnv = await initializeTestEnvironment({
-      projectId: 'whisplist-test',
+      projectId: 'whisplist-test-storage',
       storage: { host, port, rules: fs.readFileSync('storage.rules', 'utf8') },
     });
   });

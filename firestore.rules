@@ -157,17 +157,48 @@ service cloud.firestore {
       return note == null || (note is string && note.size() <= 90);
     }
 
-    function favoriteToken(wishId, anonHash) {
-      return get(/databases/$(database)/documents/wishFavoriteTokens/$(wishId + ':' + anonHash));
+    function favoriteTokenPath(wishId, anonHash) {
+      return /databases/$(database)/documents/wishFavoriteTokens/$(wishId + ':' + anonHash);
     }
 
     function hasValidFavoriteToken(wishId, anonHash) {
-      let token = favoriteToken(wishId, anonHash);
-      return token.exists
+      let tokenPath = favoriteTokenPath(wishId, anonHash);
+      let token = get(tokenPath);
+      return exists(tokenPath)
         && token.data.permitExpiresAt is timestamp
         && token.data.cooldownUntil is timestamp
         && request.time <= token.data.permitExpiresAt
         && request.time <= token.data.cooldownUntil;
+    }
+
+    function validWishStageMetadataUpdate() {
+      let diff = request.resource.data.diff(resource.data);
+      let allowed = ['stage', 'stageUpdatedAt', 'accountabilityCircleId', 'accountabilityCircleName'];
+      let stageChanged = diff.changedKeys().hasAny(['stage']) || diff.addedKeys().hasAny(['stage']);
+      let stageTimestampChanged =
+        diff.changedKeys().hasAny(['stageUpdatedAt']) || diff.addedKeys().hasAny(['stageUpdatedAt']);
+      let circleChanged =
+        diff.changedKeys().hasAny(['accountabilityCircleId', 'accountabilityCircleName'])
+        || diff.addedKeys().hasAny(['accountabilityCircleId', 'accountabilityCircleName']);
+
+      return diff.removedKeys().hasOnly([])
+        && diff.addedKeys().hasOnly(allowed)
+        && diff.changedKeys().hasOnly(allowed)
+        && (stageChanged || stageTimestampChanged || circleChanged)
+        && (!('stage' in request.resource.data) || validWishStage(request.resource.data.stage))
+        && (!('accountabilityCircleId' in request.resource.data)
+          || request.resource.data.accountabilityCircleId == null
+          || isShortString(request.resource.data.accountabilityCircleId, 120))
+        && (!('accountabilityCircleName' in request.resource.data)
+          || validCircleName(request.resource.data.accountabilityCircleName))
+        && (!stageChanged
+          || (stageTimestampChanged
+            && ('stageUpdatedAt' in request.resource.data)
+            && request.resource.data.stageUpdatedAt == request.time))
+        && (!stageTimestampChanged
+          || (stageChanged
+            && ('stageUpdatedAt' in request.resource.data)
+            && request.resource.data.stageUpdatedAt == request.time));
     }
 
     function giftReadable(data) {
@@ -249,7 +280,7 @@ service cloud.firestore {
       match /entries/{entryId} {
         allow read: if true;
         allow create: if
-          resource == null
+          !exists(/databases/$(database)/documents/wishFavorites/$(wishId)/entries/$(entryId))
           && validAnonHash(request.resource.data.anonHash)
           && entryId == request.resource.data.anonHash
           && validFavoriteNote(request.resource.data.note)
@@ -408,6 +439,26 @@ service cloud.firestore {
       allow update: if (
           signedIn()
           && request.auth.uid == resource.data.userId
+          && validWishStageMetadataUpdate()
+        )
+        || (
+          signedIn()
+          && request.writeFields.hasOnly(['commentCount'])
+          && commentCountWithinBounds(resource.data, request.resource.data)
+        )
+        || (
+          signedIn()
+          && request.resource.data.diff(resource.data).addedKeys().hasOnly([])
+          && request.resource.data.diff(resource.data).removedKeys().hasOnly([])
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly(['reactions'])
+          && (!('reactions' in resource.data) || isValidReactionMap(resource.data.reactions))
+          && ('reactions' in request.resource.data)
+          && isValidReactionMap(request.resource.data.reactions)
+          && reactionDiffWithinBounds(resource.data.reactions, request.resource.data.reactions)
+        )
+        || (
+          signedIn()
+          && request.auth.uid == resource.data.userId
           && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
           && hasOnlyAllowedKeys(request.resource.data, [
             'text','category','type','likes','userId','displayName','photoURL','isAnonymous','boostedUntil','boosted',
@@ -463,23 +514,8 @@ service cloud.firestore {
           && (!('detectedMood' in request.resource.data) || isShortString(request.resource.data.detectedMood, 30))
           && (!('voiceTranscription' in request.resource.data) || isShortString(request.resource.data.voiceTranscription, 4000))
           && (!('aiRefinedText' in request.resource.data) || isShortString(request.resource.data.aiRefinedText, 400))
-        )
-        || (
-          signedIn()
-          && request.resource.data.diff(resource.data).addedKeys().hasOnly([])
-          && request.resource.data.diff(resource.data).removedKeys().hasOnly([])
-          && request.resource.data.diff(resource.data).changedKeys().hasOnly(['reactions'])
-          && (!('reactions' in resource.data) || isValidReactionMap(resource.data.reactions))
-          && ('reactions' in request.resource.data)
-          && isValidReactionMap(request.resource.data.reactions)
-          && reactionDiffWithinBounds(resource.data.reactions, request.resource.data.reactions)
-        )
-        || (
-          signedIn()
-          && request.writeFields.hasOnly(['commentCount'])
-          && commentCountWithinBounds(resource.data, request.resource.data)
         );
-      allow delete: if wishOwner(wishId);
+      allow delete: if signedIn() && request.auth.uid == resource.data.userId;
 
       match /comments/{commentId} {
         // Allow anyone to read comments
