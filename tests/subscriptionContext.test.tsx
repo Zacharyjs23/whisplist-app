@@ -23,11 +23,14 @@ jest.mock('@/contexts/AuthSessionContext', () => ({
   useAuthSession: () => ({ user: { uid: 'u1' } }),
 }));
 
-import { SubscriptionProvider, useSubscription } from '@/contexts/SubscriptionContext';
+import {
+  SubscriptionProvider,
+  useSubscription,
+} from '@/contexts/SubscriptionContext';
 
 const Consumer = () => {
   const { sub, isActive, loading } = useSubscription();
-  if (loading) return <View testID="loading" /> as any;
+  if (loading) return (<View testID="loading" />) as any;
   return (
     <View>
       <Text testID="active">{isActive ? 'active' : 'inactive'}</Text>

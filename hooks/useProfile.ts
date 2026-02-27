@@ -1,15 +1,12 @@
 import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { useAuthFlows } from '@/contexts/AuthFlowsContext';
 import { db, storage } from '../firebase';
-import {
-  doc,
-  updateDoc,
-  getDoc,
-} from 'firebase/firestore';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { updateProfile as fbUpdateProfile } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
 import type { Profile } from '../types/Profile';
+import { normalizeWishScope } from '@/types/WishScope';
 
 export const useProfile = () => {
   const { user, setProfile } = useAuthSession();
@@ -31,6 +28,12 @@ export const useProfile = () => {
       if (newData.publicProfileEnabled === undefined)
         newData.publicProfileEnabled = true;
       if (newData.developerMode === undefined) newData.developerMode = false;
+      if (typeof newData.anonModeEnabled !== 'boolean') {
+        newData.anonModeEnabled = false;
+      }
+      newData.defaultWishScope = normalizeWishScope(
+        newData.defaultWishScope,
+      );
       setProfile(newData);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -40,7 +43,8 @@ export const useProfile = () => {
 
   const pickImage = async () => {
     try {
-      const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { granted } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!granted) return;
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -67,4 +71,3 @@ export const useProfile = () => {
 
   return { updateProfile, pickImage };
 };
-

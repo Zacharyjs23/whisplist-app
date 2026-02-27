@@ -30,4 +30,3 @@ export function shouldShowDailyQuote({
   if ((lastShownDate || '') === today) return false;
   return true;
 }
-

@@ -1,16 +1,22 @@
 import { AppContainer } from '@/components/AppContainer';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { AuthSessionProvider, useAuthSession } from '@/contexts/AuthSessionContext';
+import {
+  AuthSessionProvider,
+  useAuthSession,
+} from '@/contexts/AuthSessionContext';
 import { AuthFlowsProvider } from '@/contexts/AuthFlowsContext';
 import { ReferralProvider } from '@/contexts/ReferralContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { FeatureFlagsProvider } from '@/contexts/FeatureFlagsContext';
 import { SavedWishesProvider } from '@/contexts/SavedWishesContext';
+import { PinnedWishlistsProvider } from '@/contexts/PinnedWishlistsContext';
 import { I18nProvider } from '@/contexts/I18nContext';
 import * as logger from '@/shared/logger';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import React, { useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { StripeProvider } from '@stripe/stripe-react-native';
 
 function LayoutInner() {
   const { loading } = useAuthSession();
@@ -41,6 +47,13 @@ function LayoutInner() {
 }
 
 export default function Layout() {
+  const publishableKey =
+    process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder';
+  if (!process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+    logger.warn(
+      'Stripe publishable key missing; split-pay checkout may not function correctly.',
+    );
+  }
   return (
     <ErrorBoundary>
       <AuthSessionProvider>
@@ -49,11 +62,23 @@ export default function Layout() {
             <SubscriptionProvider>
               <I18nProvider>
                 <ThemeProvider>
-                  <SavedWishesProvider>
-                    <AppContainer>
-                      <LayoutInner />
-                    </AppContainer>
-                  </SavedWishesProvider>
+                  <FeatureFlagsProvider>
+                    <PinnedWishlistsProvider>
+                      <SavedWishesProvider>
+                        <StripeProvider
+                          publishableKey={publishableKey}
+                          merchantIdentifier={
+                            process.env.EXPO_PUBLIC_STRIPE_MERCHANT_ID ||
+                            'merchant.com.whisplist'
+                          }
+                        >
+                          <AppContainer>
+                            <LayoutInner />
+                          </AppContainer>
+                        </StripeProvider>
+                      </SavedWishesProvider>
+                    </PinnedWishlistsProvider>
+                  </FeatureFlagsProvider>
                 </ThemeProvider>
               </I18nProvider>
             </SubscriptionProvider>

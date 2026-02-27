@@ -8,8 +8,9 @@ const path = require('path');
 const config = getDefaultConfig(__dirname);
 
 // Support CJS and SVG as source files
-const assetExts = config.resolver.assetExts
-  .filter((ext) => ext !== 'cjs' && ext !== 'svg');
+const assetExts = config.resolver.assetExts.filter(
+  (ext) => ext !== 'cjs' && ext !== 'svg',
+);
 const sourceExts = [...config.resolver.sourceExts, 'cjs', 'svg'];
 
 config.resolver.assetExts = assetExts;
@@ -27,7 +28,10 @@ config.resolver.alias = {
   '@': path.resolve(__dirname),
   // Workaround: Metro (web) sometimes mis-resolves this deep dep.
   // Alias to a tiny shim to unblock web dev.
-  'set-function-length': path.resolve(__dirname, 'shims/set-function-length.js'),
+  'set-function-length': path.resolve(
+    __dirname,
+    'shims/set-function-length.js',
+  ),
 };
 
 // Conditionally alias optional native modules to local shims when not installed.
@@ -55,9 +59,27 @@ if (!maybeRNPurchases) {
   );
 }
 
+const stripeWebShimPath = path.resolve(
+  __dirname,
+  'shims/stripe-react-native.web.js',
+);
+const notificationsWebShimPath = path.resolve(
+  __dirname,
+  'shims/expo-notifications.web.js',
+);
+
 // Stronger interception: ensure any request resolves to our shim
 // even if alias isn't honored in some resolution branches on web.
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+  const isStripeModule =
+    moduleName === '@stripe/stripe-react-native' ||
+    moduleName.startsWith('@stripe/stripe-react-native/') ||
+    moduleName.includes('/node_modules/@stripe/stripe-react-native/');
+  const isExpoNotificationsModule =
+    moduleName === 'expo-notifications' ||
+    moduleName.startsWith('expo-notifications/') ||
+    moduleName.includes('/node_modules/expo-notifications/');
+
   if (moduleName === 'set-function-length') {
     return {
       type: 'sourceFile',
@@ -74,6 +96,18 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     return {
       type: 'sourceFile',
       filePath: path.resolve(__dirname, 'shims/react-native-purchases.js'),
+    };
+  }
+  if (platform === 'web' && isStripeModule) {
+    return {
+      type: 'sourceFile',
+      filePath: stripeWebShimPath,
+    };
+  }
+  if (platform === 'web' && isExpoNotificationsModule) {
+    return {
+      type: 'sourceFile',
+      filePath: notificationsWebShimPath,
     };
   }
   // Delegate to Expo/Metro's upstream resolver chain

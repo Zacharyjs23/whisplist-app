@@ -1,10 +1,7 @@
 import { useEffect, useState } from 'react';
 import { doc, onSnapshot, type Unsubscribe } from 'firebase/firestore';
 import { db } from '@/firebase';
-import {
-  fromSnapshotData,
-  getDefaultStats,
-} from '@/helpers/engagement';
+import { fromSnapshotData, getDefaultStats } from '@/helpers/engagement';
 import type { EngagementStats } from '@/types/Engagement';
 
 export function useEngagementStats(userId?: string | null) {
@@ -29,7 +26,9 @@ export function useEngagementStats(userId?: string | null) {
       (snapshot) => {
         if (!active) return;
         if (snapshot.exists()) {
-          setStats(fromSnapshotData(snapshot.data() as Partial<EngagementStats>));
+          setStats(
+            fromSnapshotData(snapshot.data() as Partial<EngagementStats>),
+          );
         } else {
           setStats(getDefaultStats());
         }
@@ -53,4 +52,3 @@ export function useEngagementStats(userId?: string | null) {
 }
 
 export default useEngagementStats;
-

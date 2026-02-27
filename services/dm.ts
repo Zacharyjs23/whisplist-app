@@ -80,7 +80,8 @@ export async function sendMessage(
     timestamp: serverTimestamp(),
   } as DMMessage);
   await updateDoc(doc(db, 'dmThreads', threadId), {
-    lastMessage: text || (imageUrl ? '[photo]' : reply?.text ? `↩︎ ${reply.text}` : ''),
+    lastMessage:
+      text || (imageUrl ? '[photo]' : reply?.text ? `↩︎ ${reply.text}` : ''),
     lastSender: senderId,
     updatedAt: serverTimestamp(),
   });
@@ -133,7 +134,11 @@ export async function findUserIdByDisplayName(displayName: string) {
 }
 
 // Typing indicators
-export async function setTyping(threadId: string, uid: string, typing: boolean) {
+export async function setTyping(
+  threadId: string,
+  uid: string,
+  typing: boolean,
+) {
   if (!db) throw new Error('Firestore not initialized');
   const ref = doc(db, 'dmThreads', threadId, 'typing', uid);
   await setDoc(ref, { typing, updatedAt: serverTimestamp() }, { merge: true });

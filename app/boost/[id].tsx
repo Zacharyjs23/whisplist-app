@@ -17,10 +17,16 @@ import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useTheme } from '@/contexts/ThemeContext';
 import ConfettiCannon from 'react-native-confetti-cannon';
-import * as Linking from 'expo-linking';
 import { getWish, boostWish } from '../../helpers/wishes';
 import { formatTimeLeft } from '../../helpers/time';
 import * as logger from '@/shared/logger';
+import {
+  logCampaignShareComplete,
+  logCampaignShareDismissed,
+  logCampaignShareStart,
+} from '@/src/lib/analytics';
+import { buildCampaignShareMessage } from '@/src/lib/campaignShare';
+import { buildPublicWishUrl } from '@/src/lib/publicLinks';
 
 const CAN_USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -178,8 +184,29 @@ export default function BoostPage() {
           )}
           <TouchableOpacity
             onPress={async () => {
-              const url = Linking.createURL(`/wish/${id}`);
-              await Share.share({ message: `Check out my wish: ${url}` });
+              if (!id) return;
+              const url = buildPublicWishUrl(id);
+              logCampaignShareStart({
+                wishId: id,
+                surface: 'boost',
+                withSplitPay: false,
+              });
+              const result = await Share.share({
+                message: buildCampaignShareMessage({ url }),
+              });
+              if (result.action === Share.sharedAction) {
+                logCampaignShareComplete({
+                  wishId: id,
+                  surface: 'boost',
+                  withSplitPay: false,
+                });
+              } else if (result.action === Share.dismissedAction) {
+                logCampaignShareDismissed({
+                  wishId: id,
+                  surface: 'boost',
+                  withSplitPay: false,
+                });
+              }
             }}
             style={[styles.button, { marginBottom: 10 }]}
           >

@@ -60,13 +60,20 @@ function normalizeEntry(input: unknown): StreakEntry {
   if (candidate.milestones && typeof candidate.milestones === 'object') {
     Object.keys(candidate.milestones).forEach((key) => {
       if (VALID_MILESTONE_IDS.has(key as MilestoneId) && candidate.milestones) {
-        milestones[key as MilestoneId] = candidate.milestones[key as MilestoneId];
+        milestones[key as MilestoneId] =
+          candidate.milestones[key as MilestoneId];
       }
     });
   }
   return {
-    current: typeof candidate.current === 'number' && candidate.current >= 0 ? candidate.current : 0,
-    longest: typeof candidate.longest === 'number' && candidate.longest >= 0 ? candidate.longest : 0,
+    current:
+      typeof candidate.current === 'number' && candidate.current >= 0
+        ? candidate.current
+        : 0,
+    longest:
+      typeof candidate.longest === 'number' && candidate.longest >= 0
+        ? candidate.longest
+        : 0,
     lastDate:
       typeof candidate.lastDate === 'string' && candidate.lastDate.length >= 8
         ? candidate.lastDate
@@ -134,9 +141,15 @@ export async function recordEngagementEvent(
   try {
     const result = await runTransaction(db, async (tx) => {
       const snap = await tx.get(ref);
-      const stats = toStats(snap.exists() ? (snap.data() as Partial<EngagementStats>) : null);
+      const stats = toStats(
+        snap.exists() ? (snap.data() as Partial<EngagementStats>) : null,
+      );
       const { entry, unlocked } = applyEvent(kind, stats[kind], todayKey);
-      if (!unlocked.length && entry.lastDate === stats[kind].lastDate && entry.current === stats[kind].current) {
+      if (
+        !unlocked.length &&
+        entry.lastDate === stats[kind].lastDate &&
+        entry.current === stats[kind].current
+      ) {
         return {
           kind,
           current: entry.current,
@@ -181,7 +194,9 @@ export function getDefaultStats(): EngagementStats {
   };
 }
 
-export function fromSnapshotData(data?: Partial<EngagementStats> | null): EngagementStats {
+export function fromSnapshotData(
+  data?: Partial<EngagementStats> | null,
+): EngagementStats {
   return toStats(data);
 }
 

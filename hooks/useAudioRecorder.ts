@@ -15,7 +15,9 @@ export const useAudioRecorder = () => {
       if (recording) {
         recording
           .stop()
-          .catch((err) => logger.warn('Failed to stop recording on unmount', err));
+          .catch((err) =>
+            logger.warn('Failed to stop recording on unmount', err),
+          );
         setRecording(null);
         setRecordedUri(null);
         setIsRecording(false);
@@ -26,16 +28,22 @@ export const useAudioRecorder = () => {
 
   const startRecording = async () => {
     try {
-      const { granted } = await (ExpoAudio as any).requestRecordingPermissionsAsync();
+      const { granted } = await (
+        ExpoAudio as any
+      ).requestRecordingPermissionsAsync();
       if (!granted) {
-        Alert.alert('Permission required', 'Microphone access is needed to record');
+        Alert.alert(
+          'Permission required',
+          'Microphone access is needed to record',
+        );
         return;
       }
       await (ExpoAudio as any).setAudioModeAsync({
         allowsRecording: true,
         interruptionMode: (ExpoAudio as any).INTERRUPTION_MODE_IOS_DO_NOT_MIX,
         playsInSilentMode: true,
-        interruptionModeAndroid: (ExpoAudio as any).INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
+        interruptionModeAndroid: (ExpoAudio as any)
+          .INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
         shouldPlayInBackground: false,
         shouldRouteThroughEarpiece: false,
       });

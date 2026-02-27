@@ -8,6 +8,9 @@ import usePushNotifications from '@/hooks/usePushNotifications';
 import useDailyQuote from '@/hooks/useDailyQuote';
 import { setTelemetry } from '@/shared/logger';
 import { sendTelemetry } from '@/services/telemetry';
+import { useWishlistDeepLinkHandler } from '@/apps/mobile/src/navigation/DeepLinkHandler';
+import { useAuthSession } from '@/contexts/AuthSessionContext';
+import { useRecentWishlistSession } from '@/src/features/wishlist/useRecentWishlistSession';
 
 export const AppContainer: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -15,6 +18,7 @@ export const AppContainer: React.FC<{ children: React.ReactNode }> = ({
   const { theme } = useTheme();
   const { authError, setAuthError } = useAuthFlows();
   const { t } = useTranslation();
+  const { user } = useAuthSession();
   const backgroundColor = theme.background;
   const barStyle =
     theme.name === 'dark' || theme.name === 'neon'
@@ -22,6 +26,8 @@ export const AppContainer: React.FC<{ children: React.ReactNode }> = ({
       : 'dark-content';
   usePushNotifications();
   useDailyQuote();
+  useRecentWishlistSession(user?.uid ?? null);
+  useWishlistDeepLinkHandler();
 
   useEffect(() => {
     if (process.env.EXPO_PUBLIC_ENV !== 'production') return;
@@ -50,7 +56,7 @@ export const AppContainer: React.FC<{ children: React.ReactNode }> = ({
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={[styles.container, { backgroundColor }]}> 
+      <SafeAreaView style={[styles.container, { backgroundColor }]}>
         <StatusBar barStyle={barStyle} />
         {children}
       </SafeAreaView>

@@ -1,4 +1,6 @@
 import type { Timestamp } from 'firebase/firestore';
+import type { WishStage } from './WishStage';
+import type { WishScope } from './WishScope';
 
 export type ReactionType = 'heart' | 'lightbulb' | 'hug' | 'pray';
 
@@ -17,10 +19,15 @@ export type Wish<
   displayName?: string;
   photoURL?: string;
   isAnonymous?: boolean;
+  /**
+   * Visibility and identity scope for the wish.
+   */
+  scope?: WishScope;
   boostedUntil?: Timestamp | null;
   boosted?: string;
   audioUrl?: string;
   imageUrl?: string;
+  videoUrl?: string;
   giftLink?: string;
   /**
    * Type of external gift link (e.g. 'kofi', 'paypal')
@@ -46,6 +53,11 @@ export type Wish<
    * Number of completed contributions
    */
   fundingSupporters?: number;
+  splitPayEnabled?: boolean;
+  targetAmount?: number;
+  fundedAmount?: number;
+  deadline?: Timestamp | null;
+  status?: 'open' | 'funding' | 'fulfilled' | 'expired';
   isPoll?: boolean;
   optionA?: string;
   optionB?: string;
@@ -75,4 +87,43 @@ export type Wish<
    * Whether this wish is marked as active
    */
   active?: boolean;
+  /**
+   * Progress stage of the wish lifecycle.
+   */
+  stage?: WishStage;
+  /**
+   * Timestamp when the stage last changed.
+   */
+  stageUpdatedAt?: Timestamp | null;
+  /**
+   * Optional accountability circle identifier assigned by the creator.
+   */
+  accountabilityCircleId?: string | null;
+  /**
+   * Cached name of the accountability circle for quick display.
+   */
+  accountabilityCircleName?: string | null;
+  /**
+   * Optional support request metadata (display-only, no direct payments)
+   */
+  supportRequest?: {
+    amount?: number;
+    reason?: string;
+  } | null;
+  /**
+   * AI-detected mood label for thematic styling.
+   */
+  detectedMood?: string | null;
+  /**
+   * Optional list of tags or keywords tied to this wish.
+   */
+  tags?: string[];
+  /**
+   * Cached transcript from voice input (if any).
+   */
+  voiceTranscription?: string | null;
+  /**
+   * Optional AI-enriched variant of the wish copy.
+   */
+  aiRefinedText?: string | null;
 } & Extra;

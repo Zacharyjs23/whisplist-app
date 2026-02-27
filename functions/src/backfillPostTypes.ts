@@ -109,7 +109,7 @@ export async function backfillPostTypes(
 
   for (const [legacy, target] of Object.entries(LEGACY_TO_POST_TYPE) as [
     LegacyPostType,
-    PostType
+    PostType,
   ][]) {
     if (legacy !== target) {
       typeUpdates[legacy] = await backfillTypeField(

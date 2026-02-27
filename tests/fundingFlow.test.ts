@@ -23,12 +23,30 @@ const mockUsersState: Record<string, Record<string, unknown>> = {
 const mockStripeSessionCreate = jest.fn();
 const mockStripeCustomerCreate = jest.fn();
 const mockStripeConstructEvent = jest.fn();
+const mockVerifyIdToken = jest.fn();
+process.env.EXPO_PUBLIC_STRIPE_PRICE_BASIC = 'price_monthly';
+process.env.EXPO_PUBLIC_STRIPE_PRICE_PATRON = 'price_monthly_patron';
+process.env.EXPO_PUBLIC_STRIPE_PRICE_PATRON_ANNUAL =
+  'price_monthly_patron_annual';
 
 jest.mock(
   'firebase-functions',
   () => ({
-    runWith: jest.fn().mockReturnValue({ https: { onRequest: (handler: any) => handler } }),
-    logger: { error: jest.fn(), info: jest.fn() },
+    https: {
+      onRequest: (...args: any[]) => {
+        const handler = typeof args[0] === 'function' ? args[0] : args[1];
+        return handler;
+      },
+    },
+    runWith: jest.fn(() => ({
+      https: {
+        onRequest: (...args: any[]) => {
+          const handler = typeof args[0] === 'function' ? args[0] : args[1];
+          return handler;
+        },
+      },
+    })),
+    logger: { error: jest.fn(), info: jest.fn(), warn: jest.fn() },
   }),
   { virtual: true },
 );
@@ -36,7 +54,20 @@ jest.mock(
 jest.mock(
   'firebase-functions/v1',
   () => ({
-    runWith: jest.fn().mockReturnValue({ https: { onRequest: (handler: any) => handler } }),
+    https: {
+      onRequest: (...args: any[]) => {
+        const handler = typeof args[0] === 'function' ? args[0] : args[1];
+        return handler;
+      },
+    },
+    runWith: jest.fn(() => ({
+      https: {
+        onRequest: (...args: any[]) => {
+          const handler = typeof args[0] === 'function' ? args[0] : args[1];
+          return handler;
+        },
+      },
+    })),
     logger: { error: jest.fn(), info: jest.fn(), warn: jest.fn() },
   }),
   { virtual: true },
@@ -137,7 +168,11 @@ function mockCreateFirestore() {
   const makeWishDoc = (id: string) => {
     const doc = {
       async set(data: any, options?: { merge?: boolean }) {
-        const next = applyPatch(mockRecords.wishes.get(id), data, !!options?.merge);
+        const next = applyPatch(
+          mockRecords.wishes.get(id),
+          data,
+          !!options?.merge,
+        );
         mockRecords.wishes.set(id, next);
       },
       async update(data: any) {
@@ -249,12 +284,17 @@ function mockFirestore() {
   increment: (value: number) => ({ __type: 'increment', value }),
 };
 
+(mockFirestore as any).Timestamp = {
+  fromMillis: (value: number) => ({ toMillis: () => value }),
+};
+
 jest.mock(
   'firebase-admin',
   () => ({
     __esModule: true,
     initializeApp: jest.fn(),
     firestore: mockFirestore,
+    auth: () => ({ verifyIdToken: mockVerifyIdToken }),
   }),
   { virtual: true },
 );
@@ -268,12 +308,17 @@ jest.mock('../functions/src/secrets', () => ({
   STRIPE_WEBHOOK_SECRET: { value: jest.fn(() => 'wh_test') },
 }));
 
-import { createCheckoutSession } from '../functions/src/createCheckoutSession';
+import {
+  createCheckoutSession,
+  stripeClient,
+} from '../functions/src/createCheckoutSession';
 import { createGiftCheckoutSession } from '../functions/src/createGiftCheckoutSession';
 import { createSubscriptionCheckoutSession } from '../functions/src/createSubscriptionCheckoutSession';
 import { stripeWebhook } from '../functions/src/stripeWebhook';
 
 describe('funding flow integration', () => {
+  const originalCheckoutCreate = stripeClient.checkout.sessions.create;
+
   beforeEach(() => {
     mockRecords.boosts.clear();
     mockRecords.gifts.clear();
@@ -286,6 +331,9 @@ describe('funding flow integration', () => {
     mockStripeSessionCreate.mockReset();
     mockStripeCustomerCreate.mockReset();
     mockStripeConstructEvent.mockReset();
+    mockVerifyIdToken.mockReset();
+    mockVerifyIdToken.mockResolvedValue({ uid: 'supporter-42' });
+    stripeClient.checkout.sessions.create = mockStripeSessionCreate as any;
     mockStripeSessionCreate
       .mockResolvedValueOnce({ id: 'sess_boost', url: 'https://boost' })
       .mockResolvedValueOnce({ id: 'sess_gift', url: 'https://gift' })
@@ -293,8 +341,17 @@ describe('funding flow integration', () => {
     mockStripeCustomerCreate.mockResolvedValue({ id: 'cus_new' });
   });
 
+  afterAll(() => {
+    stripeClient.checkout.sessions.create = originalCheckoutCreate;
+  });
+
   it('records boost, gift, and subscription artifacts', async () => {
-    const boostRes = { json: jest.fn(), status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
+    const boostRes = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+      set: jest.fn(),
+    } as any;
     await createCheckoutSession(
       {
         method: 'POST',
@@ -302,27 +359,41 @@ describe('funding flow integration', () => {
           wishId: 'wish-boost',
           userId: 'supporter-42',
           amount: 15,
-          successUrl: 'https://app/success',
-          cancelUrl: 'https://app/cancel',
+          successUrl: 'https://whisplist.app/boost-success',
+          cancelUrl: 'https://whisplist.app/boost-cancel',
         },
       } as any,
       boostRes,
     );
 
-    expect(boostRes.json).toHaveBeenCalledWith({ url: 'https://boost', sessionId: 'sess_boost' });
-    expect(mockRecords.boosts.get('sess_boost')).toMatchObject({ wishId: 'wish-boost', userId: 'supporter-42', status: 'pending' });
+    expect(boostRes.json).toHaveBeenCalledWith({
+      url: 'https://boost',
+      sessionId: 'sess_boost',
+    });
+    expect(mockRecords.boosts.get('sess_boost')).toMatchObject({
+      wishId: 'wish-boost',
+      userId: 'supporter-42',
+      status: 'pending',
+    });
 
-    const giftRes = { json: jest.fn(), status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
+    const giftRes = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+      set: jest.fn(),
+    } as any;
     await createGiftCheckoutSession(
       {
         method: 'POST',
+        get: (header: string) =>
+          header === 'Authorization' ? 'Bearer token' : undefined,
         body: {
           wishId: 'wish-boost',
           recipientId: 'recipient-1',
           amount: 30,
           supporterId: 'supporter-42',
-          successUrl: 'https://app/success',
-          cancelUrl: 'https://app/cancel',
+          successUrl: 'https://whisplist.app/gift-success',
+          cancelUrl: 'https://whisplist.app/gift-cancel',
         },
       } as any,
       giftRes,
@@ -340,7 +411,11 @@ describe('funding flow integration', () => {
       headers: { 'stripe-signature': 'sig' },
       rawBody: Buffer.from(''),
     } as any;
-    const webhookRes = { json: jest.fn(), status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
+    const webhookRes = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+    } as any;
     mockStripeConstructEvent.mockReturnValue({
       type: 'checkout.session.completed',
       data: {
@@ -361,21 +436,31 @@ describe('funding flow integration', () => {
     await stripeWebhook(webhookReq, webhookRes);
 
     expect(webhookRes.json).toHaveBeenCalledWith({ received: true });
-    expect(mockRecords.gifts.get('wish-boost/sess_gift')).toMatchObject({ status: 'completed', amount: 30 });
+    expect(mockRecords.gifts.get('wish-boost/sess_gift')).toMatchObject({
+      status: 'completed',
+      amount: 30,
+    });
     expect(mockRecords.wishes.get('wish-boost')).toMatchObject({
       fundingRaised: 30,
       fundingSupporters: 1,
     });
 
-    const subRes = { json: jest.fn(), status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
+    const subRes = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+      set: jest.fn(),
+    } as any;
     await createSubscriptionCheckoutSession(
       {
         method: 'POST',
+        get: (header: string) =>
+          header === 'Authorization' ? 'Bearer token' : undefined,
         body: {
           userId: 'supporter-42',
           priceId: 'price_monthly',
-          successUrl: 'https://app/success',
-          cancelUrl: 'https://app/cancel',
+          successUrl: 'https://whisplist.app/sub-success',
+          cancelUrl: 'https://whisplist.app/sub-cancel',
         },
       } as any,
       subRes,
@@ -386,7 +471,63 @@ describe('funding flow integration', () => {
       expect.objectContaining({ metadata: { userId: 'supporter-42' } }),
     );
     expect(mockUsersState['supporter-42'].stripeCustomerId).toBe('cus_new');
-    expect(mockRecords.billing.get('supporter-42/lastCheckout')).toMatchObject({ sessionId: 'sess_sub', priceId: 'price_monthly' });
-    expect(mockRecords.stripeCustomers.get('cus_new')).toEqual({ userId: 'supporter-42' });
+    expect(mockRecords.billing.get('supporter-42/lastCheckout')).toMatchObject({
+      sessionId: 'sess_sub',
+      priceId: 'price_monthly',
+    });
+    expect(mockRecords.stripeCustomers.get('cus_new')).toEqual({
+      userId: 'supporter-42',
+    });
+  });
+
+  it('updates subscription state from webhook events', async () => {
+    mockRecords.stripeCustomers.set('cus_existing', { userId: 'supporter-42' });
+
+    const webhookReq = {
+      headers: { 'stripe-signature': 'sig' },
+      rawBody: Buffer.from('subscription'),
+    } as any;
+    const webhookRes = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+    } as any;
+
+    mockStripeConstructEvent.mockReturnValueOnce({
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_123',
+          customer: 'cus_existing',
+          status: 'active',
+          current_period_end: 1_700_000_000,
+          cancel_at_period_end: false,
+          items: { data: [{ price: { id: 'price_monthly' } }] },
+          metadata: { userId: 'supporter-42' },
+        },
+      },
+    });
+
+    await stripeWebhook(webhookReq, webhookRes);
+
+    expect(webhookRes.json).toHaveBeenCalledWith({ received: true });
+    expect(mockRecords.billing.get('supporter-42/subscription')).toMatchObject({
+      status: 'active',
+      priceId: 'price_monthly',
+      planKey: 'supporter_monthly',
+      stripeSubscriptionId: 'sub_123',
+    });
+    expect(mockUsersState['supporter-42'].isSupporter).toBe(true);
+    expect(mockRecords.userUpdates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'supporter-42',
+          data: expect.objectContaining({
+            isSupporter: true,
+            supporterPlan: 'supporter_monthly',
+          }),
+        }),
+      ]),
+    );
   });
 });

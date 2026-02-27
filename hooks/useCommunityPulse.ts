@@ -126,8 +126,14 @@ const SUPPORTER_TIERS: {
   },
 ];
 
-function describeSupporterTier(totalAmount: number, totalGifts: number, translate: TranslateFn) {
-  const tierInfo = SUPPORTER_TIERS.find((entry) => totalAmount >= entry.minAmount) ?? SUPPORTER_TIERS.at(-1)!;
+function describeSupporterTier(
+  totalAmount: number,
+  totalGifts: number,
+  translate: TranslateFn,
+) {
+  const tierInfo =
+    SUPPORTER_TIERS.find((entry) => totalAmount >= entry.minAmount) ??
+    SUPPORTER_TIERS.at(-1)!;
   return {
     tier: tierInfo.tier,
     tierLabel: translate(tierInfo.labelKey, tierInfo.defaultLabel),
@@ -137,7 +143,8 @@ function describeSupporterTier(totalAmount: number, totalGifts: number, translat
 
 export function useCommunityPulse() {
   const { t } = useTranslation();
-  const isTestEnv = typeof process !== 'undefined' && process.env.JEST_WORKER_ID;
+  const isTestEnv =
+    typeof process !== 'undefined' && process.env.JEST_WORKER_ID;
   const [state, setState] = useState<CommunityPulseState>(INITIAL_STATE);
   const [loading, setLoading] = useState<boolean>(isTestEnv ? false : true);
   const [error, setError] = useState<string | null>(null);
@@ -170,7 +177,10 @@ export function useCommunityPulse() {
 
       if (!response.ok) {
         const message =
-          payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string'
+          payload &&
+          typeof payload === 'object' &&
+          'error' in payload &&
+          typeof payload.error === 'string'
             ? payload.error
             : `Request failed: ${response.status}`;
         throw new Error(message || 'Request failed');
@@ -179,19 +189,25 @@ export function useCommunityPulse() {
       const data = (payload ?? {}) as CommunityPulseResponse;
 
       const safeBoosts = Array.isArray(data.boosts) ? data.boosts : [];
-      const safeFulfillments = Array.isArray(data.fulfillments) ? data.fulfillments : [];
-      const safeSupporters = Array.isArray(data.supporters) ? data.supporters : [];
+      const safeFulfillments = Array.isArray(data.fulfillments)
+        ? data.fulfillments
+        : [];
+      const safeSupporters = Array.isArray(data.supporters)
+        ? data.supporters
+        : [];
 
-      const boosts: BoostPulse[] = safeBoosts.slice(0, BOOST_LIMIT).map((entry) => ({
-        id: entry.id,
-        wishId: entry.wishId,
-        wishText: entry.wishText ?? '',
-        wishOwnerName: entry.wishOwnerName ?? 'Someone',
-        boosterId: entry.boosterId,
-        boosterName: entry.boosterName ?? 'A supporter',
-        amount: typeof entry.amount === 'number' ? entry.amount : undefined,
-        completedAt: parseDate(entry.completedAt ?? undefined),
-      }));
+      const boosts: BoostPulse[] = safeBoosts
+        .slice(0, BOOST_LIMIT)
+        .map((entry) => ({
+          id: entry.id,
+          wishId: entry.wishId,
+          wishText: entry.wishText ?? '',
+          wishOwnerName: entry.wishOwnerName ?? 'Someone',
+          boosterId: entry.boosterId,
+          boosterName: entry.boosterName ?? 'A supporter',
+          amount: typeof entry.amount === 'number' ? entry.amount : undefined,
+          completedAt: parseDate(entry.completedAt ?? undefined),
+        }));
 
       const fulfillments: FulfillmentPulse[] = safeFulfillments
         .slice(0, FULFILL_LIMIT)
@@ -213,10 +229,17 @@ export function useCommunityPulse() {
 
       const supporters: SupporterPulse[] = safeSupporters
         .map((entry) => {
-          const totalAmountRaw = typeof entry.totalAmount === 'number' ? entry.totalAmount : 0;
-          const totalGifts = Number.isFinite(entry.totalGifts) ? entry.totalGifts : 0;
+          const totalAmountRaw =
+            typeof entry.totalAmount === 'number' ? entry.totalAmount : 0;
+          const totalGifts = Number.isFinite(entry.totalGifts)
+            ? entry.totalGifts
+            : 0;
           const totalAmount = Number(totalAmountRaw.toFixed(2));
-          const tierInfo = describeSupporterTier(totalAmount, totalGifts, translate);
+          const tierInfo = describeSupporterTier(
+            totalAmount,
+            totalGifts,
+            translate,
+          );
           return {
             userId: entry.userId,
             displayName: entry.displayName || 'Supporter',
@@ -226,15 +249,22 @@ export function useCommunityPulse() {
             ...tierInfo,
           };
         })
-        .sort((a, b) => b.totalAmount - a.totalAmount || b.totalGifts - a.totalGifts)
+        .sort(
+          (a, b) =>
+            b.totalAmount - a.totalAmount || b.totalGifts - a.totalGifts,
+        )
         .slice(0, 3);
 
       setState({ boosts, fulfillments, supporters });
       setError(null);
     } catch (err) {
       const message =
-        err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string'
-          ? ((err as { message: string }).message || 'Failed to load community pulse')
+        err &&
+        typeof err === 'object' &&
+        'message' in err &&
+        typeof (err as { message: unknown }).message === 'string'
+          ? (err as { message: string }).message ||
+            'Failed to load community pulse'
           : 'Failed to load community pulse';
       setError(message);
       setState(INITIAL_STATE);

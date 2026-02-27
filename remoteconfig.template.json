@@ -1,0 +1,17 @@
+{
+  "conditions": [],
+  "parameters": {},
+  "parameterGroups": {
+    "features": {
+      "description": "Feature gate toggles",
+      "parameters": {
+        "giftPot": {
+          "defaultValue": {
+            "value": "true"
+          },
+          "description": "Enable GiftTogether (split-pay) surfaces"
+        }
+      }
+    }
+  }
+}

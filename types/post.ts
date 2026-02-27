@@ -39,9 +39,9 @@ export const POST_TYPE_META: Record<PostType, PostTypeMeta> = {
   },
   goal: {
     key: 'goal',
-    emoji: '🌱',
-    defaultLabel: 'Goal 🌱',
-    defaultChipLabel: 'Goals',
+    emoji: '🌠',
+    defaultLabel: 'Wish 🌠',
+    defaultChipLabel: 'Wishes',
     color: '#2563eb',
     legacy: ['wish', 'dream'],
   },
@@ -75,13 +75,19 @@ export const FILTER_TYPES: FilterType[] = ['all', ...POST_TYPE_ORDER];
 export const DEFAULT_POST_TYPE: PostType = 'goal';
 
 export const isPostType = (value: unknown): value is PostType =>
-  typeof value === 'string' && (POST_TYPE_META as Record<string, PostTypeMeta>)[value] !== undefined;
+  typeof value === 'string' &&
+  (POST_TYPE_META as Record<string, PostTypeMeta>)[value] !== undefined;
 
 export const isLegacyPostType = (value: unknown): value is LegacyPostType =>
   typeof value === 'string' &&
-  (value === 'wish' || value === 'dream' || value === 'confession' || value === 'advice');
+  (value === 'wish' ||
+    value === 'dream' ||
+    value === 'confession' ||
+    value === 'advice');
 
-export const normalizePostType = (value?: AnyPostType | string | null): PostType => {
+export const normalizePostType = (
+  value?: AnyPostType | string | null,
+): PostType => {
   if (!value) return DEFAULT_POST_TYPE;
   if (isPostType(value)) return value;
   if (isLegacyPostType(value)) return LEGACY_TO_POST_TYPE[value];

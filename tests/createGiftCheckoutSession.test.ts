@@ -1,5 +1,5 @@
 jest.mock(
-  'firebase-functions',
+  'firebase-functions/v1',
   () => ({
     runWith: jest.fn().mockReturnValue({
       https: { onRequest: (handler: any) => handler },
@@ -10,6 +10,7 @@ jest.mock(
 );
 
 const mockStripeCreate = jest.fn();
+const mockVerifyIdToken = jest.fn();
 jest.mock(
   'stripe',
   () =>
@@ -42,6 +43,7 @@ jest.mock(
         FieldValue: { serverTimestamp: jest.fn(() => 'ts') },
       },
     ),
+    auth: () => ({ verifyIdToken: mockVerifyIdToken }),
   }),
   { virtual: true },
 );
@@ -55,22 +57,32 @@ import { createGiftCheckoutSession } from '../functions/src/createGiftCheckoutSe
 describe('createGiftCheckoutSession', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockVerifyIdToken.mockResolvedValue({ uid: 'supporter_1' });
   });
 
   it('creates stripe gift session and returns url', async () => {
-    mockUserGet.mockResolvedValue({ get: (f: string) => (f === 'stripeAccountId' ? 'acct_1' : undefined) });
+    mockUserGet.mockResolvedValue({
+      get: (f: string) => (f === 'stripeAccountId' ? 'acct_1' : undefined),
+    });
     mockStripeCreate.mockResolvedValue({ id: 'sess_g1', url: 'https://gift' });
     const req: any = {
       method: 'POST',
+      get: (header: string) =>
+        header === 'Authorization' ? 'Bearer token' : undefined,
       body: {
         wishId: 'w1',
         recipientId: 'rec1',
         amount: 20,
-        successUrl: 's',
-        cancelUrl: 'c',
+        successUrl: 'https://whisplist.app/success',
+        cancelUrl: 'https://whisplist.app/cancel',
       },
     };
-    const res = { json: jest.fn(), status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+      set: jest.fn(),
+    } as any;
     await createGiftCheckoutSession(req, res);
     expect(mockStripeCreate).toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith({ url: 'https://gift' });
@@ -80,15 +92,22 @@ describe('createGiftCheckoutSession', () => {
     mockUserGet.mockResolvedValue({ get: () => undefined });
     const req: any = {
       method: 'POST',
+      get: (header: string) =>
+        header === 'Authorization' ? 'Bearer token' : undefined,
       body: {
         wishId: 'w1',
         recipientId: 'rec1',
         amount: 20,
-        successUrl: 's',
-        cancelUrl: 'c',
+        successUrl: 'https://whisplist.app/success',
+        cancelUrl: 'https://whisplist.app/cancel',
       },
     };
-    const res = { json: jest.fn(), status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+      set: jest.fn(),
+    } as any;
     await createGiftCheckoutSession(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.send).toHaveBeenCalledWith('Recipient not enabled for Stripe');

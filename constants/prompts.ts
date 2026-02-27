@@ -243,7 +243,9 @@ export const JOURNAL_PROMPTS = [...DAILY_PROMPTS];
 const DAY_MS = 86_400_000;
 
 const resolveUtcDate = (isoDate: string): number => {
-  const [year, month, day] = isoDate.split('-').map((part) => parseInt(part, 10));
+  const [year, month, day] = isoDate
+    .split('-')
+    .map((part) => parseInt(part, 10));
   if (Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day)) {
     return Date.UTC(year, month - 1, day);
   }
@@ -269,32 +271,35 @@ export const TYPE_PROMPTS: Record<PostType, string[]> = {
     'Who helped make this joyful moment possible?',
     'What made you smile bigger than expected today?',
     'How are you honoring a milestone, no matter how small?',
-    'Which part of this victory do you want to remember later?'
+    'Which part of this victory do you want to remember later?',
   ],
   goal: [
     'Which goal are you moving toward this week?',
     'What is the next small step on your roadmap?',
     'What support would make your goal feel more doable?',
     'How will life look different when you reach this goal?',
-    'What progress have you already made toward this vision?'
+    'What progress have you already made toward this vision?',
   ],
   struggle: [
     'What’s feeling heavy that you want to set down here?',
     'What would you tell a friend going through this same moment?',
     'What do you need more of—or less of—right now?',
     'Where are you feeling stuck and hoping for relief?',
-    'How can others hold space for you today?'
+    'How can others hold space for you today?',
   ],
   advice: [
     'What decision are you wrestling with and why?',
     'What outcome are you hoping for, and what worries you?',
     'What have you already tried—and how did it go?',
     'Who are the people involved and how do you want them to feel?',
-    'What does the best possible advice help you do next?'
+    'What does the best possible advice help you do next?',
   ],
 };
 
-export const getTypePromptForDate = (type: PostType, isoDate: string): string => {
+export const getTypePromptForDate = (
+  type: PostType,
+  isoDate: string,
+): string => {
   const prompts = TYPE_PROMPTS[type] ?? [];
   if (prompts.length === 0) {
     return getDailyPromptForDate(isoDate);
@@ -302,6 +307,6 @@ export const getTypePromptForDate = (type: PostType, isoDate: string): string =>
   const baseIndex = getDailyPromptIndexForDate(isoDate);
   const offset = Math.max(0, POST_TYPE_ORDER.indexOf(type));
   const mod = prompts.length;
-  const index = ((baseIndex + offset) % mod + mod) % mod;
+  const index = (((baseIndex + offset) % mod) + mod) % mod;
   return prompts[index] ?? prompts[0];
 };

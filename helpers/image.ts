@@ -1,4 +1,3 @@
- 
 // Image optimization helper with optional expo-image-manipulator support.
 // If the native module is unavailable, falls back to the original URI.
 
@@ -12,12 +11,15 @@ type ImageManipulatorModule = typeof import('expo-image-manipulator');
 
 declare global {
   // Allow tests to inject a mock without bundling the native module.
-   
+
   var __expoImageManipulatorMock: ImageManipulatorModule | undefined;
 }
 
 async function loadImageManipulator(): Promise<ImageManipulatorModule | null> {
-  if (typeof globalThis !== 'undefined' && globalThis.__expoImageManipulatorMock) {
+  if (
+    typeof globalThis !== 'undefined' &&
+    globalThis.__expoImageManipulatorMock
+  ) {
     return globalThis.__expoImageManipulatorMock;
   }
   try {
@@ -40,12 +42,15 @@ export async function optimizeImageForUpload(
     const requested = opts.compress ?? 0.7;
     const compress = Math.max(0, Math.min(1, requested));
     const format = (opts.format ?? 'jpeg').toUpperCase();
-    type ManipulateSaveOptions = Parameters<typeof ImageManipulator.manipulateAsync>[2];
+    type ManipulateSaveOptions = Parameters<
+      typeof ImageManipulator.manipulateAsync
+    >[2];
     type ManipulateSaveFormat = NonNullable<ManipulateSaveOptions>['format'];
-    const formatMap: Record<'JPEG' | 'PNG', ManipulateSaveFormat | undefined> = {
-      JPEG: ImageManipulator.SaveFormat?.JPEG,
-      PNG: ImageManipulator.SaveFormat?.PNG,
-    };
+    const formatMap: Record<'JPEG' | 'PNG', ManipulateSaveFormat | undefined> =
+      {
+        JPEG: ImageManipulator.SaveFormat?.JPEG,
+        PNG: ImageManipulator.SaveFormat?.PNG,
+      };
     const formatKey: 'JPEG' | 'PNG' = format === 'PNG' ? 'PNG' : 'JPEG';
     const manipFormat = formatMap[formatKey];
     const saveOptions: ManipulateSaveOptions = {

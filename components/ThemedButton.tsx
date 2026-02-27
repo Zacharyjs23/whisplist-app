@@ -41,9 +41,7 @@ export default function ThemedButton({
       {...rest}
     >
       <View style={styles.contentRow}>
-        {leftIcon ? (
-          <View style={styles.leftIcon}>{leftIcon}</View>
-        ) : null}
+        {leftIcon ? <View style={styles.leftIcon}>{leftIcon}</View> : null}
         {loading ? (
           <ActivityIndicator size="small" color={theme.text} />
         ) : (

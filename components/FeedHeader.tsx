@@ -1,5 +1,12 @@
 import React, { useMemo } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+} from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useTranslation } from '@/contexts/I18nContext';
 import type { FilterType } from '@/types/post';
@@ -35,7 +42,11 @@ export const FeedHeader: React.FC<{
         onChangeText={setSearchTerm}
       />
       <Text style={styles.label}>Quick Filters</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.chipsRow}
+      >
         {chips.map((c) => {
           const selected = filterType === c.key;
           return (
@@ -52,7 +63,12 @@ export const FeedHeader: React.FC<{
               accessibilityRole="button"
               accessibilityLabel={`Filter ${c.label}`}
             >
-              <Text style={[styles.chipText, { color: selected ? theme.background : theme.text }]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  { color: selected ? theme.background : theme.text },
+                ]}
+              >
                 {c.label}
               </Text>
             </TouchableOpacity>
@@ -63,7 +79,13 @@ export const FeedHeader: React.FC<{
   );
 };
 
-const createStyles = (c: { input: string; text: string; placeholder?: string; tint?: string; background?: string }) =>
+const createStyles = (c: {
+  input: string;
+  text: string;
+  placeholder?: string;
+  tint?: string;
+  background?: string;
+}) =>
   StyleSheet.create({
     label: { color: c.text, marginBottom: 4 },
     input: {

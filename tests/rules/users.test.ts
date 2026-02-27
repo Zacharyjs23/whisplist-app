@@ -1,4 +1,8 @@
-import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
+import {
+  initializeTestEnvironment,
+  assertFails,
+  assertSucceeds,
+} from '@firebase/rules-unit-testing';
 import fs from 'fs';
 
 const EMU = process.env.FIRESTORE_EMULATOR_HOST;
@@ -11,23 +15,24 @@ describeMaybe('firestore rules - users and reactions', () => {
     const [host, portStr] = (EMU || '').split(':');
     const port = Number(portStr) || 8080;
     testEnv = await initializeTestEnvironment({
-      projectId: 'whisplist-test',
-      firestore: { host, port, rules: fs.readFileSync('firestore.rules', 'utf8') },
+      projectId: 'whisplist-test-users',
+      firestore: {
+        host,
+        port,
+        rules: fs.readFileSync('firestore.rules', 'utf8'),
+      },
     });
 
     await testEnv.withSecurityRulesDisabled(async (context: any) => {
       const adminDb = context.firestore();
       await adminDb.doc('users/user1').set({ displayName: 'U1' });
       await adminDb.doc('users/user2').set({ displayName: 'U2' });
-      await adminDb.doc('wishes/w1').set({ userId: 'user1', text: 'hello' });
-      await adminDb
-        .doc('users/user1/notifications/n1')
-        .set({
-          type: 'generic',
-          message: 'hello',
-          timestamp: { seconds: 0, nanoseconds: 0 },
-          read: false,
-        });
+      await adminDb.doc('users/user1/notifications/n1').set({
+        type: 'generic',
+        message: 'hello',
+        timestamp: { seconds: 0, nanoseconds: 0 },
+        read: false,
+      });
     });
   });
 
@@ -37,14 +42,20 @@ describeMaybe('firestore rules - users and reactions', () => {
 
   test('savedWishes only owner can write', async () => {
     const db1 = testEnv.authenticatedContext('user1').firestore();
-    await assertSucceeds(db1.doc('users/user1/savedWishes/w1').set({ createdAt: 1 }));
+    await assertSucceeds(
+      db1.doc('users/user1/savedWishes/w1').set({ createdAt: 1 }),
+    );
     const db2 = testEnv.authenticatedContext('user2').firestore();
-    await assertFails(db2.doc('users/user1/savedWishes/w1').set({ createdAt: 1 }));
+    await assertFails(
+      db2.doc('users/user1/savedWishes/w1').set({ createdAt: 1 }),
+    );
   });
 
   test('journalEntries read/write by owner only', async () => {
     const db1 = testEnv.authenticatedContext('user1').firestore();
-    await assertSucceeds(db1.doc('users/user1/journalEntries/j1').set({ text: 'note' }));
+    await assertSucceeds(
+      db1.doc('users/user1/journalEntries/j1').set({ text: 'note' }),
+    );
     const db2 = testEnv.authenticatedContext('user2').firestore();
     await assertFails(db2.doc('users/user1/journalEntries/j1').get());
   });
@@ -67,9 +78,13 @@ describeMaybe('firestore rules - users and reactions', () => {
 
   test('reactions: public read; only user can write own reaction', async () => {
     const asU1 = testEnv.authenticatedContext('user1').firestore();
-    await assertSucceeds(asU1.doc('reactions/w1/users/user1').set({ like: true }));
+    await assertSucceeds(
+      asU1.doc('reactions/w1/users/user1').set({ like: true }),
+    );
     const asU2 = testEnv.authenticatedContext('user2').firestore();
-    await assertFails(asU2.doc('reactions/w1/users/user1').set({ like: false }));
+    await assertFails(
+      asU2.doc('reactions/w1/users/user1').set({ like: false }),
+    );
     await assertSucceeds(asU2.doc('reactions/w1/users/user1').get());
   });
 

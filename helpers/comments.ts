@@ -180,10 +180,7 @@ export async function updateCommentReaction<
 
 export async function getWishComments<
   Extra extends Record<string, unknown> = Record<string, unknown>,
->(
-  wishId: string,
-  onError?: (err: unknown) => void,
-): Promise<Comment<Extra>[]> {
+>(wishId: string, onError?: (err: unknown) => void): Promise<Comment<Extra>[]> {
   try {
     const snap = await getDocs(collection(db, 'wishes', wishId, 'comments'));
     return snap.docs.map((d) => {

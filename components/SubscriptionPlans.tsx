@@ -36,9 +36,14 @@ export const SubscriptionPlans: React.FC<Props> = ({
   return (
     <View style={{ gap: 12 }}>
       {plans.map((p) => (
-        <View key={p.key} style={[styles.card, { backgroundColor: palette.input }]}>
+        <View
+          key={p.key}
+          style={[styles.card, { backgroundColor: palette.input }]}
+        >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={[styles.planName, { color: palette.text }]}>{p.name}</Text>
+            <Text style={[styles.planName, { color: palette.text }]}>
+              {p.name}
+            </Text>
             {p.badge ? (
               <View
                 style={[
@@ -48,8 +53,10 @@ export const SubscriptionPlans: React.FC<Props> = ({
                     borderColor: palette.tint,
                   },
                 ]}
-              > 
-                <Text style={{ color: palette.tint, fontSize: 12 }}>{p.badge}</Text>
+              >
+                <Text style={{ color: palette.tint, fontSize: 12 }}>
+                  {p.badge}
+                </Text>
               </View>
             ) : null}
           </View>
@@ -57,7 +64,9 @@ export const SubscriptionPlans: React.FC<Props> = ({
           {p.benefits && p.benefits.length > 0 && (
             <View style={{ marginTop: 8, gap: 2 }}>
               {p.benefits.map((b, i) => (
-                <Text key={i} style={{ color: palette.text }}>• {b}</Text>
+                <Text key={i} style={{ color: palette.text }}>
+                  • {b}
+                </Text>
               ))}
             </View>
           )}
@@ -65,7 +74,7 @@ export const SubscriptionPlans: React.FC<Props> = ({
             testID={`subscribe-${p.key}`}
             style={[
               styles.primaryBtn,
-              (p.priceId || p.iosProductId)
+              p.priceId || p.iosProductId
                 ? { backgroundColor: palette.tint }
                 : {
                     backgroundColor: palette.input,
@@ -78,7 +87,7 @@ export const SubscriptionPlans: React.FC<Props> = ({
             onPress={() => onStartCheckout(p)}
           >
             <Text style={[styles.primaryText, { color: palette.text }]}>
-              {(p.priceId || p.iosProductId)
+              {p.priceId || p.iosProductId
                 ? t('subscriptions.subscribe', 'Subscribe')
                 : t('subscriptions.unconfiguredCta', 'Finish billing setup')}
             </Text>

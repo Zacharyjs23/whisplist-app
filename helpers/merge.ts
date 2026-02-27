@@ -13,9 +13,9 @@ export function toMillis(ts: any): number {
 /**
  * Dedupe items by id and sort descending by `timestamp`.
  */
-export function dedupeSortByTimestampDesc<T extends { id: string; timestamp?: any }>(
-  items: T[],
-): T[] {
+export function dedupeSortByTimestampDesc<
+  T extends { id: string; timestamp?: any },
+>(items: T[]): T[] {
   const deduped = items.filter(
     (v, i, a) => a.findIndex((x) => x.id === v.id) === i,
   );

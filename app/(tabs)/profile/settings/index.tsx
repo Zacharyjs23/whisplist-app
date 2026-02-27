@@ -36,7 +36,14 @@ import * as Audio from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
 import * as Notifications from 'expo-notifications';
 import ReferralNameDialog from '@/components/ReferralNameDialog';
-import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  serverTimestamp,
+  updateDoc,
+} from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { getDownloadURL, ref } from 'firebase/storage';
 import * as React from 'react';
@@ -47,9 +54,18 @@ import { getWishComments } from '@/helpers/comments';
 import type { Profile } from '@/types/Profile';
 import * as logger from '@/shared/logger';
 import { postJson } from '@/services/functions';
-import { getQueueStatus, flushPendingWishes as flushPendingWishesHelper, clearQueue } from '@/helpers/offlineQueue';
+import {
+  getQueueStatus,
+  flushPendingWishes as flushPendingWishesHelper,
+  clearQueue,
+} from '@/helpers/offlineQueue';
 import { optimizeImageForUpload } from '@/helpers/image';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+import {
+  normalizeWishScope,
+  WISH_SCOPES,
+  type WishScope,
+} from '@/types/WishScope';
 
 export default function Page() {
   const { theme, setTheme } = useTheme();
@@ -95,16 +111,41 @@ export default function Page() {
 
   const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null);
   const [avatarUploading, setAvatarUploading] = React.useState(false);
-  const [avatarProgress, setAvatarProgress] = React.useState<number | null>(null);
+  const [avatarProgress, setAvatarProgress] = React.useState<number | null>(
+    null,
+  );
   const [defaultCategory, setDefaultCategory] = React.useState('general');
   const [language, setLanguage] = React.useState('en');
   const [feedback, setFeedback] = React.useState('');
-  const [anonymize, setAnonymize] = React.useState(false);
+  const [anonMode, setAnonMode] = React.useState(
+    profile?.anonModeEnabled ?? false,
+  );
+  const [defaultScope, setDefaultScope] = React.useState<WishScope>(
+    normalizeWishScope(
+      profile?.defaultWishScope ??
+        (profile?.anonModeEnabled ? 'anon' : 'all'),
+    ),
+  );
+
+  React.useEffect(() => {
+    setAnonMode(profile?.anonModeEnabled ?? false);
+    setDefaultScope(
+      normalizeWishScope(
+        profile?.defaultWishScope ??
+          (profile?.anonModeEnabled ? 'anon' : 'all'),
+      ),
+    );
+  }, [profile?.anonModeEnabled, profile?.defaultWishScope]);
   const [devMode, setDevMode] = React.useState(profile?.developerMode === true);
   const [dailyQuote, setDailyQuote] = React.useState(false);
-  const [dailyQuoteStyle, setDailyQuoteStyle] = React.useState<'uplifting' | 'stoic' | 'growth'>('uplifting');
+  const [dailyQuoteStyle, setDailyQuoteStyle] = React.useState<
+    'uplifting' | 'stoic' | 'growth'
+  >('uplifting');
   const [dailyQuoteReminder, setDailyQuoteReminder] = React.useState(false);
-  const [dailyQuoteTime, setDailyQuoteTime] = React.useState<{ hour: number; minute: number }>({ hour: 9, minute: 0 });
+  const [dailyQuoteTime, setDailyQuoteTime] = React.useState<{
+    hour: number;
+    minute: number;
+  }>({ hour: 9, minute: 0 });
   const [publicProfileEnabled, setPublicProfileEnabled] = React.useState(
     profile?.publicProfileEnabled !== false,
   );
@@ -126,7 +167,11 @@ export default function Page() {
     userCount: 0,
   });
   const [diagCopied, setDiagCopied] = React.useState(false);
-  const [queueStatus, setQueueStatus] = React.useState<{ size: number; oldestMs: number | null; nextRetryMs: number | null }>({ size: 0, oldestMs: null, nextRetryMs: null });
+  const [queueStatus, setQueueStatus] = React.useState<{
+    size: number;
+    oldestMs: number | null;
+    nextRetryMs: number | null;
+  }>({ size: 0, oldestMs: null, nextRetryMs: null });
 
   const toJsDate = React.useCallback((value: unknown): Date | undefined => {
     if (!value) return undefined;
@@ -154,14 +199,20 @@ export default function Page() {
     if (subLoading) {
       return {
         badge: t('settings.membership.badge.loading', 'Checking…'),
-        detail: t('settings.membership.detail.loading', "We're refreshing your membership status."),
+        detail: t(
+          'settings.membership.detail.loading',
+          "We're refreshing your membership status.",
+        ),
         status: 'loading' as const,
       };
     }
     if (!sub?.status) {
       return {
         badge: t('settings.membership.badge.free', 'Free'),
-        detail: t('settings.membership.detail.free', 'Unlock premium experiences with WhispList+.'),
+        detail: t(
+          'settings.membership.detail.free',
+          'Unlock premium experiences with WhispList+.',
+        ),
         status: 'free' as const,
       };
     }
@@ -173,18 +224,24 @@ export default function Page() {
       unpaid: t('settings.membership.badge.unpaid', 'Unpaid'),
     };
     const readableStatus = statusLabelMap[sub.status] || sub.status;
-    const renewal = toJsDate((sub as any)?.currentPeriodEnd)?.toLocaleDateString();
+    const renewal = toJsDate(
+      (sub as any)?.currentPeriodEnd,
+    )?.toLocaleDateString();
     if (sub.cancelAtPeriodEnd && renewal) {
       return {
         badge: t('settings.membership.badge.canceling', 'Canceling'),
-        detail: t('settings.membership.detail.canceling', 'Ends on {{date}}', { date: renewal }),
+        detail: t('settings.membership.detail.canceling', 'Ends on {{date}}', {
+          date: renewal,
+        }),
         status: sub.status,
       };
     }
     if (renewal) {
       return {
         badge: readableStatus,
-        detail: t('settings.membership.detail.renews', 'Renews on {{date}}', { date: renewal }),
+        detail: t('settings.membership.detail.renews', 'Renews on {{date}}', {
+          date: renewal,
+        }),
         status: sub.status,
       };
     }
@@ -205,7 +262,10 @@ export default function Page() {
     try {
       await Clipboard.setStringAsync(value);
       if (Platform.OS === 'android') {
-        ToastAndroid.show(`${t('common.copied', 'Copied')} ${label}`, ToastAndroid.SHORT);
+        ToastAndroid.show(
+          `${t('common.copied', 'Copied')} ${label}`,
+          ToastAndroid.SHORT,
+        );
       } else {
         Alert.alert(t('common.copied', 'Copied'), label);
       }
@@ -273,7 +333,10 @@ export default function Page() {
       ]}
     >
       <View style={styles.settingRowText}>
-        <Text style={[styles.settingRowTitle, { color: theme.text }]} numberOfLines={2}>
+        <Text
+          style={[styles.settingRowTitle, { color: theme.text }]}
+          numberOfLines={2}
+        >
           {title}
         </Text>
         {description ? (
@@ -285,7 +348,9 @@ export default function Page() {
           </Text>
         ) : null}
       </View>
-      {trailing ? <View style={styles.settingRowTrailing}>{trailing}</View> : null}
+      {trailing ? (
+        <View style={styles.settingRowTrailing}>{trailing}</View>
+      ) : null}
     </Pressable>
   );
 
@@ -294,7 +359,6 @@ export default function Page() {
       const a = await AsyncStorage.getItem('avatarUrl');
       const cat = await AsyncStorage.getItem('defaultCategory');
       const lang = await AsyncStorage.getItem('language');
-      const anon = await AsyncStorage.getItem('anonymize');
       const quote = await AsyncStorage.getItem('dailyQuote');
       const dqRem = await AsyncStorage.getItem('dailyQuoteReminder');
       const dqHour = await AsyncStorage.getItem('dailyQuoteReminderHour');
@@ -305,16 +369,20 @@ export default function Page() {
       if (a) setAvatarUrl(a);
       if (cat) setDefaultCategory(cat);
       if (lang) setLanguage(lang);
-      setAnonymize(anon === 'true');
       setDevMode(profile?.developerMode === true);
       setDailyQuote(quote === 'true');
       setDailyQuoteReminder(dqRem === 'true');
       if (dqHour && dqMin) {
         const h = parseInt(dqHour, 10);
         const m = parseInt(dqMin, 10);
-        if (!Number.isNaN(h) && !Number.isNaN(m)) setDailyQuoteTime({ hour: h, minute: m });
+        if (!Number.isNaN(h) && !Number.isNaN(m))
+          setDailyQuoteTime({ hour: h, minute: m });
       }
-      if (quoteStyle === 'stoic' || quoteStyle === 'growth' || quoteStyle === 'uplifting') {
+      if (
+        quoteStyle === 'stoic' ||
+        quoteStyle === 'growth' ||
+        quoteStyle === 'uplifting'
+      ) {
         setDailyQuoteStyle(quoteStyle);
       }
       if (storedNickname)
@@ -359,7 +427,9 @@ export default function Page() {
         setAnalytics({
           wishCount: typeof data.wishCount === 'number' ? data.wishCount : 0,
           boostCount:
-            typeof data.activeBoostCount === 'number' ? data.activeBoostCount : 0,
+            typeof data.activeBoostCount === 'number'
+              ? data.activeBoostCount
+              : 0,
           giftCount: typeof data.giftCount === 'number' ? data.giftCount : 0,
           userCount:
             typeof data.recentUserCount === 'number' ? data.recentUserCount : 0,
@@ -402,8 +472,12 @@ export default function Page() {
       setAvatarProgress(0);
       try {
         // Use resumable for progress
-        const { uploadResumableWithProgress } = await import('@/helpers/storage');
-        await uploadResumableWithProgress(r, blob, undefined, (pct) => setAvatarProgress(pct));
+        const { uploadResumableWithProgress } = await import(
+          '@/helpers/storage'
+        );
+        await uploadResumableWithProgress(r, blob, undefined, (pct) =>
+          setAvatarProgress(pct),
+        );
       } finally {
         setAvatarUploading(false);
         setAvatarProgress(null);
@@ -418,17 +492,31 @@ export default function Page() {
     const proceed = await new Promise<boolean>((resolve) => {
       Alert.alert(
         t('settings.system.resetConfirmTitle', 'Reset app data?'),
-        t('settings.system.resetConfirmBody', 'This will clear local preferences and drafts.'),
+        t(
+          'settings.system.resetConfirmBody',
+          'This will clear local preferences and drafts.',
+        ),
         [
-          { text: t('common.cancel', 'Cancel'), style: 'cancel', onPress: () => resolve(false) },
-          { text: t('common.confirm', 'Confirm'), style: 'destructive', onPress: () => resolve(true) },
+          {
+            text: t('common.cancel', 'Cancel'),
+            style: 'cancel',
+            onPress: () => resolve(false),
+          },
+          {
+            text: t('common.confirm', 'Confirm'),
+            style: 'destructive',
+            onPress: () => resolve(true),
+          },
         ],
       );
     });
     if (!proceed) return;
     await AsyncStorage.clear();
     if (Platform.OS === 'android') {
-      ToastAndroid.show(t('settings.alert.dataCleared', 'Data cleared'), ToastAndroid.SHORT);
+      ToastAndroid.show(
+        t('settings.alert.dataCleared', 'Data cleared'),
+        ToastAndroid.SHORT,
+      );
     } else {
       Alert.alert(t('settings.alert.dataCleared', 'Data cleared'));
     }
@@ -473,7 +561,10 @@ export default function Page() {
     try {
       await auth.signOut();
       if (Platform.OS === 'android') {
-        ToastAndroid.show(t('settings.system.signedOut', 'Signed out'), ToastAndroid.SHORT);
+        ToastAndroid.show(
+          t('settings.system.signedOut', 'Signed out'),
+          ToastAndroid.SHORT,
+        );
       } else {
         Alert.alert(t('settings.system.signedOut', 'Signed out'));
       }
@@ -481,10 +572,70 @@ export default function Page() {
     } catch (err) {
       logger.warn('Sign out failed', err);
       if (Platform.OS === 'android') {
-        ToastAndroid.show(t('settings.system.signOutFailed', 'Sign out failed'), ToastAndroid.SHORT);
+        ToastAndroid.show(
+          t('settings.system.signOutFailed', 'Sign out failed'),
+          ToastAndroid.SHORT,
+        );
       } else {
-        Alert.alert('Error', t('settings.system.signOutFailed', 'Sign out failed'));
+        Alert.alert(
+          'Error',
+          t('settings.system.signOutFailed', 'Sign out failed'),
+        );
       }
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user?.uid) {
+      Alert.alert('Error', 'No signed-in account found.');
+      return;
+    }
+
+    const confirmed = await new Promise<boolean>((resolve) => {
+      Alert.alert(
+        t('settings.system.deleteAccountTitle', 'Delete account?'),
+        t(
+          'settings.system.deleteAccountBody',
+          'This permanently deletes your account and associated content. This action cannot be undone.',
+        ),
+        [
+          { text: t('common.cancel', 'Cancel'), onPress: () => resolve(false) },
+          {
+            text: t('common.delete', 'Delete'),
+            style: 'destructive',
+            onPress: () => resolve(true),
+          },
+        ],
+      );
+    });
+    if (!confirmed) return;
+
+    try {
+      const callable = httpsCallable(functions, 'deleteMyAccount');
+      await callable({});
+      await AsyncStorage.clear();
+      try {
+        await auth.signOut();
+      } catch {
+        // account may already be deleted server-side
+      }
+      Alert.alert(
+        t('settings.system.deleteAccountDoneTitle', 'Account deleted'),
+        t(
+          'settings.system.deleteAccountDoneBody',
+          'Your account has been permanently deleted.',
+        ),
+      );
+      router.replace('/auth' as Href);
+    } catch (err) {
+      logger.error('Failed to delete account', err);
+      Alert.alert(
+        'Error',
+        t(
+          'settings.system.deleteAccountFailed',
+          'We could not delete your account right now. Please try again.',
+        ),
+      );
     }
   };
 
@@ -506,7 +657,10 @@ export default function Page() {
       await Notifications.scheduleNotificationAsync({
         content: {
           title: t('settings.notifications.testTitle', 'Test notification'),
-          body: t('settings.notifications.testBody', 'This is how notifications look.'),
+          body: t(
+            'settings.notifications.testBody',
+            'This is how notifications look.',
+          ),
         },
         trigger: null,
       });
@@ -565,6 +719,45 @@ export default function Page() {
     setRefDialogVisible(true);
   };
 
+  const handleRateApp = async () => {
+    const fallbackUrl = 'https://whisplist.app';
+    try {
+      if (Platform.OS === 'ios') {
+        const configuredUrl = process.env.EXPO_PUBLIC_IOS_APP_STORE_URL;
+        const appStoreId = process.env.EXPO_PUBLIC_IOS_APP_STORE_ID;
+        const reviewUrl = appStoreId
+          ? `itms-apps://itunes.apple.com/app/id${appStoreId}?action=write-review`
+          : null;
+        await Linking.openURL(configuredUrl || reviewUrl || fallbackUrl);
+        return;
+      }
+
+      if (Platform.OS === 'android') {
+        const packageId =
+          Constants.expoConfig?.android?.package || 'com.zachary.whisplist';
+        const configuredUrl = process.env.EXPO_PUBLIC_ANDROID_PLAY_STORE_URL;
+        const marketUrl = `market://details?id=${packageId}`;
+        const webUrl =
+          configuredUrl ||
+          `https://play.google.com/store/apps/details?id=${packageId}`;
+        const canUseMarketUrl = await Linking.canOpenURL(marketUrl);
+        await Linking.openURL(canUseMarketUrl ? marketUrl : webUrl);
+        return;
+      }
+
+      await Linking.openURL(fallbackUrl);
+    } catch (err) {
+      logger.warn('Failed to open rate-app URL', err);
+      Alert.alert(
+        t('settings.system.rateAppErrorTitle', 'Unable to open store'),
+        t(
+          'settings.system.rateAppErrorBody',
+          'Please try again in a moment.',
+        ),
+      );
+    }
+  };
+
   const permissionsInfo = async () => {
     const mic = await (Audio as any).getRecordingPermissionsAsync();
     const notif = await Notifications.getPermissionsAsync();
@@ -586,9 +779,38 @@ export default function Page() {
     setRefDialogVisible(false);
   };
 
-  const toggleAnonymize = async (val: boolean) => {
-    setAnonymize(val);
-    await AsyncStorage.setItem('anonymize', val ? 'true' : 'false');
+  const handleAnonModeToggle = async (val: boolean) => {
+    const nextScope =
+      val && defaultScope !== 'anon'
+        ? 'anon'
+        : !val && defaultScope === 'anon'
+          ? 'all'
+          : defaultScope;
+    setAnonMode(val);
+    setDefaultScope(nextScope);
+    try {
+      await updateProfile({
+        anonModeEnabled: val,
+        defaultWishScope: nextScope,
+      });
+    } catch (err) {
+      logger.warn('Failed to update anon mode', err);
+    }
+  };
+
+  const handleDefaultScopeChange = async (scope: WishScope) => {
+    const normalized = normalizeWishScope(scope);
+    setDefaultScope(normalized);
+    const nextAnon = normalized === 'anon';
+    setAnonMode(nextAnon);
+    try {
+      await updateProfile({
+        defaultWishScope: normalized,
+        anonModeEnabled: nextAnon,
+      });
+    } catch (err) {
+      logger.warn('Failed to update default scope', err);
+    }
   };
 
   const toggleDevMode = async (val: boolean) => {
@@ -611,18 +833,24 @@ export default function Page() {
     }
   };
 
-  const changeDailyQuoteStyle = async (val: 'uplifting' | 'stoic' | 'growth') => {
+  const changeDailyQuoteStyle = async (
+    val: 'uplifting' | 'stoic' | 'growth',
+  ) => {
     setDailyQuoteStyle(val);
     await AsyncStorage.setItem('dailyQuote.style', val);
   };
 
   const scheduleDailyQuoteReminder = async (hour: number, minute: number) => {
     const existing = await AsyncStorage.getItem('dailyQuoteReminderId');
-    if (existing) await Notifications.cancelScheduledNotificationAsync(existing);
+    if (existing)
+      await Notifications.cancelScheduledNotificationAsync(existing);
     const newId = await Notifications.scheduleNotificationAsync({
       content: {
         title: t('dailyQuote.title'),
-        body: t('notifications.dailyQuoteBody', 'Your daily dose of motivation is ready.'),
+        body: t(
+          'notifications.dailyQuoteBody',
+          'Your daily dose of motivation is ready.',
+        ),
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
@@ -638,10 +866,19 @@ export default function Page() {
     if (val) {
       const { status } = await Notifications.requestPermissionsAsync();
       if (status !== 'granted') return;
-      await scheduleDailyQuoteReminder(dailyQuoteTime.hour, dailyQuoteTime.minute);
+      await scheduleDailyQuoteReminder(
+        dailyQuoteTime.hour,
+        dailyQuoteTime.minute,
+      );
       await AsyncStorage.setItem('dailyQuoteReminder', 'true');
-      await AsyncStorage.setItem('dailyQuoteReminderHour', String(dailyQuoteTime.hour));
-      await AsyncStorage.setItem('dailyQuoteReminderMinute', String(dailyQuoteTime.minute));
+      await AsyncStorage.setItem(
+        'dailyQuoteReminderHour',
+        String(dailyQuoteTime.hour),
+      );
+      await AsyncStorage.setItem(
+        'dailyQuoteReminderMinute',
+        String(dailyQuoteTime.minute),
+      );
       setDailyQuoteReminder(true);
     } else {
       const id = await AsyncStorage.getItem('dailyQuoteReminderId');
@@ -732,7 +969,11 @@ export default function Page() {
                 />
               ) : (
                 <View style={[styles.heroAvatar, styles.heroAvatarPlaceholder]}>
-                  <Ionicons name="person-outline" size={32} color={theme.placeholder} />
+                  <Ionicons
+                    name="person-outline"
+                    size={32}
+                    color={theme.placeholder}
+                  />
                 </View>
               )}
               <View style={styles.heroDetails}>
@@ -741,7 +982,9 @@ export default function Page() {
                     style={[styles.heroTitle, { color: theme.text }]}
                     numberOfLines={1}
                   >
-                    {profile?.displayName || user?.email || t('settings.hero.greeting', 'Welcome back')}
+                    {profile?.displayName ||
+                      user?.email ||
+                      t('settings.hero.greeting', 'Welcome back')}
                   </Text>
                   <View
                     style={[
@@ -767,7 +1010,10 @@ export default function Page() {
             </View>
             <View style={styles.heroActions}>
               <TouchableOpacity
-                style={[styles.heroActionButton, { borderColor: theme.placeholder }]}
+                style={[
+                  styles.heroActionButton,
+                  { borderColor: theme.placeholder },
+                ]}
                 onPress={pickAvatar}
                 accessibilityRole="button"
               >
@@ -794,7 +1040,12 @@ export default function Page() {
               </TouchableOpacity>
             </View>
             {avatarUploading && avatarProgress !== null && (
-              <Text style={[styles.heroUploadProgress, { color: theme.placeholder }]}>
+              <Text
+                style={[
+                  styles.heroUploadProgress,
+                  { color: theme.placeholder },
+                ]}
+              >
                 {t('settings.hero.progress', '{{percent}}% uploaded', {
                   percent: Math.round(avatarProgress),
                 })}
@@ -802,18 +1053,31 @@ export default function Page() {
             )}
           </View>
 
-          <SettingsSection title={t('settings.sections.account', 'Account Info')}>
+          <SettingsSection
+            title={t('settings.sections.account', 'Account Info')}
+          >
             <SectionCard>
               <View style={styles.accountOverviewRow}>
                 {accountPhoto ? (
                   <Image source={{ uri: accountPhoto }} style={styles.avatar} />
                 ) : (
                   <View style={[styles.avatar, styles.accountAvatarFallback]}>
-                    <Ionicons name="person-circle-outline" color={theme.placeholder} size={56} />
+                    <Ionicons
+                      name="person-circle-outline"
+                      color={theme.placeholder}
+                      size={56}
+                    />
                   </View>
                 )}
                 <View style={styles.accountOverviewDetails}>
-                  <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600' }} numberOfLines={1}>
+                  <Text
+                    style={{
+                      color: theme.text,
+                      fontSize: 18,
+                      fontWeight: '600',
+                    }}
+                    numberOfLines={1}
+                  >
                     {profile?.displayName || t('account.nameUnset', 'Not set')}
                   </Text>
                   <Text style={{ color: theme.placeholder }} numberOfLines={1}>
@@ -821,22 +1085,52 @@ export default function Page() {
                   </Text>
                 </View>
               </View>
-              <View style={[styles.sectionDivider, { backgroundColor: theme.placeholder }]} />
+              <View
+                style={[
+                  styles.sectionDivider,
+                  { backgroundColor: theme.placeholder },
+                ]}
+              />
               <SettingRow
                 title={t('account.userId', 'User ID')}
                 description={user?.uid || '—'}
-                onPress={user?.uid ? () => copyToClipboard(user.uid, 'UID') : undefined}
-                accessibilityHint={t('settings.accessibility.copyUserId', 'Copy your user ID to the clipboard')}
+                onPress={
+                  user?.uid ? () => copyToClipboard(user.uid, 'UID') : undefined
+                }
+                accessibilityHint={t(
+                  'settings.accessibility.copyUserId',
+                  'Copy your user ID to the clipboard',
+                )}
                 trailing={
-                  user?.uid ? <Ionicons name="copy-outline" size={18} color={theme.tint} /> : undefined
+                  user?.uid ? (
+                    <Ionicons
+                      name="copy-outline"
+                      size={18}
+                      color={theme.tint}
+                    />
+                  ) : undefined
                 }
               />
-              <View style={[styles.sectionDivider, { backgroundColor: theme.placeholder }]} />
+              <View
+                style={[
+                  styles.sectionDivider,
+                  { backgroundColor: theme.placeholder },
+                ]}
+              />
               <SettingRow
                 title={t('account.editProfile', 'Edit Profile')}
-                description={t('settings.account.editProfileDescription', 'Update your name, photo, and bio.')}
+                description={t(
+                  'settings.account.editProfileDescription',
+                  'Update your name, photo, and bio.',
+                )}
                 onPress={() => router.push('/profile' as Href)}
-                trailing={<Ionicons name="chevron-forward" size={16} color={theme.placeholder} />}
+                trailing={
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={theme.placeholder}
+                  />
+                }
               />
             </SectionCard>
           </SettingsSection>
@@ -844,24 +1138,106 @@ export default function Page() {
           <SettingsSection title={t('settings.sections.privacy')}>
             <SectionCard>
               <SettingRow
-                title={t('settings.privacy.anonymize')}
-                description={t('settings.privacy.anonymizeDescription', 'Hide your name and avatar on new wishes.')}
-                trailing={<Switch value={anonymize} onValueChange={toggleAnonymize} />}
+                title={t('settings.privacy.anonMode', 'Anon Mode')}
+                description={t(
+                  'settings.privacy.anonModeDescription',
+                  'Default to anonymous posting across the app.',
+                )}
+                trailing={
+                  <Switch
+                    value={anonMode}
+                    onValueChange={handleAnonModeToggle}
+                  />
+                }
               />
+              <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
+                <Text
+                  style={{
+                    color: theme.placeholder,
+                    fontSize: 12,
+                    marginBottom: 8,
+                  }}
+                >
+                  {t(
+                    'settings.privacy.defaultScope',
+                    'Default visibility for new wishes',
+                  )}
+                </Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    flexWrap: 'wrap',
+                    marginHorizontal: -4,
+                  }}
+                >
+                  {WISH_SCOPES.map((scope) => {
+                    const active = defaultScope === scope;
+                    return (
+                      <TouchableOpacity
+                        key={scope}
+                        onPress={() => handleDefaultScopeChange(scope)}
+                        style={{
+                          paddingVertical: 8,
+                          paddingHorizontal: 12,
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          marginHorizontal: 4,
+                          marginBottom: 8,
+                          backgroundColor: active ? theme.tint : theme.input,
+                          borderColor: active ? theme.tint : theme.placeholder,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: active ? theme.background : theme.text,
+                            fontWeight: '600',
+                          }}
+                        >
+                          {t(`composer.scope.${scope}.title`, scope)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
               <SettingRow
-                title={t('settings.privacy.shareAnalytics', 'Share anonymous analytics')}
-                description={t('settings.privacy.shareAnalyticsDescription', 'Help us improve WhispList with aggregated usage insights.')}
-                trailing={<Switch value={shareAnalytics} onValueChange={toggleShareAnalytics} />}
+                title={t(
+                  'settings.privacy.shareAnalytics',
+                  'Share anonymous analytics',
+                )}
+                description={t(
+                  'settings.privacy.shareAnalyticsDescription',
+                  'Help us improve WhispList with aggregated usage insights.',
+                )}
+                trailing={
+                  <Switch
+                    value={shareAnalytics}
+                    onValueChange={toggleShareAnalytics}
+                  />
+                }
               />
               <SettingRow
                 title={t('settings.privacy.publicProfile')}
-                description={t('settings.privacy.publicProfileDescription', 'Let other Whispers explore your public profile page.')}
-                trailing={<Switch value={publicProfileEnabled} onValueChange={togglePublicProfile} />}
+                description={t(
+                  'settings.privacy.publicProfileDescription',
+                  'Let other Whispers explore your public profile page.',
+                )}
+                trailing={
+                  <Switch
+                    value={publicProfileEnabled}
+                    onValueChange={togglePublicProfile}
+                  />
+                }
               />
               <SettingRow
                 title={t('settings.privacy.stripeGifting')}
-                description={t('settings.privacy.stripeGiftingDescription', 'Enable gifts and payouts through your Stripe account.')}
-                trailing={<Switch value={stripeEnabled} onValueChange={toggleStripe} />}
+                description={t(
+                  'settings.privacy.stripeGiftingDescription',
+                  'Enable gifts and payouts through your Stripe account.',
+                )}
+                trailing={
+                  <Switch value={stripeEnabled} onValueChange={toggleStripe} />
+                }
               />
             </SectionCard>
           </SettingsSection>
@@ -870,48 +1246,103 @@ export default function Page() {
             <SectionCard>
               <SettingRow
                 title={t('settings.notifications.dailyQuote')}
-                description={t('settings.notifications.dailyQuoteDescription', 'Receive a daily affirmation inside WhispList.')}
-                trailing={<Switch value={dailyQuote} onValueChange={toggleDailyQuote} />}
+                description={t(
+                  'settings.notifications.dailyQuoteDescription',
+                  'Receive a daily affirmation inside WhispList.',
+                )}
+                trailing={
+                  <Switch value={dailyQuote} onValueChange={toggleDailyQuote} />
+                }
               />
               {dailyQuote && (
                 <View style={styles.settingInset}>
-                  <Text style={[styles.settingSubheading, { color: theme.placeholder }]}>
+                  <Text
+                    style={[
+                      styles.settingSubheading,
+                      { color: theme.placeholder },
+                    ]}
+                  >
                     {t('settings.notifications.quoteStyle', 'Quote Style')}
                   </Text>
                   <Picker
                     selectedValue={dailyQuoteStyle}
-                    onValueChange={(v) => changeDailyQuoteStyle(v as 'uplifting' | 'stoic' | 'growth')}
-                    style={[styles.picker, { backgroundColor: theme.input, color: theme.text }]}
+                    onValueChange={(v) =>
+                      changeDailyQuoteStyle(
+                        v as 'uplifting' | 'stoic' | 'growth',
+                      )
+                    }
+                    style={[
+                      styles.picker,
+                      { backgroundColor: theme.input, color: theme.text },
+                    ]}
                   >
-                    <Picker.Item label={t('dailyQuote.styles.uplifting', 'Uplifting')} value="uplifting" />
-                    <Picker.Item label={t('dailyQuote.styles.stoic', 'Stoic')} value="stoic" />
-                    <Picker.Item label={t('dailyQuote.styles.growth', 'Growth')} value="growth" />
+                    <Picker.Item
+                      label={t('dailyQuote.styles.uplifting', 'Uplifting')}
+                      value="uplifting"
+                    />
+                    <Picker.Item
+                      label={t('dailyQuote.styles.stoic', 'Stoic')}
+                      value="stoic"
+                    />
+                    <Picker.Item
+                      label={t('dailyQuote.styles.growth', 'Growth')}
+                      value="growth"
+                    />
                   </Picker>
 
                   <SettingRow
-                    title={t('settings.notifications.quoteReminder', 'Daily Quote Reminder')}
-                    description={t('settings.notifications.quoteReminderDescription', 'Schedule a push alert for your favorite time of day.')}
-                    trailing={<Switch value={dailyQuoteReminder} onValueChange={toggleDailyQuoteReminder} />}
+                    title={t(
+                      'settings.notifications.quoteReminder',
+                      'Daily Quote Reminder',
+                    )}
+                    description={t(
+                      'settings.notifications.quoteReminderDescription',
+                      'Schedule a push alert for your favorite time of day.',
+                    )}
+                    trailing={
+                      <Switch
+                        value={dailyQuoteReminder}
+                        onValueChange={toggleDailyQuoteReminder}
+                      />
+                    }
                   />
 
                   {dailyQuoteReminder && (
                     <View style={styles.settingInlineControls}>
                       <Picker
                         selectedValue={dailyQuoteTime.hour}
-                        onValueChange={(v) => changeDailyQuoteTime(Number(v), dailyQuoteTime.minute)}
-                        style={[styles.settingInlinePicker, { backgroundColor: theme.input, color: theme.text }]}
+                        onValueChange={(v) =>
+                          changeDailyQuoteTime(Number(v), dailyQuoteTime.minute)
+                        }
+                        style={[
+                          styles.settingInlinePicker,
+                          { backgroundColor: theme.input, color: theme.text },
+                        ]}
                       >
                         {Array.from({ length: 24 }, (_, i) => (
-                          <Picker.Item key={i} label={`${i.toString().padStart(2, '0')}`} value={i} />
+                          <Picker.Item
+                            key={i}
+                            label={`${i.toString().padStart(2, '0')}`}
+                            value={i}
+                          />
                         ))}
                       </Picker>
                       <Picker
                         selectedValue={dailyQuoteTime.minute}
-                        onValueChange={(v) => changeDailyQuoteTime(dailyQuoteTime.hour, Number(v))}
-                        style={[styles.settingInlinePicker, { backgroundColor: theme.input, color: theme.text }]}
+                        onValueChange={(v) =>
+                          changeDailyQuoteTime(dailyQuoteTime.hour, Number(v))
+                        }
+                        style={[
+                          styles.settingInlinePicker,
+                          { backgroundColor: theme.input, color: theme.text },
+                        ]}
                       >
                         {[0, 15, 30, 45].map((m) => (
-                          <Picker.Item key={m} label={`${m.toString().padStart(2, '0')}`} value={m} />
+                          <Picker.Item
+                            key={m}
+                            label={`${m.toString().padStart(2, '0')}`}
+                            value={m}
+                          />
                         ))}
                       </Picker>
                     </View>
@@ -923,31 +1354,80 @@ export default function Page() {
             <SectionCard>
               <SettingRow
                 title={t('settings.notifications.boostNotifications')}
-                description={t('settings.notifications.boostNotificationsDescription', 'Alerts when your wish is boosted or expires soon.')}
-                trailing={<Switch value={pushPrefs.wish_boosted} onValueChange={(v) => togglePush('wish_boosted', v)} />}
+                description={t(
+                  'settings.notifications.boostNotificationsDescription',
+                  'Alerts when your wish is boosted or expires soon.',
+                )}
+                trailing={
+                  <Switch
+                    value={pushPrefs.wish_boosted}
+                    onValueChange={(v) => togglePush('wish_boosted', v)}
+                  />
+                }
               />
               <SettingRow
                 title={t('settings.notifications.commentNotifications')}
-                description={t('settings.notifications.commentNotificationsDescription', 'Know when someone reacts or comments on your wish.')}
-                trailing={<Switch value={pushPrefs.new_comment} onValueChange={(v) => togglePush('new_comment', v)} />}
+                description={t(
+                  'settings.notifications.commentNotificationsDescription',
+                  'Know when someone reacts or comments on your wish.',
+                )}
+                trailing={
+                  <Switch
+                    value={pushPrefs.new_comment}
+                    onValueChange={(v) => togglePush('new_comment', v)}
+                  />
+                }
               />
               <SettingRow
                 title={t('settings.notifications.giftNotifications')}
-                description={t('settings.notifications.giftNotificationsDescription', 'Get notified when a supporter sends a gift.')}
-                trailing={<Switch value={pushPrefs.gift_received} onValueChange={(v) => togglePush('gift_received', v)} />}
+                description={t(
+                  'settings.notifications.giftNotificationsDescription',
+                  'Get notified when a supporter sends a gift.',
+                )}
+                trailing={
+                  <Switch
+                    value={pushPrefs.gift_received}
+                    onValueChange={(v) => togglePush('gift_received', v)}
+                  />
+                }
               />
-              <View style={[styles.sectionDivider, { backgroundColor: theme.placeholder }]} />
+              <View
+                style={[
+                  styles.sectionDivider,
+                  { backgroundColor: theme.placeholder },
+                ]}
+              />
               <SettingRow
-                title={t('settings.notifications.test', 'Send Test Notification')}
-                description={t('settings.notifications.testDescription', 'Double-check your device can receive pushes.')}
+                title={t(
+                  'settings.notifications.test',
+                  'Send Test Notification',
+                )}
+                description={t(
+                  'settings.notifications.testDescription',
+                  'Double-check your device can receive pushes.',
+                )}
                 onPress={sendTestNotification}
-                trailing={<Ionicons name="notifications-outline" size={18} color={theme.tint} />}
+                trailing={
+                  <Ionicons
+                    name="notifications-outline"
+                    size={18}
+                    color={theme.tint}
+                  />
+                }
               />
               <SettingRow
-                title={t('settings.notifications.openSettings', 'Open OS Settings')}
-                description={t('settings.notifications.openSettingsDescription', 'Adjust notification permissions in your device settings.')}
+                title={t(
+                  'settings.notifications.openSettings',
+                  'Open OS Settings',
+                )}
+                description={t(
+                  'settings.notifications.openSettingsDescription',
+                  'Adjust notification permissions in your device settings.',
+                )}
                 onPress={openOSSettings}
-                trailing={<Ionicons name="open-outline" size={18} color={theme.tint} />}
+                trailing={
+                  <Ionicons name="open-outline" size={18} color={theme.tint} />
+                }
               />
             </SectionCard>
           </SettingsSection>
@@ -957,16 +1437,34 @@ export default function Page() {
               <SectionCard>
                 <SettingRow
                   title={t('settings.developer.developerMode')}
-                  description={t('settings.developer.developerModeDescription', 'Unlock internal tooling, analytics, and staging shortcuts.')}
-                  trailing={<Switch value={devMode} onValueChange={toggleDevMode} />}
+                  description={t(
+                    'settings.developer.developerModeDescription',
+                    'Unlock internal tooling, analytics, and staging shortcuts.',
+                  )}
+                  trailing={
+                    <Switch value={devMode} onValueChange={toggleDevMode} />
+                  }
                 />
                 <SettingRow
                   title={t('settings.notifications.referralBonuses')}
-                  description={t('settings.notifications.referralBonusesDescription', 'Alerts when someone earns a referral reward from you.')}
-                  trailing={<Switch value={pushPrefs.referral_bonus} onValueChange={(v) => togglePush('referral_bonus', v)} />}
+                  description={t(
+                    'settings.notifications.referralBonusesDescription',
+                    'Alerts when someone earns a referral reward from you.',
+                  )}
+                  trailing={
+                    <Switch
+                      value={pushPrefs.referral_bonus}
+                      onValueChange={(v) => togglePush('referral_bonus', v)}
+                    />
+                  }
                 />
                 {profile?.developerMode && (
-                  <View style={[styles.devAnalytics, { borderColor: theme.placeholder }]}>
+                  <View
+                    style={[
+                      styles.devAnalytics,
+                      { borderColor: theme.placeholder },
+                    ]}
+                  >
                     <Text style={{ color: theme.text }}>
                       {t('settings.developer.stats.totalWishes', {
                         count: analytics.wishCount,
@@ -995,7 +1493,9 @@ export default function Page() {
 
           <SettingsSection title={t('settings.sections.system')}>
             <SectionCard>
-              <Text style={[styles.settingSubheading, { color: theme.placeholder }]}>
+              <Text
+                style={[styles.settingSubheading, { color: theme.placeholder }]}
+              >
                 {t('settings.system.offlineQueue', 'Offline queue')}
               </Text>
               <View style={styles.settingInset}>
@@ -1003,10 +1503,18 @@ export default function Page() {
                   {t('settings.system.queued', { count: queueStatus.size })}
                 </Text>
                 <Text style={{ color: theme.text }}>
-                  {t('settings.system.oldest', { mins: queueStatus.oldestMs ? Math.floor(queueStatus.oldestMs / 60000) : 0 })}
+                  {t('settings.system.oldest', {
+                    mins: queueStatus.oldestMs
+                      ? Math.floor(queueStatus.oldestMs / 60000)
+                      : 0,
+                  })}
                 </Text>
                 <Text style={{ color: theme.text }}>
-                  {t('settings.system.nextRetry', { mins: queueStatus.nextRetryMs ? Math.ceil(queueStatus.nextRetryMs / 60000) : 0 })}
+                  {t('settings.system.nextRetry', {
+                    mins: queueStatus.nextRetryMs
+                      ? Math.ceil(queueStatus.nextRetryMs / 60000)
+                      : 0,
+                  })}
                 </Text>
               </View>
               <View style={styles.systemButtonRow}>
@@ -1017,9 +1525,14 @@ export default function Page() {
                     const qs = await getQueueStatus();
                     setQueueStatus(qs);
                     if (Platform.OS === 'android') {
-                      ToastAndroid.show(t('settings.system.retryResult', { count: res.posted }), ToastAndroid.SHORT);
+                      ToastAndroid.show(
+                        t('settings.system.retryResult', { count: res.posted }),
+                        ToastAndroid.SHORT,
+                      );
                     } else {
-                      Alert.alert(t('settings.system.retryResult', { count: res.posted }));
+                      Alert.alert(
+                        t('settings.system.retryResult', { count: res.posted }),
+                      );
                     }
                   }}
                 />
@@ -1030,7 +1543,10 @@ export default function Page() {
                     const qs = await getQueueStatus();
                     setQueueStatus(qs);
                     if (Platform.OS === 'android') {
-                      ToastAndroid.show(t('settings.system.cleared', 'Cleared'), ToastAndroid.SHORT);
+                      ToastAndroid.show(
+                        t('settings.system.cleared', 'Cleared'),
+                        ToastAndroid.SHORT,
+                      );
                     } else {
                       Alert.alert(t('settings.system.cleared', 'Cleared'));
                     }
@@ -1049,27 +1565,55 @@ export default function Page() {
             <SectionCard>
               <SettingRow
                 title={t('settings.system.referFriend')}
-                description={t('settings.system.referFriendDescription', 'Share your referral link to unlock more boosts.')}
+                description={t(
+                  'settings.system.referFriendDescription',
+                  'Share your referral link to unlock more boosts.',
+                )}
                 onPress={handleShareInvite}
-                trailing={<Ionicons name="person-add-outline" size={18} color={theme.tint} />}
+                trailing={
+                  <Ionicons
+                    name="person-add-outline"
+                    size={18}
+                    color={theme.tint}
+                  />
+                }
               />
               <SettingRow
                 title={t('settings.system.permissions')}
-                description={t('settings.system.permissionsDescription', 'Check microphone and notification permissions.')}
+                description={t(
+                  'settings.system.permissionsDescription',
+                  'Check microphone and notification permissions.',
+                )}
                 onPress={permissionsInfo}
-                trailing={<Ionicons name="settings-outline" size={18} color={theme.tint} />}
+                trailing={
+                  <Ionicons
+                    name="settings-outline"
+                    size={18}
+                    color={theme.tint}
+                  />
+                }
               />
               <SettingRow
                 title={t('settings.system.rateApp')}
-                description={t('settings.system.rateAppDescription', 'Tell others what you love about WhispList.')}
-                onPress={() => {
-                  Linking.openURL('https://example.com');
-                }}
-                trailing={<Ionicons name="star-outline" size={18} color={theme.tint} />}
+                description={t(
+                  'settings.system.rateAppDescription',
+                  'Tell others what you love about WhispList.',
+                )}
+                onPress={handleRateApp}
+                trailing={
+                  <Ionicons name="star-outline" size={18} color={theme.tint} />
+                }
               />
               <SettingRow
                 title={t('settings.system.copyDiagnostics', 'Copy Diagnostics')}
-                description={diagCopied ? t('common.copied', 'Copied') : t('settings.system.copyDiagnosticsDescription', 'Copy device details to share with support.')}
+                description={
+                  diagCopied
+                    ? t('common.copied', 'Copied')
+                    : t(
+                        'settings.system.copyDiagnosticsDescription',
+                        'Copy device details to share with support.',
+                      )
+                }
                 onPress={copyDiagnostics}
                 trailing={
                   <Ionicons
@@ -1081,9 +1625,14 @@ export default function Page() {
               />
               <SettingRow
                 title={t('settings.system.debug', 'Open Debug')}
-                description={t('settings.system.debugDescription', 'Inspect local caches, storage, and developer tools.')}
+                description={t(
+                  'settings.system.debugDescription',
+                  'Inspect local caches, storage, and developer tools.',
+                )}
                 onPress={() => router.push('/debug' as Href)}
-                trailing={<Ionicons name="bug-outline" size={18} color={theme.tint} />}
+                trailing={
+                  <Ionicons name="bug-outline" size={18} color={theme.tint} />
+                }
               />
               <Text
                 style={{
@@ -1098,7 +1647,9 @@ export default function Page() {
             </SectionCard>
 
             <SectionCard>
-              <Text style={[styles.settingSubheading, { color: theme.placeholder }]}>
+              <Text
+                style={[styles.settingSubheading, { color: theme.placeholder }]}
+              >
                 {t('settings.system.defaultCategory')}
               </Text>
               <Picker
@@ -1107,7 +1658,10 @@ export default function Page() {
                   setDefaultCategory(v);
                   await AsyncStorage.setItem('defaultCategory', v);
                 }}
-                style={[styles.picker, { backgroundColor: theme.input, color: theme.text }]}
+                style={[
+                  styles.picker,
+                  { backgroundColor: theme.input, color: theme.text },
+                ]}
               >
                 <Picker.Item
                   label={t('settings.system.categories.general')}
@@ -1126,7 +1680,9 @@ export default function Page() {
                   value="health"
                 />
               </Picker>
-              <Text style={[styles.settingSubheading, { color: theme.placeholder }]}>
+              <Text
+                style={[styles.settingSubheading, { color: theme.placeholder }]}
+              >
                 {t('settings.system.language')}
               </Text>
               <Picker
@@ -1138,7 +1694,10 @@ export default function Page() {
                     setI18nLanguage(v);
                   } catch {}
                 }}
-                style={[styles.picker, { backgroundColor: theme.input, color: theme.text }]}
+                style={[
+                  styles.picker,
+                  { backgroundColor: theme.input, color: theme.text },
+                ]}
               >
                 <Picker.Item
                   label={t('settings.system.languages.en')}
@@ -1152,7 +1711,9 @@ export default function Page() {
             </SectionCard>
 
             <SectionCard>
-              <Text style={[styles.settingSubheading, { color: theme.placeholder }]}>
+              <Text
+                style={[styles.settingSubheading, { color: theme.placeholder }]}
+              >
                 {t('settings.system.feedbackTitle', 'Share feedback')}
               </Text>
               <TextInput
@@ -1180,27 +1741,74 @@ export default function Page() {
             <SectionCard>
               <SettingRow
                 title={t('settings.system.exportHistory')}
-                description={t('settings.system.exportHistoryDescription', 'Create a personal backup of your wishes and comments.')}
+                description={t(
+                  'settings.system.exportHistoryDescription',
+                  'Create a personal backup of your wishes and comments.',
+                )}
                 onPress={handleExport}
-                trailing={<Ionicons name="share-outline" size={18} color={theme.tint} />}
+                trailing={
+                  <Ionicons name="share-outline" size={18} color={theme.tint} />
+                }
               />
               <SettingRow
                 title={t('settings.system.deleteContent')}
-                description={t('settings.system.deleteContentDescription', 'Remove every wish and comment posted under your nickname.')}
+                description={t(
+                  'settings.system.deleteContentDescription',
+                  'Remove every wish and comment posted under your nickname.',
+                )}
                 onPress={handleDeleteContent}
-                trailing={<Ionicons name="trash-outline" size={18} color="rgb(220, 38, 38)" />}
+                trailing={
+                  <Ionicons
+                    name="trash-outline"
+                    size={18}
+                    color="rgb(220, 38, 38)"
+                  />
+                }
+              />
+              <SettingRow
+                title={t('settings.system.deleteAccount', 'Delete Account')}
+                description={t(
+                  'settings.system.deleteAccountDescription',
+                  'Permanently remove your account and associated data.',
+                )}
+                onPress={handleDeleteAccount}
+                trailing={
+                  <Ionicons
+                    name="alert-circle-outline"
+                    size={18}
+                    color="rgb(220, 38, 38)"
+                  />
+                }
               />
               <SettingRow
                 title={t('settings.system.signOut', 'Sign Out')}
-                description={t('settings.system.signOutDescription', 'Log out of WhispList on this device.')}
+                description={t(
+                  'settings.system.signOutDescription',
+                  'Log out of WhispList on this device.',
+                )}
                 onPress={handleSignOut}
-                trailing={<Ionicons name="log-out-outline" size={18} color={theme.tint} />}
+                trailing={
+                  <Ionicons
+                    name="log-out-outline"
+                    size={18}
+                    color={theme.tint}
+                  />
+                }
               />
               <SettingRow
                 title={t('settings.system.resetData')}
-                description={t('settings.system.resetDataDescription', 'Clear cached preferences and local drafts from the app.')}
+                description={t(
+                  'settings.system.resetDataDescription',
+                  'Clear cached preferences and local drafts from the app.',
+                )}
                 onPress={handleReset}
-                trailing={<Ionicons name="refresh-outline" size={18} color={theme.tint} />}
+                trailing={
+                  <Ionicons
+                    name="refresh-outline"
+                    size={18}
+                    color={theme.tint}
+                  />
+                }
               />
             </SectionCard>
           </SettingsSection>
@@ -1209,22 +1817,54 @@ export default function Page() {
             <SectionCard>
               <SettingRow
                 title={t('settings.system.terms', 'Terms of Service')}
-                description={t('settings.legal.termsDescription', 'Review the agreement that keeps WhispList safe for everyone.')}
+                description={t(
+                  'settings.legal.termsDescription',
+                  'Review the agreement that keeps WhispList safe for everyone.',
+                )}
                 onPress={() => router.push('/terms' as Href)}
-                trailing={<Ionicons name="document-text-outline" size={18} color={theme.tint} />}
+                trailing={
+                  <Ionicons
+                    name="document-text-outline"
+                    size={18}
+                    color={theme.tint}
+                  />
+                }
               />
-              <Text style={{ color: theme.placeholder, fontSize: 12, marginBottom: 12 }}>
+              <Text
+                style={{
+                  color: theme.placeholder,
+                  fontSize: 12,
+                  marginBottom: 12,
+                }}
+              >
                 {t('settings.legal.termsUpdated', 'Last updated: Sep 3, 2025')}
               </Text>
-              <View style={[styles.sectionDivider, { backgroundColor: theme.placeholder }]} />
+              <View
+                style={[
+                  styles.sectionDivider,
+                  { backgroundColor: theme.placeholder },
+                ]}
+              />
               <SettingRow
                 title={t('settings.system.privacy', 'Privacy Policy')}
-                description={t('settings.legal.privacyDescription', 'Understand how we store, process, and protect your data.')}
+                description={t(
+                  'settings.legal.privacyDescription',
+                  'Understand how we store, process, and protect your data.',
+                )}
                 onPress={() => router.push('/privacy' as Href)}
-                trailing={<Ionicons name="shield-checkmark-outline" size={18} color={theme.tint} />}
+                trailing={
+                  <Ionicons
+                    name="shield-checkmark-outline"
+                    size={18}
+                    color={theme.tint}
+                  />
+                }
               />
               <Text style={{ color: theme.placeholder, fontSize: 12 }}>
-                {t('settings.legal.privacyUpdated', 'Last updated: Sep 3, 2025')}
+                {t(
+                  'settings.legal.privacyUpdated',
+                  'Last updated: Sep 3, 2025',
+                )}
               </Text>
             </SectionCard>
           </SettingsSection>
@@ -1240,13 +1880,21 @@ export default function Page() {
                   <ThemeSwatch key={t} name={t} />
                 ))}
               </ScrollView>
-              <Text style={[styles.settingSubheading, { color: theme.placeholder, marginTop: 8 }]}>
+              <Text
+                style={[
+                  styles.settingSubheading,
+                  { color: theme.placeholder, marginTop: 8 },
+                ]}
+              >
                 {t('settings.theme.pickerLabel', 'Theme preset')}
               </Text>
               <Picker
                 selectedValue={theme.name}
                 onValueChange={(value) => void setTheme(value as ThemeName)}
-                style={[styles.picker, { backgroundColor: theme.input, color: theme.text }]}
+                style={[
+                  styles.picker,
+                  { backgroundColor: theme.input, color: theme.text },
+                ]}
               >
                 {themeOptions.map((t) => (
                   <Picker.Item key={t} label={t} value={t} />

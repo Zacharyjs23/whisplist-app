@@ -39,9 +39,15 @@ export const signInWithGoogle = async (
   }
 
   const res = await promptAsync();
-  if (res && 'type' in res && res.type === 'success' && res.authentication?.idToken) {
-    const credential = GoogleAuthProvider.credential(res.authentication.idToken);
+  if (
+    res &&
+    'type' in res &&
+    res.type === 'success' &&
+    res.authentication?.idToken
+  ) {
+    const credential = GoogleAuthProvider.credential(
+      res.authentication.idToken,
+    );
     await signInWithCredential(auth, credential);
   }
 };
-

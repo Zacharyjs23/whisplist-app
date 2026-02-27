@@ -1,4 +1,8 @@
-import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
+import {
+  initializeTestEnvironment,
+  assertFails,
+  assertSucceeds,
+} from '@firebase/rules-unit-testing';
 import fs from 'fs';
 
 const EMU = process.env.FIRESTORE_EMULATOR_HOST;
@@ -11,7 +15,7 @@ describeMaybe('firestore rules - gifts', () => {
     const [host, portStr] = (EMU || '').split(':');
     const port = Number(portStr) || 8080;
     testEnv = await initializeTestEnvironment({
-      projectId: 'whisplist-test',
+      projectId: 'whisplist-test-gifts',
       firestore: {
         host,
         port,
@@ -22,9 +26,13 @@ describeMaybe('firestore rules - gifts', () => {
     await testEnv.withSecurityRulesDisabled(async (context: any) => {
       const adminDb = context.firestore();
       await adminDb.doc('wishes/wish1').set({ userId: 'user1' });
-      await adminDb.doc('wishes/wish1/gifts/gift1').set({ recipientId: 'user1', amount: 10 });
+      await adminDb
+        .doc('wishes/wish1/gifts/gift1')
+        .set({ recipientId: 'user1', amount: 10 });
       // Also create a gift under alternate parent path written by backend
-      await adminDb.doc('gifts/wish2/gifts/gift2').set({ recipientId: 'user1', amount: 25 });
+      await adminDb
+        .doc('gifts/wish2/gifts/gift2')
+        .set({ recipientId: 'user1', amount: 25 });
     });
   });
 

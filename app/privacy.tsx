@@ -1,50 +1,75 @@
-import { ScrollView, Text } from 'react-native';
+import React, { useMemo } from 'react';
+import { ScrollView, Text, View, StyleSheet } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useTranslation } from '@/contexts/I18nContext';
+
+const itemKeys = [
+  'account',
+  'wishes',
+  'analytics',
+  'payments',
+  'choices',
+] as const;
+
+const createStyles = (color: string) =>
+  StyleSheet.create({
+    container: {
+      padding: 20,
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      marginBottom: 10,
+      color,
+    },
+    intro: {
+      marginBottom: 10,
+      color,
+    },
+    bulletRow: {
+      flexDirection: 'row',
+      marginBottom: 10,
+    },
+    bulletSymbol: {
+      fontSize: 18,
+      marginRight: 8,
+      color,
+    },
+    bulletTitle: {
+      fontWeight: 'bold',
+      color,
+    },
+    bulletBody: {
+      color,
+    },
+  });
 
 export default function PrivacyScreen() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
+  const styles = useMemo(() => createStyles(theme.text), [theme.text]);
+
   return (
     <ScrollView
-      contentContainerStyle={{ padding: 20, backgroundColor: theme.background }}
+      style={{ backgroundColor: theme.background }}
+      contentContainerStyle={styles.container}
+      accessibilityLabel={t('privacyScreen.title')}
     >
-      <Text
-        style={{
-          color: theme.text,
-          fontSize: 20,
-          fontWeight: 'bold',
-          marginBottom: 10,
-        }}
-      >
-        Privacy Policy
-      </Text>
-      <Text style={{ color: theme.text, marginBottom: 10 }}>
-        We respect your privacy and collect only the information needed to
-        operate WhispList.
-      </Text>
-      <Text style={{ color: theme.text, marginBottom: 10 }}>
-        • <Text style={{ fontWeight: 'bold' }}>Account Data</Text> – When you
-        sign up we store your email address and any profile details you provide
-        in Firebase. You may choose to remain anonymous.
-      </Text>
-      <Text style={{ color: theme.text, marginBottom: 10 }}>
-        • <Text style={{ fontWeight: 'bold' }}>Wishes and Comments</Text> –
-        Content you post is stored securely in Firebase until you delete it.
-      </Text>
-      <Text style={{ color: theme.text, marginBottom: 10 }}>
-        • <Text style={{ fontWeight: 'bold' }}>Analytics</Text> – We use
-        anonymous analytics to understand app usage. This data does not identify
-        you personally.
-      </Text>
-      <Text style={{ color: theme.text, marginBottom: 10 }}>
-        • <Text style={{ fontWeight: 'bold' }}>Payments</Text> – Gift
-        transactions are processed by Stripe or external links. We never store
-        your payment details.
-      </Text>
-      <Text style={{ color: theme.text }}>
-        • <Text style={{ fontWeight: 'bold' }}>Your Choices</Text> – You can
-        export or delete your data at any time from the settings screen. Contact
-        support@example.com with any questions.
-      </Text>
+      <Text style={styles.title}>{t('privacyScreen.title')}</Text>
+      <Text style={styles.intro}>{t('privacyScreen.intro')}</Text>
+      {itemKeys.map((key) => (
+        <View key={key} style={styles.bulletRow}>
+          <Text style={styles.bulletSymbol} accessibilityRole="text">
+            •
+          </Text>
+          <Text style={styles.bulletBody}>
+            <Text style={styles.bulletTitle}>
+              {t(`privacyScreen.items.${key}.title`)}
+            </Text>{' '}
+            {t(`privacyScreen.items.${key}.description`)}
+          </Text>
+        </View>
+      ))}
     </ScrollView>
   );
 }

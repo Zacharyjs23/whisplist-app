@@ -6,4 +6,3 @@
 module.exports = function setFunctionLength(fn /*, length */) {
   return fn;
 };
-

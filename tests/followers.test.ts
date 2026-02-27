@@ -28,4 +28,3 @@ describe('getFollowingIds', () => {
     expect(ids).toEqual([]);
   });
 });
-

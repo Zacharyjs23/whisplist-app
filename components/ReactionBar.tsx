@@ -1,5 +1,12 @@
 import React, { useRef } from 'react';
-import { View, Text, TouchableOpacity, Animated, StyleSheet, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Animated,
+  StyleSheet,
+  Platform,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/contexts/ThemeContext';
 
@@ -21,6 +28,7 @@ interface ReactionBarProps {
   onToggleSave: () => void;
   isSaved: boolean;
   disabled?: boolean;
+  hideSaveButton?: boolean;
 }
 
 export const ReactionBar: React.FC<ReactionBarProps> = ({
@@ -30,19 +38,26 @@ export const ReactionBar: React.FC<ReactionBarProps> = ({
   onToggleSave,
   isSaved,
   disabled = false,
+  hideSaveButton = false,
 }) => {
   const { theme } = useTheme();
   const reactionScales = useRef(
-    (Object.keys(reactionMap) as ReactionKey[]).reduce((acc, k) => {
-      acc[k] = new Animated.Value(1);
-      return acc;
-    }, {} as Record<ReactionKey, Animated.Value>),
+    (Object.keys(reactionMap) as ReactionKey[]).reduce(
+      (acc, k) => {
+        acc[k] = new Animated.Value(1);
+        return acc;
+      },
+      {} as Record<ReactionKey, Animated.Value>,
+    ),
   ).current;
 
   return (
     <View style={styles.reactionBar}>
       {(Object.keys(reactionMap) as ReactionKey[]).map((key) => (
-        <Animated.View key={key} style={{ transform: [{ scale: reactionScales[key] }] }}>
+        <Animated.View
+          key={key}
+          style={{ transform: [{ scale: reactionScales[key] }] }}
+        >
           <TouchableOpacity
             testID={`reaction-${key}`}
             disabled={disabled}
@@ -76,17 +91,19 @@ export const ReactionBar: React.FC<ReactionBarProps> = ({
           </TouchableOpacity>
         </Animated.View>
       ))}
-      <TouchableOpacity
-        testID="save-button"
-        onPress={onToggleSave}
-        style={styles.reactionButton}
-      >
-        <Ionicons
-          name={isSaved ? 'bookmark' : 'bookmark-outline'}
-          size={20}
-          color={theme.tint}
-        />
-      </TouchableOpacity>
+      {hideSaveButton ? null : (
+        <TouchableOpacity
+          testID="save-button"
+          onPress={onToggleSave}
+          style={styles.reactionButton}
+        >
+          <Ionicons
+            name={isSaved ? 'bookmark' : 'bookmark-outline'}
+            size={20}
+            color={theme.tint}
+          />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };

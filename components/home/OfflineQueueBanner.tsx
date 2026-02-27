@@ -27,12 +27,16 @@ export const OfflineQueueBanner = React.memo(function OfflineQueueBanner({
     <>
       {hasPending ? (
         <View style={[styles.pill, { backgroundColor: pillColor }]}>
-          <Text style={[styles.pillText, { color: textColor }]}>{pendingText}</Text>
+          <Text style={[styles.pillText, { color: textColor }]}>
+            {pendingText}
+          </Text>
         </View>
       ) : null}
       {postedCount > 0 ? (
         <View style={[styles.card, { backgroundColor: cardColor }]}>
-          <Text style={[styles.cardText, { color: textColor }]}>{postedText(postedCount)}</Text>
+          <Text style={[styles.cardText, { color: textColor }]}>
+            {postedText(postedCount)}
+          </Text>
         </View>
       ) : null}
     </>

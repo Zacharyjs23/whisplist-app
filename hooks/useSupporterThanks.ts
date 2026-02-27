@@ -65,12 +65,21 @@ export function useSupporterThanks(userId?: string | null) {
         const wishIds = new Set<string>();
         const entries = snap.docs
           .map((docSnap) => {
-            const { id: _ignored, ...rest } = (docSnap.data() as GiftEntry) ?? {};
+            const { id: _ignored, ...rest } =
+              (docSnap.data() as GiftEntry) ?? {};
             return { ...rest, id: docSnap.id } as GiftEntry;
           })
           .filter(
-            (entry): entry is GiftEntry & { supporterId: string; wishId: string; amount?: number } =>
-              entry.status === 'completed' && typeof entry.supporterId === 'string' && typeof entry.wishId === 'string',
+            (
+              entry,
+            ): entry is GiftEntry & {
+              supporterId: string;
+              wishId: string;
+              amount?: number;
+            } =>
+              entry.status === 'completed' &&
+              typeof entry.supporterId === 'string' &&
+              typeof entry.wishId === 'string',
           );
         entries.forEach((entry) => {
           supporterIds.add(entry.supporterId);
@@ -109,19 +118,30 @@ export function useSupporterThanks(userId?: string | null) {
           ),
         ]);
 
-        const userMap = new Map<string, { displayName?: string | null; photoURL?: string | null }>();
+        const userMap = new Map<
+          string,
+          { displayName?: string | null; photoURL?: string | null }
+        >();
         usersRaw.forEach((entry) => {
           if (entry) {
             userMap.set(entry.userId, {
-              displayName: typeof entry.displayName === 'string' ? entry.displayName : undefined,
-              photoURL: typeof entry.photoURL === 'string' ? entry.photoURL : undefined,
+              displayName:
+                typeof entry.displayName === 'string'
+                  ? entry.displayName
+                  : undefined,
+              photoURL:
+                typeof entry.photoURL === 'string' ? entry.photoURL : undefined,
             });
           }
         });
 
         const wishMap = new Map<string, string>();
         wishesRaw.forEach((entry) => {
-          if (entry && typeof entry.id === 'string' && typeof entry.text === 'string') {
+          if (
+            entry &&
+            typeof entry.id === 'string' &&
+            typeof entry.text === 'string'
+          ) {
             wishMap.set(entry.id, entry.text);
           }
         });

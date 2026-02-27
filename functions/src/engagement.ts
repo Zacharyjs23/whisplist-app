@@ -1,5 +1,8 @@
 import * as admin from 'firebase-admin';
 
+const app = admin.apps.length ? admin.app() : admin.initializeApp();
+const db = app.firestore();
+
 export type EngagementKind = 'posting' | 'gifting' | 'fulfillment';
 
 const STREAK_MILESTONES: Record<EngagementKind, number[]> = {
@@ -7,8 +10,6 @@ const STREAK_MILESTONES: Record<EngagementKind, number[]> = {
   gifting: [1, 5, 15],
   fulfillment: [1, 3, 10],
 };
-
-const db = admin.firestore();
 
 type StreakEntry = {
   current: number;
@@ -26,18 +27,28 @@ function getDateKey(date = new Date()): string {
 
 function parseEntry(raw: any): StreakEntry {
   const entry = typeof raw === 'object' && raw ? raw : {};
-  const milestones = typeof entry.milestones === 'object' && entry.milestones
-    ? Object.keys(entry.milestones).reduce<Record<string, string>>((acc, key) => {
-        const value = entry.milestones[key];
-        if (typeof value === 'string') {
-          acc[key] = value;
-        }
-        return acc;
-      }, {})
-    : {};
+  const milestones =
+    typeof entry.milestones === 'object' && entry.milestones
+      ? Object.keys(entry.milestones).reduce<Record<string, string>>(
+          (acc, key) => {
+            const value = entry.milestones[key];
+            if (typeof value === 'string') {
+              acc[key] = value;
+            }
+            return acc;
+          },
+          {},
+        )
+      : {};
   return {
-    current: typeof entry.current === 'number' && entry.current >= 0 ? entry.current : 0,
-    longest: typeof entry.longest === 'number' && entry.longest >= 0 ? entry.longest : 0,
+    current:
+      typeof entry.current === 'number' && entry.current >= 0
+        ? entry.current
+        : 0,
+    longest:
+      typeof entry.longest === 'number' && entry.longest >= 0
+        ? entry.longest
+        : 0,
     lastDate: typeof entry.lastDate === 'string' ? entry.lastDate : null,
     milestones,
   };
@@ -58,12 +69,19 @@ export async function incrementEngagement(
   kind: EngagementKind,
 ): Promise<string[]> {
   if (!userId) return [];
-  const ref = db.collection('users').doc(userId).collection('progress').doc('engagement');
+  const ref = db
+    .collection('users')
+    .doc(userId)
+    .collection('progress')
+    .doc('engagement');
   const today = getDateKey();
   return db.runTransaction(async (tx: any) => {
     const snap = await tx.get(ref);
     const data = snap.exists ? snap.data() : undefined;
-    const rawEntry = data && typeof data === 'object' ? (data as Record<string, unknown>)[kind] : undefined;
+    const rawEntry =
+      data && typeof data === 'object'
+        ? (data as Record<string, unknown>)[kind]
+        : undefined;
     const entry = parseEntry(rawEntry);
     if (entry.lastDate === today) {
       return [];

@@ -11,9 +11,9 @@ describe('shouldShowDailyQuote', () => {
   } as const;
 
   it('returns false when feature flag disabled', () => {
-    expect(
-      shouldShowDailyQuote({ ...base, featureFlagEnabled: false }),
-    ).toBe(false);
+    expect(shouldShowDailyQuote({ ...base, featureFlagEnabled: false })).toBe(
+      false,
+    );
   });
 
   it('returns false when user disabled in settings', () => {
@@ -27,9 +27,9 @@ describe('shouldShowDailyQuote', () => {
   });
 
   it('returns false when already shown today', () => {
-    expect(
-      shouldShowDailyQuote({ ...base, lastShownDate: base.today }),
-    ).toBe(false);
+    expect(shouldShowDailyQuote({ ...base, lastShownDate: base.today })).toBe(
+      false,
+    );
   });
 
   it('returns true on iOS when eligible', () => {
@@ -41,9 +41,7 @@ describe('shouldShowDailyQuote', () => {
   });
 
   it('returns false on web by default (allowOnWeb=false)', () => {
-    expect(
-      shouldShowDailyQuote({ ...base, platform: 'web' }),
-    ).toBe(false);
+    expect(shouldShowDailyQuote({ ...base, platform: 'web' })).toBe(false);
   });
 
   it('returns true on web when allowOnWeb=true', () => {
@@ -53,9 +51,8 @@ describe('shouldShowDailyQuote', () => {
   });
 
   it('returns true after date rollover', () => {
-    expect(
-      shouldShowDailyQuote({ ...base, lastShownDate: '2024-12-31' }),
-    ).toBe(true);
+    expect(shouldShowDailyQuote({ ...base, lastShownDate: '2024-12-31' })).toBe(
+      true,
+    );
   });
 });
-

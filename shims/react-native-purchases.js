@@ -26,4 +26,3 @@ const Purchases = {
 
 module.exports = Purchases;
 module.exports.default = Purchases;
-

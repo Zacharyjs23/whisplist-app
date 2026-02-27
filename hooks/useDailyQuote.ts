@@ -23,7 +23,8 @@ export default function useDailyQuote() {
         const enabled = (await AsyncStorage.getItem('dailyQuote')) === 'true';
         // Only show once per calendar day; delegate decision to pure helper
         const today = getLocalDateKey();
-        const lastShown = (await AsyncStorage.getItem('dailyQuote.lastShown')) || '';
+        const lastShown =
+          (await AsyncStorage.getItem('dailyQuote.lastShown')) || '';
         const shouldShow = shouldShowDailyQuote({
           featureFlagEnabled: DAILY_QUOTE_ENABLED,
           userEnabled: enabled,
@@ -35,19 +36,23 @@ export default function useDailyQuote() {
         });
         if (!shouldShow) return;
 
-        const style = (await AsyncStorage.getItem('dailyQuote.style')) || 'uplifting';
-        const byStyle = (t(`dailyQuote.quotesByStyle.${style}`, {
-          returnObjects: true,
-        }) as string[]) || [];
-        const fallbackQuotes = (t('dailyQuote.quotes', {
-          returnObjects: true,
-        }) as string[]) || [];
+        const style =
+          (await AsyncStorage.getItem('dailyQuote.style')) || 'uplifting';
+        const byStyle =
+          (t(`dailyQuote.quotesByStyle.${style}`, {
+            returnObjects: true,
+          }) as string[]) || [];
+        const fallbackQuotes =
+          (t('dailyQuote.quotes', {
+            returnObjects: true,
+          }) as string[]) || [];
         const curated = byStyle.length ? byStyle : fallbackQuotes;
 
         // Hybrid selection: prefer generated for variety; show curated sometimes
         let q: string | null = null;
         let source: 'generated' | 'curated' | 'fallback' = 'generated';
-        const preferGenerated = (curated?.length || 0) < 500 || Math.random() < 0.8;
+        const preferGenerated =
+          (curated?.length || 0) < 500 || Math.random() < 0.8;
         if (preferGenerated) {
           q = generateQuote(t as any);
           source = q ? 'generated' : 'fallback';

@@ -4,13 +4,19 @@ import { Stack, useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useTranslation } from '@/contexts/I18nContext';
 
-const HeaderTabs: React.FC<{ active: 'general' | 'membership' }> = ({ active }) => {
+const HeaderTabs: React.FC<{ active: 'general' | 'membership' }> = ({
+  active,
+}) => {
   const router = useRouter();
   const { theme } = useTheme();
   const { t } = useTranslation();
 
   const goTo = React.useCallback(
-    (path: '/(tabs)/profile/settings' | '/(tabs)/profile/settings/subscriptions') => {
+    (
+      path:
+        | '/(tabs)/profile/settings'
+        | '/(tabs)/profile/settings/subscriptions',
+    ) => {
       router.replace(path);
     },
     [router],

@@ -10,7 +10,9 @@ const DEFAULT: WishMeta = {
   giftTotal: 0,
 };
 
-export function useWishMeta(wish: Pick<Wish, 'id' | 'userId'> | null | undefined) {
+export function useWishMeta(
+  wish: Pick<Wish, 'id' | 'userId'> | null | undefined,
+) {
   const [meta, setMeta] = React.useState<WishMeta>(DEFAULT);
   const [loading, setLoading] = React.useState<boolean>(!!wish?.id);
   const wishId = wish?.id || null;

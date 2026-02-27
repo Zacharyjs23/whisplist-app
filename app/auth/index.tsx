@@ -167,7 +167,11 @@ export default function Page() {
 
       <View style={{ flexDirection: 'row', marginTop: 10 }}>
         <Link href="/terms" asChild>
-          <Text style={[styles.linkText, { color: theme.tint, marginRight: 16 }]}>Terms</Text>
+          <Text
+            style={[styles.linkText, { color: theme.tint, marginRight: 16 }]}
+          >
+            Terms
+          </Text>
         </Link>
         <Link href="/privacy" asChild>
           <Text style={[styles.linkText, { color: theme.tint }]}>Privacy</Text>

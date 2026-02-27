@@ -118,6 +118,27 @@ service cloud.firestore {
     }
 
 
+    function validRecentWishlistDoc(data) {
+      return data is map
+        && data.keys().hasOnly(['title','coverUri','updatedAt'])
+        && ('updatedAt' in data && data.updatedAt is timestamp)
+        && (!('title' in data) || data.title == null || isShortString(data.title, 140))
+        && (!('coverUri' in data) || data.coverUri == null || data.coverUri is string);
+    }
+
+
+    function validWishStage(stage) {
+      return stage is string
+        && ['seed','shared','nurturing','celebrating'].hasAny([stage]);
+    }
+
+
+    function validCircleName(name) {
+      return name == null
+        || (name is string && name.size() >= 1 && name.size() <= 100);
+    }
+
+
 
     function validCommentParent(wishId) {
       return !('parentId' in request.resource.data)
@@ -126,6 +147,89 @@ service cloud.firestore {
           && request.resource.data.parentId.size() >= 1
           && exists(/databases/$(database)/documents/wishes/$(wishId)/comments/$(request.resource.data.parentId))
         );
+    }
+
+    function validAnonHash(hash) {
+      return hash is string && hash.size() >= 8 && hash.size() <= 64;
+    }
+
+    function validFavoriteNote(note) {
+      return note == null || (note is string && note.size() <= 90);
+    }
+
+    function favoriteTokenPath(wishId, anonHash) {
+      return /databases/$(database)/documents/wishFavoriteTokens/$(wishId + ':' + anonHash);
+    }
+
+    function hasValidFavoriteToken(wishId, anonHash) {
+      let tokenPath = favoriteTokenPath(wishId, anonHash);
+      let token = get(tokenPath);
+      return exists(tokenPath)
+        && token.data.permitExpiresAt is timestamp
+        && token.data.cooldownUntil is timestamp
+        && request.time <= token.data.permitExpiresAt
+        && request.time <= token.data.cooldownUntil;
+    }
+
+    function validWishStageMetadataUpdate() {
+      let diff = request.resource.data.diff(resource.data);
+      let allowed = ['stage', 'stageUpdatedAt', 'accountabilityCircleId', 'accountabilityCircleName'];
+      let stageChanged = diff.changedKeys().hasAny(['stage']) || diff.addedKeys().hasAny(['stage']);
+      let stageTimestampChanged =
+        diff.changedKeys().hasAny(['stageUpdatedAt']) || diff.addedKeys().hasAny(['stageUpdatedAt']);
+      let circleChanged =
+        diff.changedKeys().hasAny(['accountabilityCircleId', 'accountabilityCircleName'])
+        || diff.addedKeys().hasAny(['accountabilityCircleId', 'accountabilityCircleName']);
+
+      return diff.removedKeys().hasOnly([])
+        && diff.addedKeys().hasOnly(allowed)
+        && diff.changedKeys().hasOnly(allowed)
+        && (stageChanged || stageTimestampChanged || circleChanged)
+        && (!('stage' in request.resource.data) || validWishStage(request.resource.data.stage))
+        && (!('accountabilityCircleId' in request.resource.data)
+          || request.resource.data.accountabilityCircleId == null
+          || isShortString(request.resource.data.accountabilityCircleId, 120))
+        && (!('accountabilityCircleName' in request.resource.data)
+          || validCircleName(request.resource.data.accountabilityCircleName))
+        && (!stageChanged
+          || (stageTimestampChanged
+            && ('stageUpdatedAt' in request.resource.data)
+            && request.resource.data.stageUpdatedAt == request.time))
+        && (!stageTimestampChanged
+          || (stageChanged
+            && ('stageUpdatedAt' in request.resource.data)
+            && request.resource.data.stageUpdatedAt == request.time));
+    }
+
+    function giftReadable(data) {
+      return signedIn()
+        && (
+          ('supporterId' in data && data.supporterId is string && request.auth.uid == data.supporterId)
+          || ('recipientId' in data && data.recipientId is string && request.auth.uid == data.recipientId)
+          || ('wishId' in data && data.wishId is string && wishOwner(data.wishId))
+        );
+    }
+
+    function validPendingGiftCreate(data) {
+      return data is map
+        && data.keys().hasOnly([
+          'wishId','amount','status','supporterId','recipientId','variant','tokenId',
+          'note','paymentTarget','platform','createdAt','expiresAt','verificationStatus','returnSeenAt'
+        ])
+        && ('wishId' in data && data.wishId is string && data.wishId.size() >= 1)
+        && ('tokenId' in data && data.tokenId is string && data.tokenId.size() >= 8)
+        && ('status' in data && data.status == 'initiated')
+        && (!('verificationStatus' in data) || data.verificationStatus == 'pending')
+        && ('amount' in data && data.amount is number && data.amount > 0 && data.amount <= 10000)
+        && (!('supporterId' in data) || data.supporterId is string)
+        && (!('recipientId' in data) || data.recipientId is string)
+        && (!('variant' in data) || data.variant is string)
+        && (!('note' in data) || data.note is string)
+        && (!('paymentTarget' in data) || data.paymentTarget is string)
+        && (!('platform' in data) || data.platform is string)
+        && (!('createdAt' in data) || data.createdAt == request.time)
+        && (!('expiresAt' in data) || data.expiresAt is timestamp)
+        && (!('returnSeenAt' in data) || data.returnSeenAt is timestamp);
     }
 
     // Direct message threads
@@ -169,6 +273,35 @@ service cloud.firestore {
           && hasOnlyAllowedKeys(request.resource.data, ['typing','updatedAt'])
           && (!('typing' in request.resource.data) || request.resource.data.typing is bool);
       }
+    }
+
+    match /wishFavorites/{wishId} {
+      allow read: if true;
+      match /entries/{entryId} {
+        allow read: if true;
+        allow create: if
+          !exists(/databases/$(database)/documents/wishFavorites/$(wishId)/entries/$(entryId))
+          && validAnonHash(request.resource.data.anonHash)
+          && entryId == request.resource.data.anonHash
+          && validFavoriteNote(request.resource.data.note)
+          && hasValidFavoriteToken(wishId, request.resource.data.anonHash);
+        allow update: if
+          request.resource.data.anonHash == resource.data.anonHash
+          && entryId == resource.data.anonHash
+          && validFavoriteNote(request.resource.data.note)
+          && validFavoriteNote(resource.data.note);
+        allow delete: if resource.data.anonHash == entryId;
+      }
+    }
+
+    match /wishFavoriteTokens/{tokenId} {
+      allow read: if false;
+      allow write: if false;
+    }
+
+    match /wishStats/{wishId} {
+      allow read: if true;
+      allow write: if false;
     }
 
     function wishOwner(wishId) {
@@ -226,9 +359,23 @@ service cloud.firestore {
         allow read, write: if request.auth != null && request.auth.uid == uid;
       }
 
+      match /recentWishlists/{listId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow create, update: if request.auth != null
+          && request.auth.uid == uid
+          && validRecentWishlistDoc(request.resource.data);
+        allow delete: if request.auth != null && request.auth.uid == uid;
+      }
+
       // Billing and subscription documents for the user
       match /billing/{docId} {
         allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      match /checkoutTokens/{tokenId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow delete: if request.auth != null && request.auth.uid == uid;
+        allow create, update: if false;
       }
 
       match /progress/{docId} {
@@ -247,8 +394,8 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid
         && hasOnlyAllowedKeys(request.resource.data, [
           'text','category','type','likes','userId','displayName','photoURL','isAnonymous','boostedUntil','boosted',
-          'audioUrl','imageUrl','giftLink','giftType','giftLabel','fulfillmentLink','fulfilledAt','fundingGoal','fundingCurrency','fundingPresets','fundingRaised','fundingSupporters','isPoll','optionA','optionB',
-          'votesA','votesB','mood','reactions','commentCount','expiresAt','timestamp','active'
+          'audioUrl','imageUrl','videoUrl','giftLink','giftType','giftLabel','fulfillmentLink','fulfilledAt','fundingGoal','fundingCurrency','fundingPresets','fundingRaised','fundingSupporters','splitPayEnabled','targetAmount','fundedAmount','deadline','status','isPoll','optionA','optionB',
+          'votesA','votesB','mood','reactions','commentCount','expiresAt','timestamp','active','detectedMood','voiceTranscription','aiRefinedText'
         ])
         && (!('likes' in request.resource.data) || request.resource.data.likes == 0)
         && (!('votesA' in request.resource.data) || request.resource.data.votesA == 0)
@@ -266,6 +413,11 @@ service cloud.firestore {
             && request.resource.data.fundingPresets.size() <= 6))
         && (!('fundingRaised' in request.resource.data) || request.resource.data.fundingRaised == 0)
         && (!('fundingSupporters' in request.resource.data) || request.resource.data.fundingSupporters == 0)
+        && (!('splitPayEnabled' in request.resource.data) || (request.resource.data.splitPayEnabled is bool && request.resource.data.splitPayEnabled == false))
+        && (!('targetAmount' in request.resource.data) || (request.resource.data.targetAmount is number && request.resource.data.targetAmount >= 0))
+        && (!('fundedAmount' in request.resource.data) || request.resource.data.fundedAmount == 0)
+        && (!('deadline' in request.resource.data) || request.resource.data.deadline == null || request.resource.data.deadline is timestamp)
+        && (!('status' in request.resource.data) || request.resource.data.status == 'open')
         && (!('text' in request.resource.data) || isShortString(request.resource.data.text, 280))
         && (!('category' in request.resource.data) || isShortString(request.resource.data.category, 40))
         && (!('type' in request.resource.data) || isShortString(request.resource.data.type, 30))
@@ -273,21 +425,45 @@ service cloud.firestore {
         && (!('photoURL' in request.resource.data) || isShortString(request.resource.data.photoURL, 2000))
         && (!('audioUrl' in request.resource.data) || isShortString(request.resource.data.audioUrl, 2000))
         && (!('imageUrl' in request.resource.data) || isShortString(request.resource.data.imageUrl, 2000))
+        && (!('videoUrl' in request.resource.data) || isShortString(request.resource.data.videoUrl, 2000))
         && (!('giftLink' in request.resource.data) || isShortString(request.resource.data.giftLink, 2000))
         && (!('giftType' in request.resource.data) || isShortString(request.resource.data.giftType, 20))
         && (!('giftLabel' in request.resource.data) || isShortString(request.resource.data.giftLabel, 50))
         && (!('fulfillmentLink' in request.resource.data) || isShortString(request.resource.data.fulfillmentLink, 2000))
         && (!('mood' in request.resource.data) || isShortString(request.resource.data.mood, 10))
         && (!('optionA' in request.resource.data) || isShortString(request.resource.data.optionA, 100))
-        && (!('optionB' in request.resource.data) || isShortString(request.resource.data.optionB, 100));
+        && (!('optionB' in request.resource.data) || isShortString(request.resource.data.optionB, 100))
+        && (!('detectedMood' in request.resource.data) || isShortString(request.resource.data.detectedMood, 30))
+        && (!('voiceTranscription' in request.resource.data) || isShortString(request.resource.data.voiceTranscription, 4000))
+        && (!('aiRefinedText' in request.resource.data) || isShortString(request.resource.data.aiRefinedText, 400));
       allow update: if (
+          signedIn()
+          && request.auth.uid == resource.data.userId
+          && validWishStageMetadataUpdate()
+        )
+        || (
+          signedIn()
+          && request.writeFields.hasOnly(['commentCount'])
+          && commentCountWithinBounds(resource.data, request.resource.data)
+        )
+        || (
+          signedIn()
+          && request.resource.data.diff(resource.data).addedKeys().hasOnly([])
+          && request.resource.data.diff(resource.data).removedKeys().hasOnly([])
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly(['reactions'])
+          && (!('reactions' in resource.data) || isValidReactionMap(resource.data.reactions))
+          && ('reactions' in request.resource.data)
+          && isValidReactionMap(request.resource.data.reactions)
+          && reactionDiffWithinBounds(resource.data.reactions, request.resource.data.reactions)
+        )
+        || (
           signedIn()
           && request.auth.uid == resource.data.userId
           && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
           && hasOnlyAllowedKeys(request.resource.data, [
             'text','category','type','likes','userId','displayName','photoURL','isAnonymous','boostedUntil','boosted',
-            'audioUrl','imageUrl','giftLink','giftType','giftLabel','fulfillmentLink','fulfilledAt','fundingGoal','fundingCurrency','fundingPresets','fundingRaised','fundingSupporters','isPoll','optionA','optionB',
-            'votesA','votesB','mood','reactions','commentCount','expiresAt','timestamp','active'
+            'audioUrl','imageUrl','videoUrl','giftLink','giftType','giftLabel','fulfillmentLink','fulfilledAt','fundingGoal','fundingCurrency','fundingPresets','fundingRaised','fundingSupporters','splitPayEnabled','targetAmount','fundedAmount','deadline','status','isPoll','optionA','optionB',
+            'votesA','votesB','mood','reactions','commentCount','expiresAt','timestamp','active','detectedMood','voiceTranscription','aiRefinedText'
           ])
           && (!('likes' in request.resource.data) || request.resource.data.likes == resource.data.likes)
           && (!('votesA' in request.resource.data) || request.resource.data.votesA == resource.data.votesA)
@@ -315,6 +491,11 @@ service cloud.firestore {
               && request.resource.data.fundingPresets.size() <= 6))
           && (!('fundingRaised' in request.resource.data) || request.resource.data.fundingRaised == resource.data.fundingRaised)
           && (!('fundingSupporters' in request.resource.data) || request.resource.data.fundingSupporters == resource.data.fundingSupporters)
+          && (!('splitPayEnabled' in request.resource.data) || request.resource.data.splitPayEnabled is bool)
+          && (!('targetAmount' in request.resource.data) || (request.resource.data.targetAmount is number && request.resource.data.targetAmount >= 0))
+          && (!('fundedAmount' in request.resource.data) || request.resource.data.fundedAmount == resource.data.fundedAmount)
+          && (!('deadline' in request.resource.data) || request.resource.data.deadline == null || request.resource.data.deadline is timestamp)
+          && (!('status' in request.resource.data) || request.resource.data.status == resource.data.status)
           && (!('text' in request.resource.data) || isShortString(request.resource.data.text, 280))
           && (!('category' in request.resource.data) || isShortString(request.resource.data.category, 40))
           && (!('type' in request.resource.data) || isShortString(request.resource.data.type, 30))
@@ -322,6 +503,7 @@ service cloud.firestore {
           && (!('photoURL' in request.resource.data) || isShortString(request.resource.data.photoURL, 2000))
           && (!('audioUrl' in request.resource.data) || isShortString(request.resource.data.audioUrl, 2000))
           && (!('imageUrl' in request.resource.data) || isShortString(request.resource.data.imageUrl, 2000))
+          && (!('videoUrl' in request.resource.data) || isShortString(request.resource.data.videoUrl, 2000))
           && (!('giftLink' in request.resource.data) || isShortString(request.resource.data.giftLink, 2000))
           && (!('giftType' in request.resource.data) || isShortString(request.resource.data.giftType, 20))
           && (!('giftLabel' in request.resource.data) || isShortString(request.resource.data.giftLabel, 50))
@@ -329,23 +511,11 @@ service cloud.firestore {
           && (!('mood' in request.resource.data) || isShortString(request.resource.data.mood, 10))
           && (!('optionA' in request.resource.data) || isShortString(request.resource.data.optionA, 100))
           && (!('optionB' in request.resource.data) || isShortString(request.resource.data.optionB, 100))
-        )
-        || (
-          signedIn()
-          && request.resource.data.diff(resource.data).addedKeys().hasOnly([])
-          && request.resource.data.diff(resource.data).removedKeys().hasOnly([])
-          && request.resource.data.diff(resource.data).changedKeys().hasOnly(['reactions'])
-          && (!('reactions' in resource.data) || isValidReactionMap(resource.data.reactions))
-          && ('reactions' in request.resource.data)
-          && isValidReactionMap(request.resource.data.reactions)
-          && reactionDiffWithinBounds(resource.data.reactions, request.resource.data.reactions)
-        )
-        || (
-          signedIn()
-          && request.writeFields.hasOnly(['commentCount'])
-          && commentCountWithinBounds(resource.data, request.resource.data)
+          && (!('detectedMood' in request.resource.data) || isShortString(request.resource.data.detectedMood, 30))
+          && (!('voiceTranscription' in request.resource.data) || isShortString(request.resource.data.voiceTranscription, 4000))
+          && (!('aiRefinedText' in request.resource.data) || isShortString(request.resource.data.aiRefinedText, 400))
         );
-      allow delete: if wishOwner(wishId);
+      allow delete: if signedIn() && request.auth.uid == resource.data.userId;
 
       match /comments/{commentId} {
         // Allow anyone to read comments
@@ -371,14 +541,31 @@ service cloud.firestore {
 
       match /gifts/{giftId} {
         allow read: if signedIn()
-          && (wishOwner(wishId)
-            || ('recipientId' in resource.data
-              && request.auth.uid == resource.data.recipientId));
-        allow create: if wishOwner(wishId) || (signedIn() && request.auth.uid == request.resource.data.recipientId);
-        allow update, delete: if wishOwner(wishId)
-          || (signedIn()
-            && ('recipientId' in resource.data)
-            && request.auth.uid == resource.data.recipientId);
+          && (
+            wishOwner(wishId)
+            || ('recipientId' in resource.data && resource.data.recipientId is string && request.auth.uid == resource.data.recipientId)
+            || ('supporterId' in resource.data && resource.data.supporterId is string && request.auth.uid == resource.data.supporterId)
+          );
+        allow write: if false;
+      }
+
+      match /pledges/{pledgeId} {
+        allow read: if signedIn()
+          && (
+            wishOwner(wishId)
+            || ('uid' in resource.data && resource.data.uid is string && request.auth.uid == resource.data.uid)
+          );
+        allow write: if false;
+      }
+
+      match /giftInvites/{inviteId} {
+        allow read: if signedIn()
+          && (
+            wishOwner(wishId)
+            || ('inviterId' in resource.data && resource.data.inviterId is string && request.auth.uid == resource.data.inviterId)
+            || ('inviteeId' in resource.data && resource.data.inviteeId is string && request.auth.uid == resource.data.inviteeId)
+          );
+        allow write: if false;
       }
 
       // Reactions stored under each wish
@@ -390,15 +577,33 @@ service cloud.firestore {
         allow create: if signedIn();
         allow read: if false;
       }
+
+      match /related/{relatedId} {
+        allow read: if true;
+        allow write: if false;
+      }
+
+      match /relatedMeta/{metaId} {
+        allow read: if true;
+        allow write: if false;
+      }
     }
 
-    // Gifts are also stored under /gifts/{wishId}/gifts/{giftId} by backend functions
-    match /gifts/{wishId} {
+    // Top-level gifts collection and legacy nested gifts
+    match /gifts/{giftDocId} {
+      allow read: if resource.data.keys().hasAny(['wishId','supporterId','recipientId']) && giftReadable(resource.data);
+      allow create: if signedIn()
+        && validPendingGiftCreate(request.resource.data)
+        && (!('supporterId' in request.resource.data) || request.resource.data.supporterId == request.auth.uid);
+      allow update, delete: if false;
+
       match /gifts/{giftId} {
         allow read: if signedIn()
-          && (wishOwner(wishId)
-            || ('recipientId' in resource.data
-              && request.auth.uid == resource.data.recipientId));
+          && (
+            ('recipientId' in resource.data && resource.data.recipientId is string && request.auth.uid == resource.data.recipientId)
+            || ('supporterId' in resource.data && resource.data.supporterId is string && request.auth.uid == resource.data.supporterId)
+            || wishOwner(giftDocId)
+          );
         // Client writes are restricted; backend functions write with admin privileges
         allow write: if false;
       }
@@ -420,9 +625,7 @@ service cloud.firestore {
     // Allows a recipient to read any gift document addressed to them,
     // regardless of whether it's under /wishes/{wishId}/gifts or /gifts/{wishId}/gifts
     match /{path=**}/gifts/{giftId} {
-      allow read: if signedIn()
-        && ('recipientId' in resource.data)
-        && request.auth.uid == resource.data.recipientId;
+      allow read: if giftReadable(resource.data);
     }
 
     // Allow reading reactions stored at /reactions/{wishId}/users/{userId}
@@ -471,6 +674,15 @@ service cloud.firestore {
         && ('timestamp' in request.resource.data)
         && isShortString(request.resource.data.text, 2000);
       allow read, update, delete: if false;
+    }
+
+    match /expressCheckoutRequests/{requestId} {
+      allow read: if signedIn()
+        && (
+          (resource.data.buyerId is string && resource.data.buyerId == request.auth.uid)
+          || (resource.data.curatorId is string && resource.data.curatorId == request.auth.uid)
+        );
+      allow write: if false;
     }
 
     match /{document=**} {

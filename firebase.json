@@ -8,5 +8,8 @@
   },
   "functions": {
     "source": "functions"
+  },
+  "remoteconfig": {
+    "template": "remoteconfig.template.json"
   }
 }

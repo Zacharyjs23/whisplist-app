@@ -1,4 +1,8 @@
-import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
+import {
+  initializeTestEnvironment,
+  assertFails,
+  assertSucceeds,
+} from '@firebase/rules-unit-testing';
 import fs from 'fs';
 
 const EMU = process.env.FIRESTORE_EMULATOR_HOST;
@@ -11,8 +15,12 @@ describeMaybe('firestore rules - votes/reports/feedback', () => {
     const [host, portStr] = (EMU || '').split(':');
     const port = Number(portStr) || 8080;
     testEnv = await initializeTestEnvironment({
-      projectId: 'whisplist-test',
-      firestore: { host, port, rules: fs.readFileSync('firestore.rules', 'utf8') },
+      projectId: 'whisplist-test-votes',
+      firestore: {
+        host,
+        port,
+        rules: fs.readFileSync('firestore.rules', 'utf8'),
+      },
     });
   });
 
@@ -38,7 +46,9 @@ describeMaybe('firestore rules - votes/reports/feedback', () => {
       await assertFails(other.doc('votes/w1/users/u1').get());
       // Cannot write another user's doc
       await assertFails(
-        db.doc('votes/w1/users/other').set({ option: 'A', timestamp: Date.now() }),
+        db
+          .doc('votes/w1/users/other')
+          .set({ option: 'A', timestamp: Date.now() }),
       );
     });
 
@@ -60,7 +70,12 @@ describeMaybe('firestore rules - votes/reports/feedback', () => {
       const db = testEnv.authenticatedContext('reporter').firestore();
       const ref = db.doc('reports/r1');
       await assertSucceeds(
-        ref.set({ itemId: 'w1', type: 'comment', reason: 'abuse', timestamp: Date.now() }),
+        ref.set({
+          itemId: 'w1',
+          type: 'comment',
+          reason: 'abuse',
+          timestamp: Date.now(),
+        }),
       );
       await assertFails(ref.get());
       await assertFails(ref.update({ reason: 'edited' }));
@@ -70,7 +85,15 @@ describeMaybe('firestore rules - votes/reports/feedback', () => {
     test('reject extra keys', async () => {
       const db = testEnv.authenticatedContext('reporter2').firestore();
       await assertFails(
-        db.doc('reports/r2').set({ itemId: 'w2', type: 'wish', reason: 'spam', timestamp: Date.now(), extra: true }),
+        db
+          .doc('reports/r2')
+          .set({
+            itemId: 'w2',
+            type: 'wish',
+            reason: 'spam',
+            timestamp: Date.now(),
+            extra: true,
+          }),
       );
     });
   });
@@ -79,7 +102,9 @@ describeMaybe('firestore rules - votes/reports/feedback', () => {
     test('signed-in can create; reads/updates/deletes denied', async () => {
       const db = testEnv.authenticatedContext('fb').firestore();
       const ref = db.doc('feedback/f1');
-      await assertSucceeds(ref.set({ text: 'Great app!', timestamp: Date.now() }));
+      await assertSucceeds(
+        ref.set({ text: 'Great app!', timestamp: Date.now() }),
+      );
       await assertFails(ref.get());
       await assertFails(ref.update({ text: 'Edited' }));
       await assertFails(ref.delete());
@@ -88,9 +113,10 @@ describeMaybe('firestore rules - votes/reports/feedback', () => {
     test('reject extra keys', async () => {
       const db = testEnv.authenticatedContext('fb2').firestore();
       await assertFails(
-        db.doc('feedback/f2').set({ text: 'x', timestamp: Date.now(), extra: true }),
+        db
+          .doc('feedback/f2')
+          .set({ text: 'x', timestamp: Date.now(), extra: true }),
       );
     });
   });
 });
-

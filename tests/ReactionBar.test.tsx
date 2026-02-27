@@ -50,6 +50,21 @@ describe('ReactionBar', () => {
     expect(onToggleSave).toHaveBeenCalled();
   });
 
+  it('hides bookmark when hideSaveButton is true', () => {
+    const { queryByTestId } = render(
+      <ReactionBar
+        counts={counts}
+        userReaction={null}
+        onReact={jest.fn()}
+        onToggleSave={jest.fn()}
+        isSaved={false}
+        hideSaveButton
+      />,
+    );
+
+    expect(queryByTestId('save-button')).toBeNull();
+  });
+
   it('highlights selected reaction', () => {
     const { getByTestId } = render(
       <ReactionBar

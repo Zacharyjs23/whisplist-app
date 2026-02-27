@@ -4,11 +4,30 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./*"
+      "@/*": ["./*"],
+      "react-native-purchases": ["./shims/react-native-purchases"],
+      "firebase-functions": [
+        "./functions/node_modules/firebase-functions/lib/v2/index.js"
       ],
-      "react-native-purchases": [
-        "./shims/react-native-purchases"
+      "firebase-functions/v1": [
+        "./functions/node_modules/firebase-functions/lib/v1/index"
+      ],
+      "firebase-functions/v1/https": [
+        "./functions/node_modules/firebase-functions/lib/v1/providers/https"
+      ],
+      "firebase-functions/v2/https": [
+        "./functions/node_modules/firebase-functions/lib/v2/providers/https"
+      ],
+      "firebase-functions/params": [
+        "./functions/node_modules/firebase-functions/lib/params/index.js"
+      ],
+      "firebase-admin": ["./functions/node_modules/firebase-admin/lib/index"],
+      "firebase-admin/*": ["./functions/node_modules/firebase-admin/lib/*"],
+      "firebase-admin/firestore": [
+        "./functions/node_modules/firebase-admin/lib/firestore"
+      ],
+      "stripe": [
+        "./functions/node_modules/stripe/cjs/stripe.cjs.node.js"
       ]
     },
     "moduleResolution": "bundler",
@@ -16,13 +35,6 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "**/*.d.ts"
-  ],
-  "exclude": [
-    "functions",
-    "functions/**/*"
-  ]
+  "include": ["**/*.ts", "**/*.tsx", "**/*.d.ts"],
+  "exclude": ["functions", "functions/**/*"]
 }

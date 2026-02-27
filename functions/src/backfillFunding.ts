@@ -12,7 +12,11 @@ async function main() {
   const stats = new Map<string, { raised: number; supporters: number }>();
   const seen = new Map<string, Set<string>>();
 
-  const includeGift = (wishId: string, giftId: string, data: firestore.DocumentData) => {
+  const includeGift = (
+    wishId: string,
+    giftId: string,
+    data: firestore.DocumentData,
+  ) => {
     if (!wishId || !giftId) return;
     const wishSeen = seen.get(wishId) ?? new Set<string>();
     if (wishSeen.has(giftId)) {
@@ -31,7 +35,10 @@ async function main() {
     } else if (typeof amountRaw === 'string') {
       const parsed = Number(amountRaw);
       amount = Number.isFinite(parsed) ? parsed : 0;
-    } else if (typeof data?.amount_total === 'number' && Number.isFinite(data.amount_total)) {
+    } else if (
+      typeof data?.amount_total === 'number' &&
+      Number.isFinite(data.amount_total)
+    ) {
       amount = Math.round((data.amount_total / 100) * 100) / 100;
     }
 
@@ -75,7 +82,9 @@ async function main() {
 
   if (dryRun) {
     updates.slice(0, 20).forEach((u) => {
-      console.log(`[DRY RUN] ${u.wishId}: raised=${u.raised}, supporters=${u.supporters}`);
+      console.log(
+        `[DRY RUN] ${u.wishId}: raised=${u.raised}, supporters=${u.supporters}`,
+      );
     });
     if (updates.length > 20) {
       console.log(`[DRY RUN] ...and ${updates.length - 20} more wishes.`);
@@ -87,7 +96,11 @@ async function main() {
   let processed = 0;
   while (processed < updates.length) {
     const batch = db.batch();
-    for (let i = processed; i < Math.min(processed + BATCH_LIMIT, updates.length); i += 1) {
+    for (
+      let i = processed;
+      i < Math.min(processed + BATCH_LIMIT, updates.length);
+      i += 1
+    ) {
       const { wishId, raised, supporters } = updates[i]!;
       const ref = db.collection('wishes').doc(wishId);
       batch.set(
@@ -101,7 +114,9 @@ async function main() {
     }
     await batch.commit();
     processed += BATCH_LIMIT;
-    console.log(`Committed ${Math.min(processed, updates.length)} of ${updates.length} wish updates.`);
+    console.log(
+      `Committed ${Math.min(processed, updates.length)} of ${updates.length} wish updates.`,
+    );
   }
 
   console.log('Backfill complete.');

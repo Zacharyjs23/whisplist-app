@@ -19,18 +19,19 @@ import { getFunctions } from 'firebase/functions';
 import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
 import { Platform, ToastAndroid, Alert } from 'react-native';
 import * as logger from '@/shared/logger';
+import { env } from './env';
 
 const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY!,
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN!,
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID!,
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET!,
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID!,
-  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID!,
+  apiKey: env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: env.EXPO_PUBLIC_FIREBASE_APP_ID,
+  measurementId: env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 if (__DEV__) {
   setLogLevel('debug');
@@ -74,7 +75,7 @@ export const db: Firestore = (() => {
 })();
 export const storage = getStorage(app);
 export const functions = (() => {
-  const region = process.env.EXPO_PUBLIC_FIREBASE_FUNCTIONS_REGION;
+  const region = env.EXPO_PUBLIC_FIREBASE_FUNCTIONS_REGION;
   try {
     return region ? getFunctions(app, region) : getFunctions(app);
   } catch (error) {
@@ -87,7 +88,7 @@ export const functions = (() => {
 })();
 
 let analytics: Analytics | undefined;
-if (process.env.EXPO_PUBLIC_ENV === 'production') {
+if (env.EXPO_PUBLIC_ENV === 'production') {
   isSupported()
     .then((supported) => {
       if (supported) {

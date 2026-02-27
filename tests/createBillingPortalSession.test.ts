@@ -1,15 +1,17 @@
 jest.mock(
-  'firebase-functions',
+  'firebase-functions/v1',
   () => ({
     runWith: jest.fn().mockReturnValue({
       https: { onRequest: (handler: any) => handler },
     }),
+    logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn() },
   }),
   { virtual: true },
 );
 
 const mockStripeCustomersCreate = jest.fn();
 const mockStripePortalCreate = jest.fn();
+const mockVerifyIdToken = jest.fn();
 jest.mock(
   'stripe',
   () =>
@@ -48,6 +50,7 @@ jest.mock(
         return { doc: () => ({}) } as any;
       },
     }),
+    auth: () => ({ verifyIdToken: mockVerifyIdToken }),
   }),
   { virtual: true },
 );
@@ -61,6 +64,7 @@ import { createBillingPortalSession } from '../functions/src/createBillingPortal
 describe('createBillingPortalSession', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockVerifyIdToken.mockResolvedValue({ uid: 'u1' });
   });
 
   it('creates a billing portal session and returns url', async () => {
@@ -70,12 +74,19 @@ describe('createBillingPortalSession', () => {
 
     const req: any = {
       method: 'POST',
+      get: (header: string) =>
+        header === 'Authorization' ? 'Bearer token' : undefined,
       body: {
         userId: 'u1',
-        returnUrl: 'https://app/link',
+        returnUrl: 'https://whisplist.app/link',
       },
     };
-    const res = { json: jest.fn(), status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+      set: jest.fn(),
+    } as any;
     await createBillingPortalSession(req, res);
     expect(mockStripeCustomersCreate).toHaveBeenCalled();
     expect(mockStripePortalCreate).toHaveBeenCalled();
@@ -83,10 +94,19 @@ describe('createBillingPortalSession', () => {
   });
 
   it('returns 400 on missing parameters', async () => {
-    const req: any = { method: 'POST', body: { userId: 'u1' } };
-    const res = { json: jest.fn(), status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
+    const req: any = {
+      method: 'POST',
+      get: (header: string) =>
+        header === 'Authorization' ? 'Bearer token' : undefined,
+      body: { userId: 'u1' },
+    };
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+      set: jest.fn(),
+    } as any;
     await createBillingPortalSession(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
   });
 });
-

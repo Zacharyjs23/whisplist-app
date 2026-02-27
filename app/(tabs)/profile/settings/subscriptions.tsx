@@ -1,5 +1,13 @@
 import * as React from 'react';
-import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useAuthSession } from '@/contexts/AuthSessionContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useTranslation } from '@/contexts/I18nContext';
@@ -56,7 +64,8 @@ export default function SubscriptionsPage() {
   const { theme } = useTheme();
   const { t } = useTranslation();
   const tForPlans = React.useCallback(
-    (key: string, defaultText?: string) => t(key, { defaultValue: defaultText }),
+    (key: string, defaultText?: string) =>
+      t(key, { defaultValue: defaultText }),
     [t],
   );
 
@@ -103,7 +112,10 @@ export default function SubscriptionsPage() {
     () => PLANS.some((p) => !!p.priceId || !!p.iosProductId),
     [],
   );
-  const hasStripePrice = React.useMemo(() => PLANS.some((p) => !!p.priceId), []);
+  const hasStripePrice = React.useMemo(
+    () => PLANS.some((p) => !!p.priceId),
+    [],
+  );
   const planBenefits = React.useMemo<Record<PlanKey, string[]>>(
     () => ({
       supporter_monthly: resolvePlanBenefits(tForPlans, 'supporter_monthly'),
@@ -138,12 +150,16 @@ export default function SubscriptionsPage() {
   const iosPlansWithBenefits = React.useMemo(() => {
     if (!iosPlans || Platform.OS !== 'ios') return null;
     return iosPlans.map((p: PlanItem) => {
-      const planKey = (p.iosProductId && productPlanMap[p.iosProductId]) as PlanKey | undefined;
+      const planKey = (p.iosProductId && productPlanMap[p.iosProductId]) as
+        | PlanKey
+        | undefined;
       const benefits = planKey ? planBenefits[planKey] : undefined;
       return {
         ...p,
         benefits: benefits ?? planBenefits.supporter_monthly,
-        badge: planKey ? resolvePlanBadge(tForPlans, planKey) ?? p.badge : p.badge,
+        badge: planKey
+          ? (resolvePlanBadge(tForPlans, planKey) ?? p.badge)
+          : p.badge,
       };
     });
   }, [iosPlans, planBenefits, productPlanMap, tForPlans]);
@@ -151,7 +167,9 @@ export default function SubscriptionsPage() {
   React.useEffect(() => {
     const s = typeof params?.status === 'string' ? params.status : undefined;
     if (s === 'success') {
-      setBanner(t('subscriptions.success', 'Thank you for supporting WhispList!'));
+      setBanner(
+        t('subscriptions.success', 'Thank you for supporting WhispList!'),
+      );
       setShowConfetti(true);
     } else if (s === 'cancel') {
       setBanner(t('subscriptions.cancelled', 'Checkout canceled'));
@@ -189,7 +207,8 @@ export default function SubscriptionsPage() {
         const map: Record<string, string> = {};
         packs.forEach((pkg: any) => {
           const prod = pkg?.product;
-          if (prod?.identifier && prod?.priceString) map[prod.identifier] = prod.priceString;
+          if (prod?.identifier && prod?.priceString)
+            map[prod.identifier] = prod.priceString;
         });
         if (!cancelled) {
           setIosPrices(map);
@@ -199,14 +218,21 @@ export default function SubscriptionsPage() {
             .map((prod: any, idx: number) => {
               // Derive a simple badge from package type if available
               const p = packs[idx];
-              const pt = (p && p.packageType) ? String(p.packageType).toUpperCase() : '';
+              const pt =
+                p && p.packageType ? String(p.packageType).toUpperCase() : '';
               let badge: string | undefined;
-              if (pt.includes('THREE') && pt.includes('MONTH')) badge = t('subscriptions.badges.3mo', '3-Month');
-              else if (pt.includes('SIX') && pt.includes('MONTH')) badge = t('subscriptions.badges.6mo', '6-Month');
-              else if (pt.includes('MONTH')) badge = t('subscriptions.badges.monthly', 'Monthly');
-              else if (pt.includes('YEAR') || pt.includes('ANNUAL')) badge = t('subscriptions.badges.annual', 'Annual');
-              else if (pt.includes('WEEK')) badge = t('subscriptions.badges.weekly', 'Weekly');
-              else if (pt.includes('LIFE')) badge = t('subscriptions.badges.lifetime', 'Lifetime');
+              if (pt.includes('THREE') && pt.includes('MONTH'))
+                badge = t('subscriptions.badges.3mo', '3-Month');
+              else if (pt.includes('SIX') && pt.includes('MONTH'))
+                badge = t('subscriptions.badges.6mo', '6-Month');
+              else if (pt.includes('MONTH'))
+                badge = t('subscriptions.badges.monthly', 'Monthly');
+              else if (pt.includes('YEAR') || pt.includes('ANNUAL'))
+                badge = t('subscriptions.badges.annual', 'Annual');
+              else if (pt.includes('WEEK'))
+                badge = t('subscriptions.badges.weekly', 'Weekly');
+              else if (pt.includes('LIFE'))
+                badge = t('subscriptions.badges.lifetime', 'Lifetime');
 
               // Localize plan names by mapping known product IDs to labels
               const id = String(prod.identifier);
@@ -225,28 +251,35 @@ export default function SubscriptionsPage() {
                 ),
               };
               const localizedName = idMap[id] || prod.title || id;
-              return ({
+              return {
                 key: prod.identifier,
                 name: localizedName,
                 price: prod.priceString,
                 iosProductId: prod.identifier,
                 badge,
-              } as PlanItem);
+              } as PlanItem;
             });
           setIosPlans(plans);
         }
-      } catch {}
-      finally {
+      } catch {
+      } finally {
         if (!cancelled) setIosLoading(false);
       }
     };
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [uid, t]);
 
   if (!user) {
     return (
-      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
+      <View
+        style={[
+          styles.container,
+          { alignItems: 'center', justifyContent: 'center' },
+        ]}
+      >
         <Text style={[styles.emptyText, { color: theme.text }]}>
           {t('subscriptions.signIn', 'Sign in to manage your subscription')}
         </Text>
@@ -255,9 +288,11 @@ export default function SubscriptionsPage() {
   }
 
   const successUrl =
-    process.env.EXPO_PUBLIC_SUBSCRIBE_SUCCESS_URL || Linking.createURL('/(tabs)/profile/settings/subscriptions?status=success');
+    process.env.EXPO_PUBLIC_SUBSCRIBE_SUCCESS_URL ||
+    Linking.createURL('/(tabs)/profile/settings/subscriptions?status=success');
   const cancelUrl =
-    process.env.EXPO_PUBLIC_SUBSCRIBE_CANCEL_URL || Linking.createURL('/(tabs)/profile/settings/subscriptions?status=cancel');
+    process.env.EXPO_PUBLIC_SUBSCRIBE_CANCEL_URL ||
+    Linking.createURL('/(tabs)/profile/settings/subscriptions?status=cancel');
 
   async function startCheckout(plan: PlanItem) {
     const planKey = plan.key as PlanKey;
@@ -267,9 +302,13 @@ export default function SubscriptionsPage() {
       if (!productId) {
         Alert.alert(
           t('subscriptions.missingPrice', 'Missing price configuration'),
-          t('subscriptions.setupHelp', 'Add the RevenueCat product IDs for {{plan}}.', {
-            plan: plan.name,
-          }),
+          t(
+            'subscriptions.setupHelp',
+            'Add the RevenueCat product IDs for {{plan}}.',
+            {
+              plan: plan.name,
+            },
+          ),
         );
         return;
       }
@@ -294,10 +333,13 @@ export default function SubscriptionsPage() {
         } catch {}
         const res = await Purchases.purchaseProduct(productId);
         if (res && res.customerInfo) {
-          const entitlement = process.env.EXPO_PUBLIC_RC_ENTITLEMENT || 'supporter';
+          const entitlement =
+            process.env.EXPO_PUBLIC_RC_ENTITLEMENT || 'supporter';
           const active = res.customerInfo.entitlements?.active?.[entitlement];
           if (active) {
-            setBanner(t('subscriptions.success', 'Thank you for supporting WhispList!'));
+            setBanner(
+              t('subscriptions.success', 'Thank you for supporting WhispList!'),
+            );
             setShowConfetti(true);
             setTimeout(() => setShowConfetti(false), 2500);
             try {
@@ -313,7 +355,10 @@ export default function SubscriptionsPage() {
             error: (err as any)?.message,
           });
         } catch {}
-        Alert.alert('Error', t('subscriptions.errorStart', 'Could not start checkout.'));
+        Alert.alert(
+          'Error',
+          t('subscriptions.errorStart', 'Could not start checkout.'),
+        );
       }
       return;
     }
@@ -332,16 +377,22 @@ export default function SubscriptionsPage() {
       try {
         trackEvent('subscription_checkout_start', { priceId, plan: planKey });
       } catch {}
-      const { url } = await postJson<{ url: string }>('createSubscriptionCheckoutSession', {
-        userId: uid,
-        priceId,
-        successUrl,
-        cancelUrl,
-      });
+      const { url } = await postJson<{ url: string }>(
+        'createSubscriptionCheckoutSession',
+        {
+          userId: uid,
+          priceId,
+          successUrl,
+          cancelUrl,
+        },
+      );
       if (url) await WebBrowser.openBrowserAsync(url);
     } catch (err) {
       logger.error('Failed to start subscription checkout', err);
-      Alert.alert('Error', t('subscriptions.errorStart', 'Could not start checkout.'));
+      Alert.alert(
+        'Error',
+        t('subscriptions.errorStart', 'Could not start checkout.'),
+      );
     }
   }
 
@@ -353,23 +404,40 @@ export default function SubscriptionsPage() {
         await Linking.openURL('https://apps.apple.com/account/subscriptions');
         return;
       }
-      try { trackEvent('billing_portal_open'); } catch {}
-      const { url } = await postJson<{ url: string }>('createBillingPortalSession', {
-        userId: uid,
-        returnUrl: Linking.createURL('/(tabs)/profile/settings/subscriptions'),
-      });
+      try {
+        trackEvent('billing_portal_open');
+      } catch {}
+      const { url } = await postJson<{ url: string }>(
+        'createBillingPortalSession',
+        {
+          userId: uid,
+          returnUrl: Linking.createURL(
+            '/(tabs)/profile/settings/subscriptions',
+          ),
+        },
+      );
       if (url) await WebBrowser.openBrowserAsync(url);
     } catch (err) {
       logger.error('Failed to open billing portal', err);
-      Alert.alert('Error', t('subscriptions.errorPortal', 'Could not open billing portal.'));
+      Alert.alert(
+        'Error',
+        t('subscriptions.errorPortal', 'Could not open billing portal.'),
+      );
     }
   }
 
   return (
     <View style={styles.container}>
-      {showConfetti && <ConfettiCannon count={40} origin={{ x: 0, y: 0 }} fadeOut />}
+      {showConfetti && (
+        <ConfettiCannon count={40} origin={{ x: 0, y: 0 }} fadeOut />
+      )}
       {banner && (
-        <View style={[styles.card, { backgroundColor: theme.input, marginBottom: 10 }]}>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: theme.input, marginBottom: 10 },
+          ]}
+        >
           <Text style={{ color: theme.text }}>{banner}</Text>
         </View>
       )}
@@ -384,7 +452,9 @@ export default function SubscriptionsPage() {
       </Text>
 
       {loading ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <View
+          style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+        >
           <ActivityIndicator color={theme.tint} />
         </View>
       ) : sub?.status && sub.status !== 'canceled' ? (
@@ -394,38 +464,45 @@ export default function SubscriptionsPage() {
           </Text>
           {sub.priceId && (
             <Text style={{ color: theme.placeholder }}>
-              {t('subscriptions.plan', 'Plan')}: {PLANS.find((p) => p.priceId === sub.priceId)?.name || '—'}
+              {t('subscriptions.plan', 'Plan')}:{' '}
+              {PLANS.find((p) => p.priceId === sub.priceId)?.name || '—'}
             </Text>
           )}
           {sub.currentPeriodEnd && (
             <Text style={{ color: theme.placeholder }}>
-              {(
-                sub.status === 'trialing'
-                  ? t('subscriptions.trialEndsOn', 'Trial ends on {{date}}', {
-                      date: new Date(
-                        (sub.currentPeriodEnd.toDate?.() || sub.currentPeriodEnd.seconds * 1000) as number,
-                      ).toLocaleDateString(),
-                    })
-                  : t('subscriptions.renewsOn', 'Renews on {{date}}', {
-                      date: new Date(
-                        (sub.currentPeriodEnd.toDate?.() || sub.currentPeriodEnd.seconds * 1000) as number,
-                      ).toLocaleDateString(),
-                    })
-              )}
+              {sub.status === 'trialing'
+                ? t('subscriptions.trialEndsOn', 'Trial ends on {{date}}', {
+                    date: new Date(
+                      (sub.currentPeriodEnd.toDate?.() ||
+                        sub.currentPeriodEnd.seconds * 1000) as number,
+                    ).toLocaleDateString(),
+                  })
+                : t('subscriptions.renewsOn', 'Renews on {{date}}', {
+                    date: new Date(
+                      (sub.currentPeriodEnd.toDate?.() ||
+                        sub.currentPeriodEnd.seconds * 1000) as number,
+                    ).toLocaleDateString(),
+                  })}
             </Text>
           )}
           {sub.cancelAtPeriodEnd && sub.currentPeriodEnd && (
             <Text style={{ color: theme.placeholder }}>
               {t('subscriptions.cancelsOn', 'Cancels on {{date}}', {
                 date: new Date(
-                  (sub.currentPeriodEnd.toDate?.() || sub.currentPeriodEnd.seconds * 1000) as number,
+                  (sub.currentPeriodEnd.toDate?.() ||
+                    sub.currentPeriodEnd.seconds * 1000) as number,
                 ).toLocaleDateString(),
               })}
             </Text>
           )}
-          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.tint }]} onPress={openPortal}>
+          <TouchableOpacity
+            style={[styles.primaryBtn, { backgroundColor: theme.tint }]}
+            onPress={openPortal}
+          >
             <Text style={[styles.primaryText, { color: theme.text }]}>
-              {Platform.OS === 'ios' ? t('subscriptions.manageAppStore', 'Manage in App Store') : t('subscriptions.manage', 'Manage Subscription')}
+              {Platform.OS === 'ios'
+                ? t('subscriptions.manageAppStore', 'Manage in App Store')
+                : t('subscriptions.manage', 'Manage Subscription')}
             </Text>
           </TouchableOpacity>
           {Platform.OS === 'ios' && (
@@ -433,11 +510,16 @@ export default function SubscriptionsPage() {
               style={[styles.primaryBtn, { backgroundColor: theme.input }]}
               onPress={async () => {
                 try {
-                  const PurchasesModule: any = await import('react-native-purchases');
+                  const PurchasesModule: any = await import(
+                    'react-native-purchases'
+                  );
                   const Purchases = PurchasesModule.default || PurchasesModule;
                   if (Purchases?.isStub) {
                     Alert.alert(
-                      t('subscriptions.unavailableTitle', 'In-app purchases unavailable'),
+                      t(
+                        'subscriptions.unavailableTitle',
+                        'In-app purchases unavailable',
+                      ),
                       t(
                         'subscriptions.unavailableMessage',
                         'Install RevenueCat before enabling iOS subscriptions.',
@@ -445,43 +527,69 @@ export default function SubscriptionsPage() {
                     );
                     return;
                   }
-                  try { trackEvent('rc_restore_attempt'); } catch {}
+                  try {
+                    trackEvent('rc_restore_attempt');
+                  } catch {}
                   await Purchases.restorePurchases();
-                  setBanner(t('subscriptions.success', 'Thank you for supporting WhispList!'));
-                  try { trackEvent('rc_restore_success'); } catch {}
+                  setBanner(
+                    t(
+                      'subscriptions.success',
+                      'Thank you for supporting WhispList!',
+                    ),
+                  );
+                  try {
+                    trackEvent('rc_restore_success');
+                  } catch {}
                 } catch (e) {
-                  try { trackEvent('rc_restore_failed', { error: (e as any)?.message }); } catch {}
-                  Alert.alert('Error', t('subscriptions.restoreFailed', 'Restore failed'));
+                  try {
+                    trackEvent('rc_restore_failed', {
+                      error: (e as any)?.message,
+                    });
+                  } catch {}
+                  Alert.alert(
+                    'Error',
+                    t('subscriptions.restoreFailed', 'Restore failed'),
+                  );
                 }
               }}
             >
-              <Text style={[styles.primaryText, { color: theme.text }]}>{t('subscriptions.restore', 'Restore Purchases')}</Text>
+              <Text style={[styles.primaryText, { color: theme.text }]}>
+                {t('subscriptions.restore', 'Restore Purchases')}
+              </Text>
             </TouchableOpacity>
           )}
         </View>
+      ) : Platform.OS === 'ios' && iosLoading ? (
+        <View style={{ padding: 16, alignItems: 'center' }}>
+          <ActivityIndicator color={theme.tint} />
+          <Text style={{ marginTop: 8, color: theme.placeholder }}>
+            {t('subscriptions.loadingPlans', 'Loading plans…')}
+          </Text>
+        </View>
       ) : (
-        Platform.OS === 'ios' && iosLoading ? (
-          <View style={{ padding: 16, alignItems: 'center' }}>
-            <ActivityIndicator color={theme.tint} />
-            <Text style={{ marginTop: 8, color: theme.placeholder }}>{t('subscriptions.loadingPlans', 'Loading plans…')}</Text>
-          </View>
-        ) : (
-          <SubscriptionPlans
-            plans={
-              Platform.OS === 'ios' && iosPlansWithBenefits && iosPlansWithBenefits.length > 0
-                ? iosPlansWithBenefits
-                : plansWithBenefits
-            }
-            palette={{ text: theme.text, input: theme.input, placeholder: theme.placeholder, tint: theme.tint }}
-            t={tForPlans}
-            onStartCheckout={startCheckout}
-            stripeConfigured={
-              Platform.OS === 'ios'
-                ? !!(iosPlansWithBenefits && iosPlansWithBenefits.length > 0) || anyPlanConfigured
-                : hasStripePrice
-            }
-          />
-        )
+        <SubscriptionPlans
+          plans={
+            Platform.OS === 'ios' &&
+            iosPlansWithBenefits &&
+            iosPlansWithBenefits.length > 0
+              ? iosPlansWithBenefits
+              : plansWithBenefits
+          }
+          palette={{
+            text: theme.text,
+            input: theme.input,
+            placeholder: theme.placeholder,
+            tint: theme.tint,
+          }}
+          t={tForPlans}
+          onStartCheckout={startCheckout}
+          stripeConfigured={
+            Platform.OS === 'ios'
+              ? !!(iosPlansWithBenefits && iosPlansWithBenefits.length > 0) ||
+                anyPlanConfigured
+              : hasStripePrice
+          }
+        />
       )}
     </View>
   );

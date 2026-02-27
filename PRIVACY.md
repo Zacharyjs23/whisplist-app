@@ -50,10 +50,10 @@ These providers process data on our behalf under their own privacy and security 
 
 ### How to export or delete your data (in‑app)
 
-1) Open the app and go to Settings → System & Account
-2) Tap “Export History” to export your wishes and comments
-3) Tap “Delete My Content” to remove content you’ve posted
-4) To delete your account entirely, contact support@whisplist.app (account deletion will remove your profile and content stored under your UID)
+1. Open the app and go to Settings → System & Account
+2. Tap “Export History” to export your wishes and comments
+3. Tap “Delete My Content” to remove content you’ve posted
+4. To delete your account entirely, contact support@whisplist.app (account deletion will remove your profile and content stored under your UID)
 
 ## Security
 

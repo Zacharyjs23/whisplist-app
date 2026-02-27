@@ -70,7 +70,9 @@ export const ReferralProvider = ({
           await updateDoc(doc(db, 'users', referrerId), {
             boostCredits: increment(1),
           });
-          await updateDoc(doc(db, 'users', userId), { boostCredits: increment(1) });
+          await updateDoc(doc(db, 'users', userId), {
+            boostCredits: increment(1),
+          });
           await setDoc(doc(db, 'referrals', userId), {
             referrerId,
             referrerDisplayName:
@@ -105,4 +107,3 @@ export const ReferralProvider = ({
 };
 
 export const useReferral = () => useContext(ReferralContext);
-

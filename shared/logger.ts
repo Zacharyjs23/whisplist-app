@@ -18,7 +18,11 @@ export function setTelemetry(fn: TelemetryFn) {
 function emit(level: 'log' | 'warn' | 'error', args: any[]) {
   let meta: TelemetryMeta | undefined;
   const last = args[args.length - 1];
-  if (last && typeof last === 'object' && ('userId' in last || 'severity' in last)) {
+  if (
+    last &&
+    typeof last === 'object' &&
+    ('userId' in last || 'severity' in last)
+  ) {
     meta = args.pop();
   }
 
