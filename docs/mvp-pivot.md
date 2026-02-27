@@ -1,4 +1,4 @@
-# WhispList MVP Pivot (TikTok + GoFundMe)
+# WhispList MVP Pivot (Creator Feed + Community Funding)
 
 ## Product focus
 Build only one clear loop:

@@ -10,7 +10,7 @@ The app is built with Expo + React Native, Firebase, and Cloud Functions, and su
 - Personalized feed ranking and discovery
 - Reactions, comments, boosts, and lightweight social support
 - Direct messages and notification inbox
-- Gifting and split-pay support flows (Stripe + Venmo-related flows)
+- Gifting and split-pay support flows (WhispPay + Stripe rails)
 - Subscription and feature-flag-driven premium capabilities
 
 ## Tech Stack
@@ -54,6 +54,12 @@ cp .env.example .env
 - `EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID`
 
 Runtime env validation is implemented in `env.ts` (Zod). Use the exported `env` object instead of reading `process.env` directly.
+
+Optional (recommended for production store builds):
+
+- `EXPO_PUBLIC_IOS_APP_STORE_URL` (direct App Store listing URL)
+- `EXPO_PUBLIC_IOS_APP_STORE_ID` (numeric app ID for iOS review deep-link)
+- `EXPO_PUBLIC_ANDROID_PLAY_STORE_URL` (Play Store listing URL override)
 
 4. Run locally
 
