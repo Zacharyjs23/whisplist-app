@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, waitFor } from '@testing-library/react-native';
+import { act, render } from '@testing-library/react-native';
 import { AdvancedOptionsModal } from '@/components/composer/AdvancedOptionsModal';
 import { createComposerStyles } from '@/components/composer/composerStyles';
 
@@ -102,34 +102,33 @@ describe('AdvancedOptionsModal', () => {
     const getMemberHintField = () =>
       getByPlaceholderText('Who’s in this circle? (optional)');
 
-    await waitFor(() => {
-      expect(getCadenceField().props.value).toBe('7');
-      expect(getMemberHintField().props.value).toBe('Alex');
+    await act(async () => {});
+    expect(getCadenceField().props.value).toBe('7');
+    expect(getMemberHintField().props.value).toBe('Alex');
+
+    await act(async () => {
+      rerender(
+        <AdvancedOptionsModal
+          visible
+          onClose={jest.fn()}
+          t={t as any}
+          theme={theme}
+          styles={styles}
+          hitSlop={HIT_SLOP}
+          composer={{
+            ...baseComposer,
+            circles: [],
+            selectedCircleId: null,
+          }}
+          supportAmount=""
+          setSupportAmount={jest.fn()}
+          supportReason=""
+          setSupportReason={jest.fn()}
+        />,
+      );
     });
 
-    rerender(
-      <AdvancedOptionsModal
-        visible
-        onClose={jest.fn()}
-        t={t as any}
-        theme={theme}
-        styles={styles}
-        hitSlop={HIT_SLOP}
-        composer={{
-          ...baseComposer,
-          circles: [],
-          selectedCircleId: null,
-        }}
-        supportAmount=""
-        setSupportAmount={jest.fn()}
-        supportReason=""
-        setSupportReason={jest.fn()}
-      />,
-    );
-
-    await waitFor(() => {
-      expect(getCadenceField().props.value).toBe('3');
-      expect(getMemberHintField().props.value).toBe('');
-    });
+    expect(getCadenceField().props.value).toBe('3');
+    expect(getMemberHintField().props.value).toBe('');
   });
 });
