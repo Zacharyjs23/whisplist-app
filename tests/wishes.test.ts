@@ -1,4 +1,18 @@
-jest.mock('@/firebase', () => ({ db: {} }));
+const mockGetIdToken = jest.fn();
+jest.mock('@/firebase', () => ({
+  db: {},
+  functions: {},
+  auth: {
+    currentUser: null,
+  },
+}));
+jest.mock('../firebase', () => ({
+  db: {},
+  functions: {},
+  auth: {
+    currentUser: null,
+  },
+}));
 jest.mock('@/helpers/followers', () => ({ getFollowingIds: jest.fn() }));
 jest.mock('firebase/firestore', () => ({
   collection: jest.fn(),
@@ -32,6 +46,11 @@ import {
   doc,
   deleteDoc,
 } from 'firebase/firestore';
+import { auth } from '@/firebase';
+
+beforeEach(() => {
+  (auth as any).currentUser = { getIdToken: mockGetIdToken };
+});
 
 describe('listenTrendingWishes', () => {
   beforeEach(() => {
@@ -170,6 +189,7 @@ describe('checkout helpers', () => {
   });
 
   it('createGiftCheckout posts to function and returns url', async () => {
+    mockGetIdToken.mockResolvedValue('token_123');
     (global as any).fetch = jest.fn().mockResolvedValue({
       json: async () => ({ url: 'http://gift' }),
     });
@@ -189,7 +209,10 @@ describe('checkout helpers', () => {
       'https://us-central1-testproj.cloudfunctions.net/createGiftCheckoutSession',
     );
     expect(options.method).toBe('POST');
-    expect(options.headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(options.headers).toEqual({
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer token_123',
+    });
     expect(JSON.parse(options.body)).toEqual({
       wishId: 'wish1',
       amount: 5,

@@ -41,11 +41,14 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
-const { giftStartHandler: handleGiftStart, giftConfirmHandler: handleGiftConfirm } =
-  createGiftHttpHandlers({
-    db,
-    readRuntimeConfig,
-  });
+const {
+  giftStartHandler: handleGiftStart,
+  giftConfirmHandler: handleGiftConfirm,
+  giftProviderWebhookHandler: handleGiftProviderWebhook,
+} = createGiftHttpHandlers({
+  db,
+  readRuntimeConfig,
+});
 
 function applyCors(res: Response) {
   res.set('Access-Control-Allow-Origin', '*');
@@ -147,6 +150,10 @@ export const gifts = region('us-central1')
       await handleGiftConfirm(req, res);
       return;
     }
+    if (path === '/provider-webhook') {
+      await handleGiftProviderWebhook(req, res);
+      return;
+    }
     res.status(404).json({ error: 'not_found' });
   });
 
@@ -239,6 +246,11 @@ export const confirmGift = region('us-central1')
     await handleGiftConfirm(req, res);
   });
 
+export const confirmGiftProvider = region('us-central1')
+  .https.onRequest(async (req: Request, res: Response) => {
+    await handleGiftProviderWebhook(req, res);
+  });
+
 export const __test = { sendPush };
 
 export const notifyWishLike = firestore
@@ -320,7 +332,18 @@ export const notifyWishBoost = firestore
 
 export const notifyGiftReceived = firestore
   .document('wishes/{wishId}/gifts/{giftId}')
-  .onCreate(async (snap: any, context: any) => {
+  .onWrite(async (change: any, context: any) => {
+    const before = change.before.exists ? change.before.data() : null;
+    const after = change.after.exists ? change.after.data() : null;
+    if (!after) return null;
+    const beforeStatus =
+      before && typeof before.status === 'string' ? before.status : null;
+    const afterStatus =
+      typeof after.status === 'string' ? after.status : null;
+    if (afterStatus !== 'confirmed' || beforeStatus === 'confirmed') {
+      return null;
+    }
+
     const wishId = context.params.wishId;
     const wishSnap = await db.collection('wishes').doc(wishId).get();
     const wish = wishSnap.data();
@@ -460,3 +483,4 @@ export { generateWishMatches } from './wishMatcher';
 export { expressCheckout } from './expressCheckout';
 export { createGiftTogetherInvite } from './splitpay/createInvite';
 export { api } from './httpApi';
+export { deleteMyAccount } from './deleteMyAccount';

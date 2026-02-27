@@ -6,9 +6,29 @@ import Stripe from 'stripe';
 import { STRIPE_SECRET_KEY } from './secrets';
 import { assertValidRedirectUrl, RedirectUrlError } from './redirectValidation';
 
-export const stripeClient = new Stripe(STRIPE_SECRET_KEY.value(), {
-  apiVersion: '2022-11-15',
-});
+type StripeClient = InstanceType<typeof Stripe>;
+type StripeCheckoutCreate = StripeClient['checkout']['sessions']['create'];
+let stripeClientInstance: StripeClient | null = null;
+
+function getStripeClient(): StripeClient {
+  if (!stripeClientInstance) {
+    stripeClientInstance = new Stripe(STRIPE_SECRET_KEY.value(), {
+      apiVersion: '2022-11-15',
+    });
+  }
+  return stripeClientInstance;
+}
+
+export const stripeClient: {
+  checkout: { sessions: { create: StripeCheckoutCreate } };
+} = {
+  checkout: {
+    sessions: {
+      create: ((...args: Parameters<StripeCheckoutCreate>) =>
+        getStripeClient().checkout.sessions.create(...args)) as StripeCheckoutCreate,
+    },
+  },
+};
 
 type FirestoreInstance = ReturnType<typeof admin.firestore>;
 let db: FirestoreInstance = admin.firestore();
@@ -19,6 +39,9 @@ export const __test = {
   },
   getDb(): FirestoreInstance {
     return db;
+  },
+  setStripeClientForTests(client: StripeClient | null) {
+    stripeClientInstance = client;
   },
 };
 

@@ -144,7 +144,6 @@ jest.mock(
   () => ({
     createManualPaymentIntent: mockCreateManualPaymentIntent,
   }),
-  { virtual: true },
 );
 
 jest.mock(
@@ -152,7 +151,6 @@ jest.mock(
   () => ({
     notifyOwnerOfPledge: mockNotifyOwnerOfPledge,
   }),
-  { virtual: true },
 );
 
 jest.mock(
@@ -160,7 +158,6 @@ jest.mock(
   () => ({
     logPledgeCreated: mockLogPledgeCreated,
   }),
-  { virtual: true },
 );
 
 jest.mock(
@@ -168,10 +165,17 @@ jest.mock(
   () => ({
     assertGiftPotEnabled: mockAssertGiftPotEnabled,
   }),
-  { virtual: true },
 );
 
-const { createPledge } = require('../functions/src/splitpay/createPledge');
+let createPledge: (
+  data: Record<string, unknown>,
+  context: Record<string, unknown>,
+) => Promise<{
+  pledgeId: string;
+  clientSecret: string;
+  paymentIntentId: string;
+  status: string;
+}>;
 
 
 function setDoc(path: string, data: Record<string, unknown>) {
@@ -186,6 +190,9 @@ describe('createPledge idempotency', () => {
   beforeEach(() => {
     store.clear();
     jest.clearAllMocks();
+    jest.isolateModules(() => {
+      ({ createPledge } = require('../functions/src/splitpay/createPledge'));
+    });
     setDoc('wishes/wish-1', {
       splitPayEnabled: true,
       targetAmount: 100000,

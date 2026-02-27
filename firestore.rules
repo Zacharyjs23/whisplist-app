@@ -183,20 +183,22 @@ service cloud.firestore {
       return data is map
         && data.keys().hasOnly([
           'wishId','amount','status','supporterId','recipientId','variant','tokenId',
-          'note','venmoRecipient','platform','createdAt','expiresAt'
+          'note','paymentTarget','platform','createdAt','expiresAt','verificationStatus','returnSeenAt'
         ])
         && ('wishId' in data && data.wishId is string && data.wishId.size() >= 1)
         && ('tokenId' in data && data.tokenId is string && data.tokenId.size() >= 8)
-        && ('status' in data && data.status == 'pending')
+        && ('status' in data && data.status == 'initiated')
+        && (!('verificationStatus' in data) || data.verificationStatus == 'pending')
         && ('amount' in data && data.amount is number && data.amount > 0 && data.amount <= 10000)
         && (!('supporterId' in data) || data.supporterId is string)
         && (!('recipientId' in data) || data.recipientId is string)
         && (!('variant' in data) || data.variant is string)
         && (!('note' in data) || data.note is string)
-        && (!('venmoRecipient' in data) || data.venmoRecipient is string)
+        && (!('paymentTarget' in data) || data.paymentTarget is string)
         && (!('platform' in data) || data.platform is string)
         && (!('createdAt' in data) || data.createdAt == request.time)
-        && (!('expiresAt' in data) || data.expiresAt is timestamp);
+        && (!('expiresAt' in data) || data.expiresAt is timestamp)
+        && (!('returnSeenAt' in data) || data.returnSeenAt is timestamp);
     }
 
     // Direct message threads

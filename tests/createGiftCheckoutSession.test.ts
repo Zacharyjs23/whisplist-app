@@ -10,6 +10,7 @@ jest.mock(
 );
 
 const mockStripeCreate = jest.fn();
+const mockVerifyIdToken = jest.fn();
 jest.mock(
   'stripe',
   () =>
@@ -42,6 +43,7 @@ jest.mock(
         FieldValue: { serverTimestamp: jest.fn(() => 'ts') },
       },
     ),
+    auth: () => ({ verifyIdToken: mockVerifyIdToken }),
   }),
   { virtual: true },
 );
@@ -55,6 +57,7 @@ import { createGiftCheckoutSession } from '../functions/src/createGiftCheckoutSe
 describe('createGiftCheckoutSession', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockVerifyIdToken.mockResolvedValue({ uid: 'supporter_1' });
   });
 
   it('creates stripe gift session and returns url', async () => {
@@ -64,6 +67,8 @@ describe('createGiftCheckoutSession', () => {
     mockStripeCreate.mockResolvedValue({ id: 'sess_g1', url: 'https://gift' });
     const req: any = {
       method: 'POST',
+      get: (header: string) =>
+        header === 'Authorization' ? 'Bearer token' : undefined,
       body: {
         wishId: 'w1',
         recipientId: 'rec1',
@@ -76,6 +81,7 @@ describe('createGiftCheckoutSession', () => {
       json: jest.fn(),
       status: jest.fn().mockReturnThis(),
       send: jest.fn(),
+      set: jest.fn(),
     } as any;
     await createGiftCheckoutSession(req, res);
     expect(mockStripeCreate).toHaveBeenCalled();
@@ -86,6 +92,8 @@ describe('createGiftCheckoutSession', () => {
     mockUserGet.mockResolvedValue({ get: () => undefined });
     const req: any = {
       method: 'POST',
+      get: (header: string) =>
+        header === 'Authorization' ? 'Bearer token' : undefined,
       body: {
         wishId: 'w1',
         recipientId: 'rec1',
@@ -98,6 +106,7 @@ describe('createGiftCheckoutSession', () => {
       json: jest.fn(),
       status: jest.fn().mockReturnThis(),
       send: jest.fn(),
+      set: jest.fn(),
     } as any;
     await createGiftCheckoutSession(req, res);
     expect(res.status).toHaveBeenCalledWith(400);

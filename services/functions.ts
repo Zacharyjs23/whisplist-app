@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { auth } from '@/firebase';
 
 const DEFAULT_REGION = 'us-central1';
 
@@ -21,13 +22,20 @@ export function functionUrl(name: string): string {
 export async function postJson<T = any>(
   name: string,
   body: unknown,
-  options: { headers?: Record<string, string> } = {},
+  options: {
+    headers?: Record<string, string>;
+    omitAuth?: boolean;
+  } = {},
 ): Promise<T> {
   const url = functionUrl(name);
+  const token = !options.omitAuth
+    ? await auth.currentUser?.getIdToken?.().catch(() => null)
+    : null;
   const resp = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
     body: JSON.stringify(body ?? {}),
@@ -41,12 +49,19 @@ export async function postJson<T = any>(
 
 export async function getJson<T = any>(
   name: string,
-  options: { headers?: Record<string, string> } = {},
+  options: {
+    headers?: Record<string, string>;
+    omitAuth?: boolean;
+  } = {},
 ): Promise<T> {
   const url = functionUrl(name);
+  const token = !options.omitAuth
+    ? await auth.currentUser?.getIdToken?.().catch(() => null)
+    : null;
   const resp = await fetch(url, {
     method: 'GET',
     headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
   });

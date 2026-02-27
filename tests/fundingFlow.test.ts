@@ -23,6 +23,7 @@ const mockUsersState: Record<string, Record<string, unknown>> = {
 const mockStripeSessionCreate = jest.fn();
 const mockStripeCustomerCreate = jest.fn();
 const mockStripeConstructEvent = jest.fn();
+const mockVerifyIdToken = jest.fn();
 process.env.EXPO_PUBLIC_STRIPE_PRICE_BASIC = 'price_monthly';
 process.env.EXPO_PUBLIC_STRIPE_PRICE_PATRON = 'price_monthly_patron';
 process.env.EXPO_PUBLIC_STRIPE_PRICE_PATRON_ANNUAL =
@@ -293,6 +294,7 @@ jest.mock(
     __esModule: true,
     initializeApp: jest.fn(),
     firestore: mockFirestore,
+    auth: () => ({ verifyIdToken: mockVerifyIdToken }),
   }),
   { virtual: true },
 );
@@ -329,6 +331,8 @@ describe('funding flow integration', () => {
     mockStripeSessionCreate.mockReset();
     mockStripeCustomerCreate.mockReset();
     mockStripeConstructEvent.mockReset();
+    mockVerifyIdToken.mockReset();
+    mockVerifyIdToken.mockResolvedValue({ uid: 'supporter-42' });
     stripeClient.checkout.sessions.create = mockStripeSessionCreate as any;
     mockStripeSessionCreate
       .mockResolvedValueOnce({ id: 'sess_boost', url: 'https://boost' })
@@ -381,6 +385,8 @@ describe('funding flow integration', () => {
     await createGiftCheckoutSession(
       {
         method: 'POST',
+        get: (header: string) =>
+          header === 'Authorization' ? 'Bearer token' : undefined,
         body: {
           wishId: 'wish-boost',
           recipientId: 'recipient-1',
@@ -443,10 +449,13 @@ describe('funding flow integration', () => {
       json: jest.fn(),
       status: jest.fn().mockReturnThis(),
       send: jest.fn(),
+      set: jest.fn(),
     } as any;
     await createSubscriptionCheckoutSession(
       {
         method: 'POST',
+        get: (header: string) =>
+          header === 'Authorization' ? 'Bearer token' : undefined,
         body: {
           userId: 'supporter-42',
           priceId: 'price_monthly',

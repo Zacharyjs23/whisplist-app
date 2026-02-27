@@ -18,10 +18,11 @@ import {
   logGiftCancel,
   logGiftConfirmed,
   logGiftCtaTap,
-  logReturnSuccess,
-  logVenmoOpen,
+  logGiftReturned,
+  logGiftVerificationPending,
+  logQuickPayOpen,
 } from '@/src/lib/analytics';
-import { buildVenmoLinks, openVenmo } from '@/src/lib/venmo';
+import { buildWhispPayLinks, openWhispPay } from '@/src/lib/whispPay';
 import { useExperiment } from '@/src/experiments/useExperiment';
 import { createGiftCheckout } from '@/helpers/wishes';
 import * as logger from '@/shared/logger';
@@ -32,7 +33,7 @@ type GiftCTAProps = {
   recipientId: string;
   goalAmount?: number | null;
   currentGiftTotal?: number | null;
-  venmoRecipient?: string | null;
+  quickPayRecipient?: string | null;
   isPrivate?: boolean;
   onGiftConfirmed?: (amount: number) => void;
 };
@@ -42,12 +43,12 @@ type StartGiftResponse = {
   giftId: string;
   amount: number;
   note: string;
-  recipient?: string | null;
+  paymentTarget?: string | null;
   expiresAt: string;
 };
 
 type ConfirmGiftResponse = {
-  status: 'confirmed' | 'already_confirmed';
+  status: 'verification_pending' | 'confirmed' | 'already_confirmed';
   wishId: string;
   amount: number;
   giftTotal: number;
@@ -81,7 +82,7 @@ export function GiftCTA({
   recipientId,
   goalAmount,
   currentGiftTotal,
-  venmoRecipient,
+  quickPayRecipient,
   isPrivate,
   onGiftConfirmed,
 }: GiftCTAProps) {
@@ -101,8 +102,8 @@ export function GiftCTA({
   const lastTapRef = useRef<number>(0);
 
   const variant = useExperiment(
-    'gift_venmo_vs_stripe',
-    ['venmo', 'stripe'] as const,
+    'gift_quickpay_vs_stripe',
+    ['whisppay', 'stripe'] as const,
     { subject: user?.uid ?? null },
   );
 
@@ -169,12 +170,19 @@ export function GiftCTA({
           throw new Error(`Confirm failed: ${res.status}`);
         }
         const data = (await res.json()) as ConfirmGiftResponse;
-        if (
-          data.status === 'confirmed' ||
-          data.status === 'already_confirmed'
-        ) {
+        if (data.status === 'verification_pending') {
           const payload = makePayload(data.amount);
-          logReturnSuccess(payload);
+          logGiftReturned(payload);
+          logGiftVerificationPending(payload);
+          Alert.alert(
+            'Support received',
+            'Your contribution return is captured. Final confirmation appears once payment verification completes.',
+          );
+          return;
+        }
+        if (data.status === 'confirmed' || data.status === 'already_confirmed') {
+          const payload = makePayload(data.amount);
+          logGiftReturned(payload);
           logGiftConfirmed(payload);
           setLocalGiftTotal(data.giftTotal);
           onGiftConfirmed?.(data.amount);
@@ -238,31 +246,31 @@ export function GiftCTA({
     };
   }, [handleIncomingUrl]);
 
-  const launchVenmo = useCallback(
+  const launchQuickPay = useCallback(
     async (payload: StartGiftResponse) => {
       const returnUrl = Linking.createURL(
         `gift/complete?token=${encodeURIComponent(payload.token)}`,
       );
-      const links = buildVenmoLinks({
+      const links = buildWhispPayLinks({
         amount: payload.amount,
         note: payload.note,
-        recipient: payload.recipient ?? venmoRecipient ?? undefined,
+        recipient: payload.paymentTarget ?? quickPayRecipient ?? undefined,
         returnUrl,
       });
 
-      const result = await openVenmo(links);
+      const result = await openWhispPay(links);
       if (result.opened) {
-        logVenmoOpen(makePayload(payload.amount));
+        logQuickPayOpen(makePayload(payload.amount));
         activeGiftRef.current = payload;
       } else {
         logGiftCancel(makePayload(payload.amount));
         Alert.alert(
-          'Unable to open Venmo',
-          'We could not open Venmo on this device. Please try again or use the Stripe option.',
+          'Unable to open WhispPay',
+          'WhispPay could not open on this device. Please try again or use Stripe checkout.',
         );
       }
     },
-    [makePayload, venmoRecipient],
+    [makePayload, quickPayRecipient],
   );
 
   const requestStartGift = useCallback(
@@ -279,7 +287,7 @@ export function GiftCTA({
         body: JSON.stringify({
           wishId,
           amount,
-          variant: 'venmo',
+          variant: 'whisppay',
           userId: user?.uid ?? null,
           platform: Platform.OS,
         }),
@@ -303,9 +311,9 @@ export function GiftCTA({
     try {
       setPending(true);
       const payload = await requestStartGift(selectedAmount);
-      await launchVenmo(payload);
+      await launchQuickPay(payload);
     } catch (err) {
-      logger.warn('Failed to start Venmo gift', err);
+      logger.warn('Failed to start quick pay gift', err);
       logGiftCancel(makePayload(selectedAmount));
       setLastError('Unable to start gifting flow. Please try again.');
     } finally {
@@ -313,7 +321,7 @@ export function GiftCTA({
     }
   }, [
     disabled,
-    launchVenmo,
+    launchQuickPay,
     makePayload,
     requestStartGift,
     selectedAmount,
@@ -350,6 +358,9 @@ export function GiftCTA({
       </Text>
       <Text style={[styles.total, { color: theme.placeholder }]}>
         {totalDisplay}
+      </Text>
+      <Text style={[styles.verificationHint, { color: theme.placeholder }]}>
+        Contributions are counted after secure payment verification.
       </Text>
 
       <View style={styles.presetsRow}>
@@ -421,8 +432,8 @@ export function GiftCTA({
         {pending ? (
           <ActivityIndicator color={theme.background} />
         ) : (
-          <Text style={[styles.ctaText, { color: theme.background }]}>
-            {`Send ${formatCurrency(selectedAmount)} toward this wish — Venmo opens instantly.`}
+            <Text style={[styles.ctaText, { color: theme.background }]}>
+            {`Send ${formatCurrency(selectedAmount)} toward this wish — WhispPay opens instantly.`}
           </Text>
         )}
       </TouchableOpacity>
@@ -447,7 +458,7 @@ export function GiftCTA({
               Stripe checkout
             </Text>
             <Text style={[styles.modalBody, { color: theme.text }]}>
-              Venmo is unavailable for you right now. Continue with Stripe to
+              WhispPay is unavailable for you right now. Continue with Stripe to
               send {formatCurrency(selectedAmount)} securely.
             </Text>
             <View style={styles.modalActions}>
@@ -503,6 +514,10 @@ const styles = StyleSheet.create({
   total: {
     marginTop: 6,
     fontSize: 14,
+  },
+  verificationHint: {
+    marginTop: 4,
+    fontSize: 12,
   },
   presetsRow: {
     flexDirection: 'row',

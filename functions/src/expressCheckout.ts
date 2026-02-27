@@ -5,14 +5,27 @@ import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
 import { STRIPE_SECRET_KEY } from './secrets';
 
-const stripeClient = new Stripe(STRIPE_SECRET_KEY.value(), {
-  apiVersion: '2022-11-15',
-});
-
 type FirestoreInstance = ReturnType<typeof admin.firestore>;
 let db: FirestoreInstance = admin.firestore();
-type StripeClient = typeof stripeClient;
-let stripe: StripeClient = stripeClient;
+type StripeSdk = InstanceType<typeof Stripe>;
+type StripeClient = Pick<
+  StripeSdk,
+  'paymentIntents'
+>;
+let stripe: StripeClient | null = null;
+
+function getStripe(): StripeClient {
+  if (!stripe) {
+    stripe = new Stripe(STRIPE_SECRET_KEY.value(), {
+      apiVersion: '2022-11-15',
+    });
+  }
+  const client = stripe;
+  if (!client) {
+    throw new Error('Stripe client unavailable');
+  }
+  return client;
+}
 
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9:_\-.]{8,128}$/;
 
@@ -23,10 +36,10 @@ export const __test = {
   getDb(): FirestoreInstance {
     return db;
   },
-  setStripe(client: StripeClient) {
+  setStripe(client: StripeClient | null) {
     stripe = client;
   },
-  getStripe(): StripeClient {
+  getStripe(): StripeClient | null {
     return stripe;
   },
 };
@@ -402,7 +415,7 @@ async function handleExpressCheckout(
       return;
     }
 
-    const payment = await stripe.paymentIntents.create(
+    const payment = await getStripe().paymentIntents.create(
       {
         amount,
         currency: currency ?? 'usd',

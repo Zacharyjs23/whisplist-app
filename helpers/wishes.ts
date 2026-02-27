@@ -19,7 +19,7 @@ import {
   type QueryDocumentSnapshot,
   type QuerySnapshot,
 } from 'firebase/firestore';
-import { db, functions } from '../firebase';
+import { auth, db, functions } from '@/firebase';
 import * as Linking from 'expo-linking';
 import type { Wish, ReactionType } from '../types/Wish';
 import type { WishStage } from '../types/WishStage';
@@ -301,11 +301,18 @@ export async function createGiftCheckout(
 ) {
   const sUrl = successUrl || Linking.createURL(`/wish/${wishId}?gift=success`);
   const cUrl = cancelUrl || Linking.createURL(`/wish/${wishId}?gift=cancel`);
+  const token = await auth.currentUser?.getIdToken?.().catch(() => null);
+  if (!token) {
+    throw new Error('Authentication required');
+  }
   const resp = await fetch(
     `https://us-central1-${process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID}.cloudfunctions.net/createGiftCheckoutSession`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({
         wishId,
         amount,

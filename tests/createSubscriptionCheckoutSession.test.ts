@@ -25,6 +25,7 @@ jest.mock(
 
 const mockStripeCustomersCreate = jest.fn();
 const mockStripeCheckoutCreate = jest.fn();
+const mockVerifyIdToken = jest.fn();
 process.env.EXPO_PUBLIC_STRIPE_PRICE_BASIC = 'price_monthly';
 process.env.EXPO_PUBLIC_STRIPE_PRICE_PATRON = 'price_patron';
 process.env.EXPO_PUBLIC_STRIPE_PRICE_PATRON_ANNUAL = 'price_patron_annual';
@@ -74,6 +75,7 @@ jest.mock(
       __esModule: true,
       initializeApp: jest.fn(),
       firestore: firestoreFn,
+      auth: () => ({ verifyIdToken: mockVerifyIdToken }),
     };
   },
   { virtual: true },
@@ -88,6 +90,7 @@ import { createSubscriptionCheckoutSession } from '../functions/src/createSubscr
 describe('createSubscriptionCheckoutSession', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockVerifyIdToken.mockResolvedValue({ uid: 'u1' });
   });
 
   it('creates a subscription checkout session and returns url', async () => {
@@ -100,6 +103,8 @@ describe('createSubscriptionCheckoutSession', () => {
 
     const req: any = {
       method: 'POST',
+      get: (header: string) =>
+        header === 'Authorization' ? 'Bearer token' : undefined,
       body: {
         userId: 'u1',
         priceId: 'price_monthly',
@@ -111,6 +116,7 @@ describe('createSubscriptionCheckoutSession', () => {
       json: jest.fn(),
       status: jest.fn().mockReturnThis(),
       send: jest.fn(),
+      set: jest.fn(),
     } as any;
     await createSubscriptionCheckoutSession(req, res);
     expect(mockStripeCustomersCreate).toHaveBeenCalled();
@@ -124,6 +130,8 @@ describe('createSubscriptionCheckoutSession', () => {
     mockUserGet.mockResolvedValue({ get: () => undefined });
     const req: any = {
       method: 'POST',
+      get: (header: string) =>
+        header === 'Authorization' ? 'Bearer token' : undefined,
       body: {
         userId: 'u1',
         priceId: 'price_invalid',
@@ -135,6 +143,7 @@ describe('createSubscriptionCheckoutSession', () => {
       json: jest.fn(),
       status: jest.fn().mockReturnThis(),
       send: jest.fn(),
+      set: jest.fn(),
     } as any;
     await createSubscriptionCheckoutSession(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
@@ -143,11 +152,17 @@ describe('createSubscriptionCheckoutSession', () => {
   });
 
   it('returns 400 on missing parameters', async () => {
-    const req: any = { method: 'POST', body: { userId: 'u1' } };
+    const req: any = {
+      method: 'POST',
+      get: (header: string) =>
+        header === 'Authorization' ? 'Bearer token' : undefined,
+      body: { userId: 'u1' },
+    };
     const res = {
       json: jest.fn(),
       status: jest.fn().mockReturnThis(),
       send: jest.fn(),
+      set: jest.fn(),
     } as any;
     await createSubscriptionCheckoutSession(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
@@ -156,6 +171,8 @@ describe('createSubscriptionCheckoutSession', () => {
   it('rejects disallowed redirect host', async () => {
     const req: any = {
       method: 'POST',
+      get: (header: string) =>
+        header === 'Authorization' ? 'Bearer token' : undefined,
       body: {
         userId: 'u1',
         priceId: 'price_monthly',
@@ -167,6 +184,7 @@ describe('createSubscriptionCheckoutSession', () => {
       json: jest.fn(),
       status: jest.fn().mockReturnThis(),
       send: jest.fn(),
+      set: jest.fn(),
     } as any;
     await createSubscriptionCheckoutSession(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
