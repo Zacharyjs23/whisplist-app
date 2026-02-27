@@ -98,14 +98,13 @@ describe('AdvancedOptionsModal', () => {
       />,
     );
 
-    const cadenceField = getByPlaceholderText('Check-in cadence in days');
-    const memberHintField = getByPlaceholderText(
-      'Who’s in this circle? (optional)',
-    );
+    const getCadenceField = () => getByPlaceholderText('Check-in cadence in days');
+    const getMemberHintField = () =>
+      getByPlaceholderText('Who’s in this circle? (optional)');
 
     await waitFor(() => {
-      expect(cadenceField.props.value).toBe('7');
-      expect(memberHintField.props.value).toBe('Alex');
+      expect(getCadenceField().props.value).toBe('7');
+      expect(getMemberHintField().props.value).toBe('Alex');
     });
 
     rerender(
@@ -129,8 +128,8 @@ describe('AdvancedOptionsModal', () => {
     );
 
     await waitFor(() => {
-      expect(cadenceField.props.value).toBe('3');
-      expect(memberHintField.props.value).toBe('');
+      expect(getCadenceField().props.value).toBe('3');
+      expect(getMemberHintField().props.value).toBe('');
     });
   });
 });
